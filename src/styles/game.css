@@ -1,0 +1,340 @@
+/* ==========================================
+   Game UI Styles
+   ========================================== */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: #1a1a2e;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+
+#root {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+/* ==========================================
+   HUD Styles
+   ========================================== */
+
+.hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.hud > * {
+  pointer-events: auto;
+}
+
+.hud-top {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 8px 16px;
+  border-radius: 8px;
+  color: white;
+  font-size: 14px;
+}
+
+.hud-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.time-icon {
+  font-size: 16px;
+}
+
+.weather-icon {
+  font-size: 14px;
+  margin-left: 4px;
+}
+
+.hud-connection {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.connection-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #888;
+}
+
+.connection-dot.connected {
+  background: #4ade80;
+}
+
+.connection-dot.connecting {
+  background: #fbbf24;
+  animation: pulse 1s infinite;
+}
+
+.connection-dot.error {
+  background: #ef4444;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.hud-player {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: white;
+}
+
+.player-name {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.player-coords {
+  font-size: 12px;
+  color: #aaa;
+  margin-top: 2px;
+}
+
+.hud-controls {
+  position: absolute;
+  bottom: 80px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: #aaa;
+  font-size: 11px;
+}
+
+/* ==========================================
+   Hotbar Styles
+   ========================================== */
+
+.hotbar {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.hotbar-slot {
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.hotbar-slot:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.hotbar-slot.selected {
+  border-color: #fbbf24;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.5);
+}
+
+.slot-number {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.slot-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+}
+
+.slot-quantity {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  font-size: 11px;
+  font-weight: bold;
+  color: white;
+  text-shadow: 1px 1px 2px black;
+}
+
+/* ==========================================
+   Inventory Panel Styles
+   ========================================== */
+
+.inventory-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.inventory-panel {
+  background: #2a2a3e;
+  border: 2px solid #4a4a6e;
+  border-radius: 12px;
+  padding: 20px;
+  min-width: 400px;
+  max-width: 90vw;
+  color: white;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.inventory-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.inventory-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0 8px;
+  line-height: 1;
+}
+
+.close-btn:hover {
+  color: white;
+}
+
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.inventory-slot {
+  width: 56px;
+  height: 56px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.inventory-slot:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.inventory-slot.selected {
+  border-color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+}
+
+.inventory-slot .slot-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+}
+
+.inventory-slot .slot-quantity {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  color: white;
+  text-shadow: 1px 1px 2px black;
+}
+
+.inventory-details {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+  min-height: 80px;
+}
+
+.inventory-details h3 {
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.inventory-details .item-category {
+  font-size: 12px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.inventory-details .item-description {
+  font-size: 14px;
+  color: #ccc;
+  line-height: 1.4;
+}
+
+.inventory-details .item-quantity {
+  font-size: 13px;
+  color: #aaa;
+  margin-top: 8px;
+}
+
+.inventory-details .no-item {
+  color: #666;
+  font-style: italic;
+}
