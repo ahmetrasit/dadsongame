@@ -5,6 +5,7 @@ import type { Season } from './index';
 export type PlantStage = 'seed' | 'sprout' | 'mature' | 'withered';
 export type SoilType = 'grass' | 'sand' | 'rock' | 'fertile' | 'swamp';
 export type PlantSubCategory = 'tree' | 'crop' | 'flower' | 'bush';
+export type PlantInteractionType = 'harvest' | 'chop' | 'water' | 'inspect' | 'pick';
 
 export interface AliveYield {
   resourceId: string;
@@ -31,6 +32,10 @@ export interface PlantDefinition {
   aliveYields: AliveYield[];
   deadYields: DeadYield[];
   spriteKey: string;
+  // Interaction properties
+  interactionRadius: number;
+  interactionTypes: PlantInteractionType[];
+  isBlocking: boolean;
 }
 
 // Plant slice state and actions
@@ -62,6 +67,9 @@ export const defaultPlant = (): PlantDefinition => ({
   aliveYields: [],
   deadYields: [],
   spriteKey: 'plant-default',
+  interactionRadius: 40,
+  interactionTypes: ['harvest', 'inspect'],
+  isBlocking: false,
 });
 
 export const initialPlants: PlantDefinition[] = [
@@ -78,6 +86,9 @@ export const initialPlants: PlantDefinition[] = [
     aliveYields: [{ resourceId: 'res-apple', amount: 2, interval: 7, seasons: ['spring', 'summer', 'autumn'] }],
     deadYields: [{ resourceId: 'res-wood', quantity: 10 }],
     spriteKey: 'plant-apple-tree',
+    interactionRadius: 50,
+    interactionTypes: ['harvest', 'chop', 'inspect'],
+    isBlocking: true,
   },
   {
     id: 'plant-wheat',
@@ -92,6 +103,9 @@ export const initialPlants: PlantDefinition[] = [
     aliveYields: [],
     deadYields: [{ resourceId: 'res-wheat', quantity: 3 }],
     spriteKey: 'plant-wheat',
+    interactionRadius: 30,
+    interactionTypes: ['harvest', 'water', 'inspect'],
+    isBlocking: false,
   },
 ];
 

@@ -3,7 +3,11 @@ import { smoothPolygon } from './splineUtils';
 
 export interface CollisionMapData {
   rivers: { points: Point[] }[];
-  trees: { x: number; y: number }[];
+  plants: { x: number; y: number }[];
+  animals: { x: number; y: number }[];
+  waters: { x: number; y: number }[];
+  // Legacy support
+  trees?: { x: number; y: number }[];
 }
 
 /**
@@ -26,7 +30,7 @@ export function pointInPolygon(point: Point, polygon: Point[]): boolean {
 }
 
 /**
- * Checks if a position collides with any rivers or trees
+ * Checks if a position collides with any rivers, plants, or animals
  * Returns true if there is a collision
  */
 export function checkCollision(x: number, y: number, mapData: CollisionMapData): boolean {
@@ -38,17 +42,36 @@ export function checkCollision(x: number, y: number, mapData: CollisionMapData):
     }
   }
 
-  // Check tree collision (circle)
-  const treeRadius = 12;
+  // Check plant collision (circle) - trees are solid obstacles
+  const plantRadius = 12;
   const playerRadius = 8;
-  for (const tree of mapData.trees) {
-    const dx = x - tree.x;
-    const dy = y - tree.y;
+  for (const plant of mapData.plants) {
+    const dx = x - plant.x;
+    const dy = y - plant.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < treeRadius + playerRadius) {
+    if (dist < plantRadius + playerRadius) {
       return true;
     }
   }
+
+  // Legacy: Check trees if present
+  if (mapData.trees) {
+    for (const tree of mapData.trees) {
+      const dx = x - tree.x;
+      const dy = y - tree.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < plantRadius + playerRadius) {
+        return true;
+      }
+    }
+  }
+
+  // Animals don't block movement (they can be walked through)
+  // In the future, this could be changed based on animal size/type
+
+  // Water bodies don't block by default (wading through shallow water)
+  // In the future, deep water blocking could be checked via definition.isBlocking
+  // This would require passing definitions to this function
 
   return false;
 }

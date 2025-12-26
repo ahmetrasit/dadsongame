@@ -12,7 +12,12 @@ import '@/styles/game.css';
 function App() {
   const { currentScreen, returnToMenu } = useGameStateStore();
   const { setEditing } = useMapEditorStore();
-  const { closeEditor } = useDefinitionsStore();
+  const { closeEditor, initFromFirebase } = useDefinitionsStore();
+
+  // Initialize definitions from Firebase on app start
+  useEffect(() => {
+    initFromFirebase();
+  }, [initFromFirebase]);
 
   // Open map editor when entering mapEditor screen
   useEffect(() => {

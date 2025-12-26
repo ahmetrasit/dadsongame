@@ -13,10 +13,17 @@ export {
   type PlantStage,
   type SoilType,
   type PlantSubCategory,
+  type PlantInteractionType,
   // Animal types
   type AnimalDefinition,
   type AnimalCapability,
   type AnimalSubCategory,
+  type AnimalInteractionType,
   // Resource types
   type ResourceDefinition,
+  // Water types
+  type WaterDefinition,
+  type WaterType,
+  type WaterInteractionType,
+  type FishType,
 } from './definitions';
