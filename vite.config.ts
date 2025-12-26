@@ -4,6 +4,9 @@ import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 
 export default defineConfig({
+  server: {
+    host: '0.0.0.0'
+  },
   plugins: [
     react(),
     VitePWA({
@@ -31,7 +34,8 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,json}']
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024 // 3 MB (default is 2 MB)
       }
     })
   ],
