@@ -44,13 +44,21 @@ export class BootScene extends Phaser.Scene {
   }
 
   private createPlaceholderGraphics(): void {
-    // Player sprite (simple colored rectangle for now)
+    // Player sprite - top-down 3/4 view (20x20px, Factorio-style)
     const playerGraphics = this.make.graphics({ x: 0, y: 0 });
-    playerGraphics.fillStyle(0x3b82f6); // Blue
-    playerGraphics.fillRect(0, 0, 24, 32);
-    playerGraphics.fillStyle(0xfcd34d); // Yellow head
-    playerGraphics.fillRect(4, 2, 16, 12);
-    playerGraphics.generateTexture('player', 24, 32);
+    // Shadow
+    playerGraphics.fillStyle(0x000000, 0.3);
+    playerGraphics.fillEllipse(10, 16, 14, 6);
+    // Body (blue shirt, viewed from above)
+    playerGraphics.fillStyle(0x3b82f6);
+    playerGraphics.fillEllipse(10, 10, 12, 10);
+    // Head (top of head visible)
+    playerGraphics.fillStyle(0xfcd9b6);
+    playerGraphics.fillCircle(10, 6, 5);
+    // Hair on top
+    playerGraphics.fillStyle(0x8b4513);
+    playerGraphics.fillCircle(10, 4, 4);
+    playerGraphics.generateTexture('player', 20, 20);
     playerGraphics.destroy();
 
     // Remote player (different color)
@@ -76,16 +84,34 @@ export class BootScene extends Phaser.Scene {
     grassGraphics.generateTexture('tile-grass', 32, 32);
     grassGraphics.destroy();
 
-    // Tile: Tree
-    const treeGraphics = this.make.graphics({ x: 0, y: 0 });
-    treeGraphics.fillStyle(0x4ade80); // Grass background
-    treeGraphics.fillRect(0, 0, 32, 32);
-    treeGraphics.fillStyle(0x854d0e); // Brown trunk
-    treeGraphics.fillRect(12, 20, 8, 12);
-    treeGraphics.fillStyle(0x166534); // Dark green leaves
-    treeGraphics.fillCircle(16, 12, 12);
-    treeGraphics.generateTexture('tile-tree', 32, 32);
-    treeGraphics.destroy();
+    // Tile: Tree Top (canopy from above - top-down view)
+    const treeTopGraphics = this.make.graphics({ x: 0, y: 0 });
+    // Shadow under canopy
+    treeTopGraphics.fillStyle(0x0f4c2a, 0.5);
+    treeTopGraphics.fillCircle(18, 18, 14);
+    // Main canopy (circular from above)
+    treeTopGraphics.fillStyle(0x166534);
+    treeTopGraphics.fillCircle(16, 16, 14);
+    // Lighter leaf clusters on top
+    treeTopGraphics.fillStyle(0x22c55e);
+    treeTopGraphics.fillCircle(12, 12, 6);
+    treeTopGraphics.fillCircle(20, 14, 5);
+    treeTopGraphics.fillCircle(14, 18, 4);
+    treeTopGraphics.generateTexture('tile-tree-top', 32, 32);
+    treeTopGraphics.destroy();
+
+    // Tile: Tree Bottom (trunk visible from above, with shadow)
+    const treeBottomGraphics = this.make.graphics({ x: 0, y: 0 });
+    // Shadow
+    treeBottomGraphics.fillStyle(0x000000, 0.3);
+    treeBottomGraphics.fillEllipse(18, 24, 16, 8);
+    // Trunk (small circle from above)
+    treeBottomGraphics.fillStyle(0x854d0e);
+    treeBottomGraphics.fillCircle(16, 16, 6);
+    treeBottomGraphics.fillStyle(0x6b4c0a);
+    treeBottomGraphics.fillCircle(14, 14, 2);
+    treeBottomGraphics.generateTexture('tile-tree-bottom', 32, 32);
+    treeBottomGraphics.destroy();
 
     // Tile: Water
     const waterGraphics = this.make.graphics({ x: 0, y: 0 });
@@ -96,17 +122,6 @@ export class BootScene extends Phaser.Scene {
     waterGraphics.fillRect(2, 20, 28, 4);
     waterGraphics.generateTexture('tile-water', 32, 32);
     waterGraphics.destroy();
-
-    // Tile: Rock
-    const rockGraphics = this.make.graphics({ x: 0, y: 0 });
-    rockGraphics.fillStyle(0x4ade80); // Grass background
-    rockGraphics.fillRect(0, 0, 32, 32);
-    rockGraphics.fillStyle(0x6b7280); // Gray rock
-    rockGraphics.fillCircle(16, 20, 10);
-    rockGraphics.fillStyle(0x9ca3af); // Lighter highlight
-    rockGraphics.fillCircle(12, 16, 4);
-    rockGraphics.generateTexture('tile-rock', 32, 32);
-    rockGraphics.destroy();
 
     // Tile: Path
     const pathGraphics = this.make.graphics({ x: 0, y: 0 });

@@ -1,455 +1,161 @@
-# Dad & Son Game - Design Document
+# Dad & Son Game - Design Spec
+
+## CRITICAL: AI Assistant Rules
+- **Use Sonnet agents for all implementations** - never implement directly
+- **Concise summaries only** - just "Done (vX.XXX)" with bullet points
+- **Batch related changes** into single agent calls when possible
+- **Use agents for exploration** - Opus or Sonnet, return summaries only
+- **Never show code snippets** in responses to user
+- **Always run dev server on 0.0.0.0**
+- **Increment version** with each change (src/version.ts)
 
 ## Overview
+2D open-world peaceful survival/management. Player wakes on island, gathers resources, crafts, recruits villagers, trades. No combat. Inspirations: Terraria, Sneaky Sasquatch, RDR.
 
-A 2D open-world peaceful survival/management game. Player wakes up on an island, explores, gathers resources, recruits villagers, and builds a thriving clan. No combat - purely cooperative survival.
+## Time
+**Day length by season:** Summer=75%, Spring=50%, Fall=40%, Winter=30%
+**Year:** 4 season slots × 30 days = 120 days. Player chooses season order during map design. Can repeat (tropical=summer×4). Instant switch at day 30/60/90.
 
-**Inspirations:** Terraria, Sneaky Sasquatch, Red Dead Redemption (open-world feel)
-
----
-
-## Core Gameplay Loop
-
-1. Wake up on island → explore open-world 2D
-2. Gather resources (catch animals, pick plants, mine)
-3. Craft tools and structures
-4. Find villagers → complete quests → recruit → keep fed
-5. Specialize (farming, building, trading, etc.)
-6. Trade at marketplace
-7. Expand to other islands (future)
-
----
-
-## Time System
-
-| Unit | Duration |
-|------|----------|
-| Day | In-game day/night cycle |
-| Season | 30 in-game days |
-| Year | 120 in-game days (4 seasons) |
-
-- Season configuration set during map creation
-- Different islands can have offset seasons (future)
-- Sun exposure varies by time of day and season
-
----
-
-## Creature System
-
-### Hierarchy
-
-```
-Creature (base)
-├── age, health, growth rate, hunger, needs, resource yield
-│
-├── Plant
-│   └── needs: water, sun, soil type
-│
-├── Animal
-│   └── + interaction, speed, intelligence, energy
-│
-└── Human (Player/Villager)
-    └── + crafting, trading, human interactions
-    └── no resource yield
-    └── villagers follow player orders
-```
-
-### Resource Yield (Animals)
-
-```
-aliveYield: { resource, rate, requiresFed }  // milk, eggs, wool
-deadYield: { resources[] }                    // meat, leather, bones
-```
-
----
+## Creatures
+**Hierarchy:** Creature(base: age,health,growthRate,hunger,needs,yield) → Plant(+water,sun,soil) | Animal(+interaction,speed,intelligence,energy) | Human(+crafting,trading,noYield)
+**Yield:** aliveYield{resource,rate,requiresFed} deadYield{resources[]}
 
 ## Plants
-
-### Growth Stages
-
-```
-seed → sprout → mature (harvestable) → withered (gone)
-```
-
-| Property | Crops | Trees |
-|----------|-------|-------|
-| Stages | All 4 | seed → sprout → mature |
-| Permanent | No (withers) | Yes (once mature) |
-| Harvest window | Limited time | Always harvestable |
-| Regrow | Yes, cycles back | Yes, continuous |
-| Season-dependent | Yes | TBD |
-
-### Soil Types (5)
-
-- Grass
-- Sand
-- Rock
-- Fertile
-- Swamp
-
-Plants require suitable soil type to grow.
-
----
+**Stages:** seed→sprout→mature→withered(gone). Trees: permanent at mature.
+**Soil types(5):** grass,sand,rock,fertile,swamp
+**Props:** Crops wither, trees don't. Harvest window limited for crops. Season-dependent.
 
 ## Animals
-
-### Properties
-
-- All base creature properties
-- **Interaction**: capabilities (eat, carry, transport)
-- **Speed**: movement rate
-- **Intelligence**: affects taming, task efficiency
-- **Energy**: depletes when working, regenerates with rest
-
-### Capabilities (per species)
-
-| Capability | Examples |
-|------------|----------|
-| Eat | Rabbit eats carrots |
-| Carry | Donkey pulls cart |
-| Transport | Horse carries humans |
-| Produce | Cow gives milk |
-
-### Behavior
-
-- **Taming**: Required for wild animals. Villager performs taming. Villager stats affect duration + success rate. Failure = just try again.
-- **Breeding**: Automatic. Happiness affects breeding rate.
-- **Feeding**: Increases yield. Not feeding = stops working/producing (no death, no leaving). Resumes when fed.
-- **Baby animals**: No yield, cannot be killed. Wait until mature.
-- **Death**: Natural (old age) or player-killed. No sickness mechanic.
-
----
+**Capabilities:** eat,carry,transport,produce (per species)
+**Behavior:** Taming by villager (stats affect duration/success, retry on fail). Breeding automatic (happiness→rate). Baby: no yield, can't kill.
+**Feeding:** Free-roaming: not fed→stops producing. Enclosed: not fed→dies, no yield.
 
 ## Villagers
-
-### Needs
-
-| Need | Effect if unmet |
-|------|-----------------|
-| Food | Warning → leave |
-| Water | Warning → leave |
-| Shelter | Reduced happiness |
-| Happiness | Determines loyalty |
-
-**Flow:** Needs drop → Warning state → Leave (if not addressed)
-
-No death from neglect - villagers just leave the clan.
-
-### Stats
-
-- Intelligence
-- Strength
-- Speed
-- (Others TBD based on gameplay needs)
-
-### Recruitment
-
-1. Find villager at spawn location
-2. Complete their request/quest
-3. Villager joins clan
-4. Keep fed to retain
-
-### Abilities
-
-Villagers can do everything the player can:
-- Gather resources
-- Craft
-- Tame animals
-- Carry/transport
-- Trade
-
----
-
-## Tool System
-
-### Tool Properties (10)
-
-| Property | Use Cases |
-|----------|-----------|
-| Cutting | Food, plants, trees, rope, fabric |
-| Digging | Soil, sand, roots, burying |
-| Smashing | Rocks, shells, bones, ore |
-| Hammering | Building, shaping metal, nailing |
-| Reaching | High fruits, fishing from shore |
-| Damaging | One-way hunting (animals don't fight back) |
-| Piercing | Fishing spear, sewing, small animal hunting |
-| Grinding | Flour, herbs, pigments, crushing ore |
-| Scooping | Water, grain, sand, liquids |
-| Precision | Fine crafting, medicine, jewelry, traps |
-
-### Star-Based Crafting (Unique Mechanic)
-
-**No predefined tools.** Player allocates "crafting stars" to properties.
-
-**Example:**
-- Total stars available: 5
-- Allocation: 2 cutting + 3 digging
-- Result: Hybrid tool usable for both
-
-**Requirements:**
-- Each task has min/max requirements per property
-- Example: `food cutting: min 1, max 3` (4+ cutting ruins food)
-- Example: `tree chopping: min 3 cutting`
-
-**Star Source:**
-- Total crafting capacity = sum of helping villagers' skills
-- More/better villagers = more stars available
-
-### Tool Physical Properties
-
-- **Length**: Affects storage, reach
-- **Weight**: Affects carrying capacity
-
-### Carrying System
-
-| Container | Holds | Capacity |
-|-----------|-------|----------|
-| Pouch | Tools | Basic (starting) |
-| Satchel | Tools | Crafted upgrade |
-| Basket | Materials | Weight limit |
-
----
-
-## Materials
-
-### Categories (6)
-
-| Category | Examples | Perishable |
-|----------|----------|------------|
-| Food | Meat, milk, vegetables, fruits, juice | Yes |
-| Water | Water | Yes |
-| Metal | Iron, copper, brass, gold | No |
-| Rock | Stone, granite, brick (crafted) | No |
-| Wood | Logs, planks, sticks, branches (natural only) | No |
-| Organics | Wool, cotton, leather, bone, rope, fabric | No |
-
-**Special materials:**
-- **Branches**: Wood subtype, natural only (from trees/bushes), cannot craft from wood
-- **Brick**: Rock subtype, crafted from Rock + Water + Fire
-
-### Processing Chain
-
-```
-Raw Materials → Crafted Materials → Complex Materials
-    ↓                 ↓                   ↓
-  (ore)            (ingot)            (gear)
-```
-
-Processed materials stay in same category, just different item.
-
-### Spoilage System
-
-**What spoils:** Food, juice, water
-
-**Spoilage speed categories:**
-| Category | Examples |
-|----------|----------|
-| Fast | Fresh milk, raw meat, juice |
-| Medium | Vegetables, cooked food |
-| Slow | Dried/salted/preserved items |
-| Never | Rock, metal, gold, wood, organics |
-
-**Preservation:** Crafting can extend shelf life (salting, drying, jarring)
-
-**Spoiled:** Gone completely (no secondary use)
-
----
-
-## Economy & Trading
-
-### Specialization
-
-Emergent from player choice - not locked classes:
-- Farming
-- Building
-- Trading
-- Traveling
-- Animal husbandry
-- Crafting
-
-### Marketplace
-
-| Property | Value |
-|----------|-------|
-| Location | Physical location on map |
-| Scope | Global (one market, access points per island) |
-| Trading | Async (post offer, check later) |
-| Prices | Player-set (materials for materials) |
-| Operator | NPC-facilitated initially |
-| Trades | Partial quantities allowed |
-| Notifications | In-game message on new listings |
-
-**Gold:** Just another metal material (no special currency status)
-
-**Services:** Can purchase services (boat to another island, etc.)
-
-### Listing Behavior
-
-- Perishable listings spoil over time
-- Non-perishable listings stay until accepted/cancelled
-- Partial purchases allowed
-
----
-
-## Multiplayer (Future)
-
-### Teams
-
-- Multiple players form a team
-- No team size limit
-- Shared resources/base
-- Division of labor
-
-### Co-op
-
-- Work on different aspects together
-- Contribute to shared buildings
-- Coordinate via in-game communication
-
-### Inter-team Trading
-
-- Marketplace enables trade between teams
-- No direct interaction required (async)
-
----
-
-## World Structure
-
-### Current Phase
-
-- Single island
-- Open-world 2D exploration
-- Tile-based terrain
-
-### Future Phase
-
-- Multiple islands
-- Connected via bridges/boats
-- Each island can have different:
-  - Biomes
-  - Resources
-  - Season offset
-  - Marketplace access point
-
----
-
-## Buildings & Structures
-
-### Building Types
-
-| Type | Roof | Stars | Function |
-|------|------|-------|----------|
-| Roofed | Yes | Yes (1 per interior tile) | Full features via star allocation |
-| Roofless | No | None | Movement blocking only (walls/compounds) |
-
-**Roofless buildings:**
-- Can contain roofed buildings inside (walled towns)
-- Can be nested (outer wall → inner wall → buildings)
-- Can have gaps (open entrances) or doors
-- No weather protection
-
-### Building Stars (15 Features)
-
-Allocate stars to features based on interior size (1 star per tile).
-
-| # | Feature | Description |
-|---|---------|-------------|
-| 1 | Resting speed | Faster stamina/energy recovery |
-| 2 | Weather protection | Shield from rain, snow, sun exposure |
-| 3 | Storage (general) | Non-perishable material storage |
-| 4 | Cold storage | Perishable storage, slows spoilage |
-| 5 | Crafting speed | Tool crafting bonus |
-| 6 | Kitchen | Food processing, cooking, preservation |
-| 7 | Stables | Animal shelter + breeding bonus |
-| 8 | Happiness | Spa, temple, recreation |
-| 9 | Taming | Taming pen, boosts success rate |
-| 10 | Farming/Greenhouse | Indoor crops, growth speed, season extension |
-| 11 | Healing | Health recovery speed |
-| 12 | Training | Villager stat improvement |
-| 13 | Repair | Tool durability restoration |
-| 14 | Dock | Boat access (future) |
-| 15 | Water collection | Wells, rain barrels |
-
-### Construction Flow
-
-```
-Draw Blueprint → Material List Shown → Gather Materials → Construction (progress bar) → Complete
-```
-
-### Construction Materials
-
-**Walls:**
-- Wood OR Rock (can mix in same building)
-- Based on perimeter length
-- Inner walls optional (dividers)
-
-**Doors:**
-- Metal (hinges) + Wood (panel)
-- Always required, regardless of wall material
-- Minimum 1 door per building
-
-**Roof (roofed buildings only):**
-
-| Tier | Materials Required | Weather Protection |
-|------|-------------------|-------------------|
-| Basic | Wood base + Branches | 1x |
-| Standard | Wood base + Wood | 2x |
-| Reinforced | Wood base + Branches + Rock | 4x |
-| Premium | Wood base + Brick | 8x |
-
-- Wood always required as base
-- Only Basic (branches) can be upgraded to Reinforced (+rock)
-- Brick is crafted: Rock + Water + Fire
-
-**Branches:**
-- Wood subtype (cannot craft from wood)
-- Collected from live or dead trees/bushes
-
-### Blueprint Validation
-
-- Must be enclosed
-- Minimum 2x1 interior space
-- Minimum 1 door (each door uses 1x1 space)
-- Shape does not matter
-
-### Demolition
-
-- Whole building only (no partial)
-- Requires time + effort (progress bar)
-- 100% material reclaim
-
-### Animal Control Pattern
-
-Build roofed building with 2 doors as "airlock":
-- One door faces outside
-- One door faces walled (roofless) area
-- Controls animal movement into enclosed space
-
----
-
-## Future Scope (Not Current Phase)
-
-- Heating system
-- Coal/oil fuel
-- Different food effects (meat = longer hunger satisfaction)
-- Multiple islands
-- Boats/bridges
-- Advanced multiplayer features
-
----
-
-## Technical Notes
-
-### Architecture (from scaffold)
-
-- **Slow state** (Firebase): Inventory, world saves, profiles
-- **Fast state** (in-memory): Positions, actions (synced loosely)
-- **MultiplayerService**: Abstraction layer for backend swapping
-
-### Stack
-
-- Vite + React + TypeScript
-- Phaser 3 (rendering)
-- Zustand (state)
-- Firebase (persistence, initial multiplayer)
-- PWA-ready
+**Needs:** food,water,shelter,happiness
+**States:** Normal(works)→Warning(weak,can't work)→Leaves. No death.
+**Stats:** intelligence,strength(carrying),speed,craftingSkill
+**Recruitment:** Find→complete quest→joins→keep fed
+**Abilities:** Same as player: gather,craft,tame,carry,trade
+
+## Tool Properties(10)
+cutting,digging,smashing,hammering,reaching,damaging,piercing,grinding,scooping,precision
+
+## Crafting
+**Types:** Tool(toolhead+handle+binder), Cart(wheels×2++body+handle+binder), Container(TBD)
+
+### Tool Crafting
+**Baskets:** Toolhead(materials→properties), Handle(wood→length), Binder(sap/string/nails)
+**Toolhead→Properties:** rock→smashing, metal→cutting, bone→precision, etc.
+**Handle:** 1 handle=1 length. Count must match toolhead. Fewer=-20%, More=-10%.
+**Binder:** Sap(≤3 pieces,-10%/over), String(≤10,-10%/over), Nails(unlimited). 1 binder per total piece. Single type only.
+
+### Villager Stars
+**Complexity:** stars≥tool points. **Speed:** stars/points. **Time:** baseHours/speed. Base=1hr(admin configurable).
+No star combining for tools. Combining OK for buildings.
+
+### Task Requirements
+Each task has min/max per property. Ex: cut tree needs cutting≥3, smashing≤2.
+
+### Cart Crafting
+Wheels(2+baskets,≤6 materials each)→speed. Body→capacity. Handle+Binder required.
+
+## Storage & Carrying
+**Storage:** Bags(mobile), Sheds(static in buildings)
+**Human bags(2):** Tool bag(tools only), Material bag(materials only). Upgradeable. Speed penalty by weight.
+**Shed capacity:** area×66 storage points (points=lbs). Formula: area(m²)×2m×3.3×10
+**Carrying:** Hand(strength limit), Basket(1p=strength, 2p=3×capacity,(str1+str2)×1.5 limit), Cart(by body basket,animal or human pulls)
+**Speed penalty:** All containers cause penalty based on weight.
+
+## Materials(6)
+Food(perishable), Water(perishable), Metal, Rock, Wood, Organics
+**Special:** Branches=wood subtype(natural only). Brick=rock subtype(rock+water+fire)
+**Spoilage:** Fast(milk,meat,juice), Medium(vegetables,cooked), Slow(preserved), Never(rock,metal,wood,organics)
+
+## Economy
+**Marketplace:** Physical location, global scope, async trading, player-set prices, partial trades OK, NPC-facilitated.
+**Gold:** Just another metal. **Services:** Boat rides, etc.
+
+## Multiplayer(future)
+Teams(no size limit), shared resources, division of labor. Marketplace for inter-team async trade.
+
+## World
+**Units:** All measurements in meters. Humans=2m tall.
+**Current:** Single island, tile-based. **Future:** Multiple islands via bridges/boats, season offsets.
+
+## Buildings
+**Types:** Roofed(has stars,1/interior tile), Roofless(no stars,movement blocking only,can nest)
+**Features(15):** resting_speed,weather_protection,storage_general,storage_cold,crafting_speed,kitchen,stables,happiness,taming,farming,healing,training,repair,dock,water_collection
+**Construction:** Blueprint→gather materials→build(progress bar)→complete
+**Walls:** Wood or Rock(can mix), perimeter-based. Inner walls optional.
+**Doors:** Metal+Wood always. Min 1/building.
+**Roof tiers:** Basic(wood+branches,1×), Standard(wood+wood,2×), Reinforced(wood+branches+rock,4×), Premium(wood+brick,8×). Only Basic upgradeable.
+**Validation:** Must enclose, min 2×1 interior, min 1 door.
+**Demolition:** Whole only, progress bar, 100% reclaim.
+
+## Tech
+**Stack:** Vite+React+TS, Phaser3, Zustand, Firebase, PWA
+**State:** Slow(Firebase:inventory,saves,profiles), Fast(memory:positions,actions)
+**Admin config:** Base craft time(1hr default)
+
+## Visual Style
+**Perspective:** Top-down 3/4 view (Factorio-style). All sprites viewed from above at slight angle.
+**Tile size:** 32×32px = 1m
+**Player sprite:** 20×20px, top-down view (see top of head/shoulders, not front-facing)
+**Trees:** Top-down canopy view, 2 tiles tall (canopy tile + trunk tile). Canopy renders above player.
+**Shadows:** Objects cast elliptical shadows to indicate depth/perspective.
+**Camera:** Free pan (arrow keys), free zoom (mouse wheel 0.5x-3x). No auto-follow.
+
+## Main Menu
+**Screens:** menu → game | mapEditor | materialEditor | creatureEditor
+**Options:** New Game (choose map), Resume, Editor (Map/Material/Creature)
+**State:** Managed by gameStateStore.ts
+
+## Editors
+
+### Map Editor (E key in game, or via menu)
+**Tools:** Tree (1), River (2), Spawn (3), Eraser (4)
+**River drawing:** Click points, Enter to close polygon, Catmull-Rom smoothing
+**Collision:** Point-in-polygon for rivers, circular for trees
+**Export/Import:** JSON to clipboard
+**Store:** mapEditorStore.ts
+
+### Definition Editor (Shift+D in game, or via menu)
+**Tabs:** Plants, Animals, Materials (resources)
+**Layout:** Card-based, two-column layout, tree sidebar with categories
+**Plant fields:** name, subCategory(tree/crop/flower/bush), growthTime, harvestWindow, seasons, soils, waterNeed, sunNeed, aliveYields[], deadYields[]
+**Animal fields:** name, subCategory(livestock/poultry/wild/pet), capabilities, baseSpeed, baseIntelligence, maxEnergy, tamingDifficulty, aliveYields[], deadYields[]
+**Resource fields:** name, category(food/water/metal/rock/wood/organics), spoilageRate, stackSize
+**Yield structure:** { resourceId, amount, interval (days), seasons[], requiresFed }
+**Export/Import:** JSON to clipboard
+**Store:** definitionsStore.ts
+
+## Version Display
+**File:** src/version.ts - increment with each change
+**Component:** VersionBadge.tsx - shows version top-right on all screens
+
+## Key Files
+- src/App.tsx - main app with screen routing
+- src/stores/gameStateStore.ts - menu/game state
+- src/stores/mapEditorStore.ts - map editor state + map data
+- src/stores/definitionsStore.ts - plants/animals/resources definitions
+- src/components/MainMenu.tsx - main menu
+- src/components/DefinitionEditor.tsx - definition editor UI
+- src/components/EditorToolbar.tsx - map editor toolbar
+- src/game/scenes/MainScene.ts - Phaser game scene
+
+## Current Phase: Editor Foundation (v0.010)
+**Version:** v0.010
+**Theme:** FT salmon (#FFF1E5) with Avenir font
+**Main Menu:** New Game, Resume, Editor (Map Editor, Object Editor)
+**Object Editor:**
+- Three tabs: Plants, Animals, Materials
+- Tree sidebar navigation with subcategories
+- Draft pattern for new items with Save/Cancel buttons and unique name validation
+- Draft pattern for dead yields with Save/Cancel when adding
+- No abbreviations (full words: Spring, Summer, Autumn, Winter, Quantity)
+**Controls:** ESC returns to menu from game
+**Persistence:** localStorage via zustand persist middleware
+**Player:** Top-down sprite (20×20px), WASD movement
+**Camera:** Factorio-style (arrows=pan, wheel=zoom)
+**Map:** Polygon rivers with Catmull-Rom smoothing, placeable trees
+**Next:** Resource gathering, spawning defined creatures on map
