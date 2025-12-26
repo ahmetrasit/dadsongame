@@ -1,10 +1,12 @@
 import Phaser from 'phaser';
 import { TILE_SIZE, MAP_SIZE } from '@/game/config';
-import { useMapEditorStore } from '@/stores/mapEditorStore';
+import { useMapEditorStore, PlantPlacement, AnimalPlacement, WaterPlacement } from '@/stores/mapEditorStore';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
 import { useGameStateStore } from '@/stores/gameStateStore';
+import { useInteractionStore } from '@/stores/interactionStore';
 import { smoothPolygon } from '@/game/utils/splineUtils';
 import { checkCollision } from '@/game/utils/collisionDetection';
+import { findNearestInteractable } from '@/game/utils/interactionDetection';
 
 export class MainScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite;
@@ -14,8 +16,19 @@ export class MainScene extends Phaser.Scene {
   // Graphics for rendering
   private riverGraphics!: Phaser.GameObjects.Graphics;
   private activeRiverGraphics!: Phaser.GameObjects.Graphics;
-  private treeSprites: Phaser.GameObjects.Sprite[] = [];
+  private plantSprites: Map<string, Phaser.GameObjects.Container> = new Map();
+  private animalSprites: Map<string, Phaser.GameObjects.Container> = new Map();
+  private waterSprites: Map<string, Phaser.GameObjects.Container> = new Map();
   private spawnMarker!: Phaser.GameObjects.Graphics;
+
+  // State tracking for diff-based rendering
+  private lastRiversHash = '';
+  private lastActiveRiverHash = '';
+  private lastPlantsHash = '';
+  private lastAnimalsHash = '';
+  private lastWatersHash = '';
+  private lastSpawnHash = '';
+  private lastIsEditing = false;
 
   // Movement
   private readonly MOVE_SPEED = 160;
@@ -31,6 +44,8 @@ export class MainScene extends Phaser.Scene {
     TWO: Phaser.Input.Keyboard.Key;
     THREE: Phaser.Input.Keyboard.Key;
     FOUR: Phaser.Input.Keyboard.Key;
+    FIVE: Phaser.Input.Keyboard.Key;
+    SIX: Phaser.Input.Keyboard.Key;
     ENTER: Phaser.Input.Keyboard.Key;
     ESC: Phaser.Input.Keyboard.Key;
   };
@@ -77,11 +92,13 @@ export class MainScene extends Phaser.Scene {
 
     this.editorKeys = {
       E: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E),
-      D_KEY: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D, false), // false = don't capture for WASD
+      D_KEY: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D, false),
       ONE: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
       TWO: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
       THREE: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
       FOUR: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR),
+      FIVE: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE),
+      SIX: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SIX),
       ENTER: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER),
       ESC: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC),
     };
@@ -102,8 +119,8 @@ export class MainScene extends Phaser.Scene {
       this.handleEditorClick(pointer);
     });
 
-    // Initial render
-    this.renderMapData();
+    // Initial render (force full render)
+    this.renderMapData(true);
   }
 
   update(_time: number, delta: number): void {
@@ -112,13 +129,43 @@ export class MainScene extends Phaser.Scene {
     const mapStore = useMapEditorStore.getState();
     const defStore = useDefinitionsStore.getState();
 
-    // Only allow player movement when neither editor is open
+    // Only allow player movement and interaction when neither editor is open
     if (!mapStore.isEditing && !defStore.isEditorOpen) {
       this.handlePlayerMovement(delta);
+      this.updateInteractionDetection(mapStore, defStore);
+    } else {
+      // Clear interaction target when in editor mode
+      useInteractionStore.getState().clearTarget();
     }
 
     this.handleCameraPan(delta);
     this.renderMapData();
+  }
+
+  private updateInteractionDetection(
+    mapStore: ReturnType<typeof useMapEditorStore.getState>,
+    defStore: ReturnType<typeof useDefinitionsStore.getState>
+  ): void {
+    const interactionStore = useInteractionStore.getState();
+
+    // Find nearest interactable object
+    const target = findNearestInteractable(
+      this.player.x,
+      this.player.y,
+      mapStore.mapData,
+      {
+        plants: defStore.plants,
+        animals: defStore.animals,
+        waters: defStore.waters,
+      }
+    );
+
+    // Update store
+    if (target) {
+      interactionStore.setTarget(target);
+    } else {
+      interactionStore.clearTarget();
+    }
   }
 
   private createGrassBackground(): void {
@@ -136,12 +183,17 @@ export class MainScene extends Phaser.Scene {
     const mapStore = useMapEditorStore.getState();
     const defStore = useDefinitionsStore.getState();
     const gameStateStore = useGameStateStore.getState();
+    const interactionStore = useInteractionStore.getState();
 
+    // E key is used only for interaction (not editor toggle)
     if (Phaser.Input.Keyboard.JustDown(this.editorKeys.E)) {
-      mapStore.toggleEditor();
+      if (!mapStore.isEditing && !defStore.isEditorOpen && interactionStore.currentTarget) {
+        const primaryAction = interactionStore.currentTarget.interactionTypes[0];
+        interactionStore.executeInteraction(primaryAction);
+      }
     }
 
-    // Toggle Definition Editor with Shift+D (to avoid conflict with WASD)
+    // Toggle Definition Editor with Shift+D
     if (Phaser.Input.Keyboard.JustDown(this.editorKeys.D_KEY) &&
         (this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT).isDown)) {
       defStore.toggleEditor();
@@ -152,27 +204,6 @@ export class MainScene extends Phaser.Scene {
       if (!mapStore.isEditing && !defStore.isEditorOpen) {
         gameStateStore.returnToMenu();
         return;
-      }
-    }
-
-    if (mapStore.isEditing) {
-      if (Phaser.Input.Keyboard.JustDown(this.editorKeys.ONE)) {
-        mapStore.setTool('tree');
-      }
-      if (Phaser.Input.Keyboard.JustDown(this.editorKeys.TWO)) {
-        mapStore.setTool('river');
-      }
-      if (Phaser.Input.Keyboard.JustDown(this.editorKeys.THREE)) {
-        mapStore.setTool('spawn');
-      }
-      if (Phaser.Input.Keyboard.JustDown(this.editorKeys.FOUR)) {
-        mapStore.setTool('eraser');
-      }
-      if (Phaser.Input.Keyboard.JustDown(this.editorKeys.ENTER)) {
-        mapStore.closeRiver();
-      }
-      if (Phaser.Input.Keyboard.JustDown(this.editorKeys.ESC)) {
-        mapStore.cancelRiver();
       }
     }
   }
@@ -193,8 +224,14 @@ export class MainScene extends Phaser.Scene {
     }
 
     switch (store.currentTool) {
-      case 'tree':
-        store.addTree(x, y);
+      case 'plant':
+        store.addPlant(x, y);
+        break;
+      case 'animal':
+        store.addAnimal(x, y);
+        break;
+      case 'water':
+        store.addWater(x, y);
         break;
       case 'river':
         store.addRiverPoint({ x, y });
@@ -209,16 +246,68 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
-  private renderMapData(): void {
-    const store = useMapEditorStore.getState();
-    const { mapData, activeRiver, isEditing } = store;
+  private hashData(data: unknown): string {
+    return JSON.stringify(data);
+  }
 
-    // Clear and redraw rivers
+  private renderMapData(forceRender = false): void {
+    const mapStore = useMapEditorStore.getState();
+    const defStore = useDefinitionsStore.getState();
+    const { mapData, activeRiver, isEditing } = mapStore;
+
+    // Check if editing mode changed (need to update labels)
+    const editingChanged = isEditing !== this.lastIsEditing;
+    this.lastIsEditing = isEditing;
+
+    // Rivers - only update if changed
+    const riversHash = this.hashData(mapData.rivers);
+    if (forceRender || riversHash !== this.lastRiversHash) {
+      this.lastRiversHash = riversHash;
+      this.renderRivers(mapData.rivers);
+    }
+
+    // Active river - only update if changed
+    const activeRiverHash = this.hashData(activeRiver);
+    if (forceRender || activeRiverHash !== this.lastActiveRiverHash) {
+      this.lastActiveRiverHash = activeRiverHash;
+      this.renderActiveRiver(activeRiver);
+    }
+
+    // Plants - only update if changed or editing mode changed
+    const plantsHash = this.hashData(mapData.plants);
+    if (forceRender || plantsHash !== this.lastPlantsHash || editingChanged) {
+      this.lastPlantsHash = plantsHash;
+      this.updatePlants(mapData.plants, defStore.plants, isEditing);
+    }
+
+    // Animals - only update if changed or editing mode changed
+    const animalsHash = this.hashData(mapData.animals);
+    if (forceRender || animalsHash !== this.lastAnimalsHash || editingChanged) {
+      this.lastAnimalsHash = animalsHash;
+      this.updateAnimals(mapData.animals, defStore.animals, isEditing);
+    }
+
+    // Waters - only update if changed or editing mode changed
+    const watersHash = this.hashData(mapData.waters);
+    if (forceRender || watersHash !== this.lastWatersHash || editingChanged) {
+      this.lastWatersHash = watersHash;
+      this.updateWaters(mapData.waters, defStore.waters, isEditing);
+    }
+
+    // Spawn marker - only update if changed or editing mode changed
+    const spawnHash = this.hashData(mapData.spawn);
+    if (forceRender || spawnHash !== this.lastSpawnHash || editingChanged) {
+      this.lastSpawnHash = spawnHash;
+      this.renderSpawnMarker(mapData.spawn, isEditing);
+    }
+  }
+
+  private renderRivers(rivers: { points: { x: number; y: number }[] }[]): void {
     this.riverGraphics.clear();
     this.riverGraphics.fillStyle(0x3b82f6, 0.8);
     this.riverGraphics.lineStyle(2, 0x2563eb, 1);
 
-    for (const river of mapData.rivers) {
+    for (const river of rivers) {
       if (river.points.length >= 3) {
         const smoothed = smoothPolygon(river.points);
         this.riverGraphics.beginPath();
@@ -231,8 +320,9 @@ export class MainScene extends Phaser.Scene {
         this.riverGraphics.strokePath();
       }
     }
+  }
 
-    // Draw active river being edited
+  private renderActiveRiver(activeRiver: { x: number; y: number }[]): void {
     this.activeRiverGraphics.clear();
     if (activeRiver.length > 0) {
       this.activeRiverGraphics.lineStyle(2, 0x60a5fa, 1);
@@ -249,26 +339,322 @@ export class MainScene extends Phaser.Scene {
         this.activeRiverGraphics.fillCircle(point.x, point.y, 4);
       }
     }
+  }
 
-    // Update trees - remove old, add new
-    for (const sprite of this.treeSprites) {
-      sprite.destroy();
+  private updatePlants(
+    placements: PlantPlacement[],
+    definitions: { id: string; name: string; subCategory: string }[],
+    isEditing: boolean
+  ): void {
+    const currentIds = new Set(placements.map(p => p.id));
+
+    // Remove sprites that no longer exist
+    for (const [id, container] of this.plantSprites) {
+      if (!currentIds.has(id)) {
+        container.destroy();
+        this.plantSprites.delete(id);
+      }
     }
-    this.treeSprites = [];
 
-    for (const tree of mapData.trees) {
-      const sprite = this.add.sprite(tree.x, tree.y, 'tile-tree-top');
-      sprite.setDepth(5);
-      this.treeSprites.push(sprite);
+    // Add or update sprites
+    for (const placement of placements) {
+      const existing = this.plantSprites.get(placement.id);
+
+      if (existing) {
+        // Update position if changed
+        if (existing.x !== placement.x || existing.y !== placement.y) {
+          existing.setPosition(placement.x, placement.y);
+        }
+        // Update label visibility based on editing mode
+        this.updatePlantLabel(existing, placement, definitions, isEditing);
+      } else {
+        // Create new sprite
+        const container = this.createPlantSprite(placement, definitions, isEditing);
+        this.plantSprites.set(placement.id, container);
+      }
+    }
+  }
+
+  private createPlantSprite(
+    placement: PlantPlacement,
+    definitions: { id: string; name: string; subCategory: string }[],
+    isEditing: boolean
+  ): Phaser.GameObjects.Container {
+    const definition = definitions.find(p => p.id === placement.definitionId);
+    const container = this.add.container(placement.x, placement.y);
+
+    // Create sprite
+    const spriteKey = definition?.subCategory === 'tree' ? 'tile-tree-top' : 'tile-grass';
+    const sprite = this.add.sprite(0, 0, spriteKey);
+
+    // Add tint based on plant type
+    if (definition) {
+      const colorMap: Record<string, number> = {
+        tree: 0x22c55e,
+        crop: 0xeab308,
+        flower: 0xec4899,
+        bush: 0x84cc16,
+      };
+      sprite.setTint(colorMap[definition.subCategory] || 0xffffff);
     }
 
-    // Draw spawn marker in edit mode
+    container.add(sprite);
+
+    // Add label if editing
+    if (isEditing && definition) {
+      const label = this.add.text(0, 20, definition.name, {
+        fontSize: '10px',
+        color: '#ffffff',
+        backgroundColor: '#000000aa',
+        padding: { x: 2, y: 1 },
+      });
+      label.setOrigin(0.5, 0);
+      label.setName('label');
+      container.add(label);
+    }
+
+    container.setDepth(5);
+    return container;
+  }
+
+  private updatePlantLabel(
+    container: Phaser.GameObjects.Container,
+    placement: PlantPlacement,
+    definitions: { id: string; name: string; subCategory: string }[],
+    isEditing: boolean
+  ): void {
+    const existingLabel = container.getByName('label') as Phaser.GameObjects.Text | null;
+    const definition = definitions.find(p => p.id === placement.definitionId);
+
+    if (isEditing && definition) {
+      if (!existingLabel) {
+        const label = this.add.text(0, 20, definition.name, {
+          fontSize: '10px',
+          color: '#ffffff',
+          backgroundColor: '#000000aa',
+          padding: { x: 2, y: 1 },
+        });
+        label.setOrigin(0.5, 0);
+        label.setName('label');
+        container.add(label);
+      }
+    } else if (existingLabel) {
+      existingLabel.destroy();
+    }
+  }
+
+  private updateAnimals(
+    placements: AnimalPlacement[],
+    definitions: { id: string; name: string; subCategory: string }[],
+    isEditing: boolean
+  ): void {
+    const currentIds = new Set(placements.map(p => p.id));
+
+    // Remove sprites that no longer exist
+    for (const [id, container] of this.animalSprites) {
+      if (!currentIds.has(id)) {
+        container.destroy();
+        this.animalSprites.delete(id);
+      }
+    }
+
+    // Add or update sprites
+    for (const placement of placements) {
+      const existing = this.animalSprites.get(placement.id);
+
+      if (existing) {
+        // Update position if changed
+        if (existing.x !== placement.x || existing.y !== placement.y) {
+          existing.setPosition(placement.x, placement.y);
+        }
+        // Update label visibility based on editing mode
+        this.updateAnimalLabel(existing, placement, definitions, isEditing);
+      } else {
+        // Create new sprite
+        const container = this.createAnimalSprite(placement, definitions, isEditing);
+        this.animalSprites.set(placement.id, container);
+      }
+    }
+  }
+
+  private createAnimalSprite(
+    placement: AnimalPlacement,
+    definitions: { id: string; name: string; subCategory: string }[],
+    isEditing: boolean
+  ): Phaser.GameObjects.Container {
+    const definition = definitions.find(a => a.id === placement.definitionId);
+    const container = this.add.container(placement.x, placement.y);
+
+    // Create colored circle
+    const graphics = this.add.graphics();
+    const colorMap: Record<string, number> = {
+      livestock: 0x8b4513,
+      poultry: 0xffa500,
+      wild: 0x808080,
+      pet: 0xff69b4,
+    };
+    const color = definition ? (colorMap[definition.subCategory] || 0xffffff) : 0xffffff;
+
+    graphics.fillStyle(color, 1);
+    graphics.fillCircle(0, 0, 12);
+    graphics.lineStyle(2, 0x000000, 1);
+    graphics.strokeCircle(0, 0, 12);
+
+    container.add(graphics);
+
+    // Add label if editing
+    if (isEditing && definition) {
+      const label = this.add.text(0, 18, definition.name, {
+        fontSize: '10px',
+        color: '#ffffff',
+        backgroundColor: '#000000aa',
+        padding: { x: 2, y: 1 },
+      });
+      label.setOrigin(0.5, 0);
+      label.setName('label');
+      container.add(label);
+    }
+
+    container.setDepth(6);
+    return container;
+  }
+
+  private updateAnimalLabel(
+    container: Phaser.GameObjects.Container,
+    placement: AnimalPlacement,
+    definitions: { id: string; name: string; subCategory: string }[],
+    isEditing: boolean
+  ): void {
+    const existingLabel = container.getByName('label') as Phaser.GameObjects.Text | null;
+    const definition = definitions.find(a => a.id === placement.definitionId);
+
+    if (isEditing && definition) {
+      if (!existingLabel) {
+        const label = this.add.text(0, 18, definition.name, {
+          fontSize: '10px',
+          color: '#ffffff',
+          backgroundColor: '#000000aa',
+          padding: { x: 2, y: 1 },
+        });
+        label.setOrigin(0.5, 0);
+        label.setName('label');
+        container.add(label);
+      }
+    } else if (existingLabel) {
+      existingLabel.destroy();
+    }
+  }
+
+  private updateWaters(
+    placements: WaterPlacement[],
+    definitions: { id: string; name: string; waterType: string }[],
+    isEditing: boolean
+  ): void {
+    const currentIds = new Set(placements.map(p => p.id));
+
+    // Remove sprites that no longer exist
+    for (const [id, container] of this.waterSprites) {
+      if (!currentIds.has(id)) {
+        container.destroy();
+        this.waterSprites.delete(id);
+      }
+    }
+
+    // Add or update sprites
+    for (const placement of placements) {
+      const existing = this.waterSprites.get(placement.id);
+
+      if (existing) {
+        // Update position if changed
+        if (existing.x !== placement.x || existing.y !== placement.y) {
+          existing.setPosition(placement.x, placement.y);
+        }
+        // Update label visibility based on editing mode
+        this.updateWaterLabel(existing, placement, definitions, isEditing);
+      } else {
+        // Create new sprite
+        const container = this.createWaterSprite(placement, definitions, isEditing);
+        this.waterSprites.set(placement.id, container);
+      }
+    }
+  }
+
+  private createWaterSprite(
+    placement: WaterPlacement,
+    definitions: { id: string; name: string; waterType: string }[],
+    isEditing: boolean
+  ): Phaser.GameObjects.Container {
+    const definition = definitions.find(w => w.id === placement.definitionId);
+    const container = this.add.container(placement.x, placement.y);
+
+    // Create colored circle for water
+    const graphics = this.add.graphics();
+    const colorMap: Record<string, number> = {
+      river: 0x3b82f6,
+      pond: 0x60a5fa,
+      lake: 0x2563eb,
+      ocean: 0x1d4ed8,
+      well: 0x6b7280,
+    };
+    const color = definition ? (colorMap[definition.waterType] || 0x3b82f6) : 0x3b82f6;
+
+    graphics.fillStyle(color, 0.8);
+    graphics.fillCircle(0, 0, 20);
+    graphics.lineStyle(2, 0x1e40af, 1);
+    graphics.strokeCircle(0, 0, 20);
+
+    container.add(graphics);
+
+    // Add label if editing
+    if (isEditing && definition) {
+      const label = this.add.text(0, 26, definition.name, {
+        fontSize: '10px',
+        color: '#ffffff',
+        backgroundColor: '#000000aa',
+        padding: { x: 2, y: 1 },
+      });
+      label.setOrigin(0.5, 0);
+      label.setName('label');
+      container.add(label);
+    }
+
+    container.setDepth(4); // Below plants/animals but above grass
+    return container;
+  }
+
+  private updateWaterLabel(
+    container: Phaser.GameObjects.Container,
+    placement: WaterPlacement,
+    definitions: { id: string; name: string; waterType: string }[],
+    isEditing: boolean
+  ): void {
+    const existingLabel = container.getByName('label') as Phaser.GameObjects.Text | null;
+    const definition = definitions.find(w => w.id === placement.definitionId);
+
+    if (isEditing && definition) {
+      if (!existingLabel) {
+        const label = this.add.text(0, 26, definition.name, {
+          fontSize: '10px',
+          color: '#ffffff',
+          backgroundColor: '#000000aa',
+          padding: { x: 2, y: 1 },
+        });
+        label.setOrigin(0.5, 0);
+        label.setName('label');
+        container.add(label);
+      }
+    } else if (existingLabel) {
+      existingLabel.destroy();
+    }
+  }
+
+  private renderSpawnMarker(spawn: { x: number; y: number }, isEditing: boolean): void {
     this.spawnMarker.clear();
     if (isEditing) {
       this.spawnMarker.lineStyle(2, 0x22c55e, 1);
-      this.spawnMarker.strokeCircle(mapData.spawn.x, mapData.spawn.y, 12);
-      this.spawnMarker.lineBetween(mapData.spawn.x - 8, mapData.spawn.y, mapData.spawn.x + 8, mapData.spawn.y);
-      this.spawnMarker.lineBetween(mapData.spawn.x, mapData.spawn.y - 8, mapData.spawn.x, mapData.spawn.y + 8);
+      this.spawnMarker.strokeCircle(spawn.x, spawn.y, 12);
+      this.spawnMarker.lineBetween(spawn.x - 8, spawn.y, spawn.x + 8, spawn.y);
+      this.spawnMarker.lineBetween(spawn.x, spawn.y - 8, spawn.x, spawn.y + 8);
     }
   }
 

@@ -4,6 +4,7 @@ import { EditorToolbar } from '@/components/EditorToolbar';
 import { DefinitionEditor } from '@/components/DefinitionEditor';
 import { MainMenu } from '@/components/MainMenu';
 import { VersionBadge } from '@/components/VersionBadge';
+import { InteractionPrompt } from '@/components/InteractionPrompt';
 import { useGameStateStore } from '@/stores/gameStateStore';
 import { useMapEditorStore } from '@/stores/mapEditorStore';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
@@ -12,7 +13,12 @@ import '@/styles/game.css';
 function App() {
   const { currentScreen, returnToMenu } = useGameStateStore();
   const { setEditing } = useMapEditorStore();
-  const { closeEditor } = useDefinitionsStore();
+  const { closeEditor, initFromFirebase } = useDefinitionsStore();
+
+  // Initialize definitions from Firebase on app start
+  useEffect(() => {
+    initFromFirebase();
+  }, [initFromFirebase]);
 
   // Open map editor when entering mapEditor screen
   useEffect(() => {
@@ -53,6 +59,9 @@ function App() {
 
       {/* Show editor toolbar only in game and mapEditor modes */}
       {(currentScreen === 'game' || currentScreen === 'mapEditor') && <EditorToolbar />}
+
+      {/* Show interaction prompt in game mode */}
+      {currentScreen === 'game' && <InteractionPrompt />}
 
       {/* Show definition editor in materialEditor and creatureEditor modes */}
       {currentScreen === 'materialEditor' && (

@@ -4,6 +4,7 @@ import type { AliveYield, DeadYield } from './index';
 // Animal-specific types
 export type AnimalCapability = 'eat' | 'carry' | 'transport' | 'produce';
 export type AnimalSubCategory = 'livestock' | 'poultry' | 'wild' | 'pet';
+export type AnimalInteractionType = 'pet' | 'feed' | 'milk' | 'shear' | 'ride' | 'collect' | 'tame' | 'inspect';
 
 export interface AnimalDefinition {
   id: string;
@@ -18,6 +19,10 @@ export interface AnimalDefinition {
   aliveYields: AliveYield[];
   deadYields: DeadYield[];
   spriteKey: string;
+  // Interaction properties
+  interactionRadius: number;
+  interactionTypes: AnimalInteractionType[];
+  isBlocking: boolean;
 }
 
 // Animal slice state and actions
@@ -49,6 +54,9 @@ export const defaultAnimal = (): AnimalDefinition => ({
   aliveYields: [],
   deadYields: [],
   spriteKey: 'animal-default',
+  interactionRadius: 40,
+  interactionTypes: ['inspect', 'tame'],
+  isBlocking: false,
 });
 
 export const initialAnimals: AnimalDefinition[] = [
@@ -68,6 +76,9 @@ export const initialAnimals: AnimalDefinition[] = [
       { resourceId: 'res-leather', quantity: 2 },
     ],
     spriteKey: 'animal-cow',
+    interactionRadius: 50,
+    interactionTypes: ['pet', 'feed', 'milk', 'inspect'],
+    isBlocking: true,
   },
   {
     id: 'animal-chicken',
@@ -82,6 +93,9 @@ export const initialAnimals: AnimalDefinition[] = [
     aliveYields: [{ resourceId: 'res-egg', amount: 1, interval: 1, seasons: ['spring', 'summer', 'autumn', 'winter'] }],
     deadYields: [{ resourceId: 'res-meat', quantity: 2 }],
     spriteKey: 'animal-chicken',
+    interactionRadius: 30,
+    interactionTypes: ['pet', 'feed', 'collect', 'inspect'],
+    isBlocking: false,
   },
 ];
 
