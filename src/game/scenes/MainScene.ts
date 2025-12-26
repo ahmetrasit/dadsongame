@@ -3,8 +3,10 @@ import { TILE_SIZE, MAP_SIZE } from '@/game/config';
 import { useMapEditorStore, PlantPlacement, AnimalPlacement, WaterPlacement } from '@/stores/mapEditorStore';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
 import { useGameStateStore } from '@/stores/gameStateStore';
+import { useInteractionStore } from '@/stores/interactionStore';
 import { smoothPolygon } from '@/game/utils/splineUtils';
 import { checkCollision } from '@/game/utils/collisionDetection';
+import { findNearestInteractable } from '@/game/utils/interactionDetection';
 
 export class MainScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite;
@@ -127,13 +129,43 @@ export class MainScene extends Phaser.Scene {
     const mapStore = useMapEditorStore.getState();
     const defStore = useDefinitionsStore.getState();
 
-    // Only allow player movement when neither editor is open
+    // Only allow player movement and interaction when neither editor is open
     if (!mapStore.isEditing && !defStore.isEditorOpen) {
       this.handlePlayerMovement(delta);
+      this.updateInteractionDetection(mapStore, defStore);
+    } else {
+      // Clear interaction target when in editor mode
+      useInteractionStore.getState().clearTarget();
     }
 
     this.handleCameraPan(delta);
     this.renderMapData();
+  }
+
+  private updateInteractionDetection(
+    mapStore: ReturnType<typeof useMapEditorStore.getState>,
+    defStore: ReturnType<typeof useDefinitionsStore.getState>
+  ): void {
+    const interactionStore = useInteractionStore.getState();
+
+    // Find nearest interactable object
+    const target = findNearestInteractable(
+      this.player.x,
+      this.player.y,
+      mapStore.mapData,
+      {
+        plants: defStore.plants,
+        animals: defStore.animals,
+        waters: defStore.waters,
+      }
+    );
+
+    // Update store
+    if (target) {
+      interactionStore.setTarget(target);
+    } else {
+      interactionStore.clearTarget();
+    }
   }
 
   private createGrassBackground(): void {
@@ -151,9 +183,17 @@ export class MainScene extends Phaser.Scene {
     const mapStore = useMapEditorStore.getState();
     const defStore = useDefinitionsStore.getState();
     const gameStateStore = useGameStateStore.getState();
+    const interactionStore = useInteractionStore.getState();
 
     if (Phaser.Input.Keyboard.JustDown(this.editorKeys.E)) {
-      mapStore.toggleEditor();
+      // If not in editor mode and there's an interaction target, trigger interaction
+      if (!mapStore.isEditing && !defStore.isEditorOpen && interactionStore.currentTarget) {
+        const primaryAction = interactionStore.currentTarget.interactionTypes[0];
+        interactionStore.executeInteraction(primaryAction);
+      } else {
+        // Otherwise toggle the map editor
+        mapStore.toggleEditor();
+      }
     }
 
     // Toggle Definition Editor with Shift+D
