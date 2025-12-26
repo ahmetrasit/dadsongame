@@ -1,7 +1,8 @@
 # Dad & Son Game - Design Spec
 
 ## CRITICAL: AI Assistant Rules
-- **Use Sonnet agents for all implementations** - never implement directly
+- **Two sonnet agents always** - one for implementation, one for review
+- **Never implement before confirmation** - confirm understanding concisely first
 - **Concise summaries only** - just "Done (vX.XXX)" with bullet points
 - **Batch related changes** into single agent calls when possible
 - **Use agents for exploration** - Opus or Sonnet, return summaries only

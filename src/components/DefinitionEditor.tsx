@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useDefinitionsStore, Season, SoilType, AnimalCapability, DeadYield, AliveYield, PlantSubCategory, AnimalSubCategory } from '@/stores/definitionsStore';
+import { useDefinitionsStore, Season, SoilType, DeadYield, AliveYield, PlantSubCategory, AnimalSubCategory } from '@/stores/definitionsStore';
 
 interface DefinitionEditorProps {
   initialTab?: 'plants' | 'animals' | 'resources';
@@ -564,7 +564,7 @@ function PlantForm({ item, isDraft, onSave, onCancel }: { item: any; isDraft?: b
   };
 
   const handleAddAliveYield = () => {
-    handleChange('aliveYields', [...item.aliveYields, { resourceId: '', amount: 1, interval: 7, seasons: ['spring', 'summer', 'autumn', 'winter'], requiresFed: false }]);
+    handleChange('aliveYields', [...item.aliveYields, { resourceId: '', amount: 1, interval: 7, seasons: ['spring', 'summer', 'autumn', 'winter'] }]);
   };
 
   const handleRemoveAliveYield = (index: number) => {
@@ -825,15 +825,6 @@ function PlantForm({ item, isDraft, onSave, onCancel }: { item: any; isDraft?: b
                   handleAliveYieldChange(i, { ...ay, seasons: newSeasons });
                 }}
               />
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: '#333' }}>
-                <input
-                  type="checkbox"
-                  checked={ay.requiresFed}
-                  onChange={(e) => handleAliveYieldChange(i, { ...ay, requiresFed: e.target.checked })}
-                  style={{ accentColor: '#0D7680' }}
-                />
-                Fed
-              </label>
             </div>
           ))}
           <button
@@ -978,15 +969,8 @@ function AnimalForm({ item, isDraft, onSave, onCancel }: { item: any; isDraft?: 
     }
   };
 
-  const handleCapabilityToggle = (capability: AnimalCapability) => {
-    const capabilities = item.capabilities.includes(capability)
-      ? item.capabilities.filter((c: AnimalCapability) => c !== capability)
-      : [...item.capabilities, capability];
-    handleChange('capabilities', capabilities);
-  };
-
   const handleAddAliveYield = () => {
-    handleChange('aliveYields', [...item.aliveYields, { resourceId: '', amount: 1, interval: 7, seasons: ['spring', 'summer', 'autumn', 'winter'], requiresFed: false }]);
+    handleChange('aliveYields', [...item.aliveYields, { resourceId: '', amount: 1, interval: 7, seasons: ['spring', 'summer', 'autumn', 'winter'] }]);
   };
 
   const handleRemoveAliveYield = (index: number) => {
@@ -1026,7 +1010,6 @@ function AnimalForm({ item, isDraft, onSave, onCancel }: { item: any; isDraft?: 
     handleChange('deadYields', updated);
   };
 
-  const capabilities: AnimalCapability[] = ['eat', 'carry', 'transport', 'produce'];
   const subCategories: AnimalSubCategory[] = ['livestock', 'poultry', 'wild', 'pet'];
   const seasons: Season[] = ['spring', 'summer', 'autumn', 'winter'];
 
@@ -1069,6 +1052,15 @@ function AnimalForm({ item, isDraft, onSave, onCancel }: { item: any; isDraft?: 
             width="150px"
             options={subCategories.map(cat => ({ value: cat, label: cat.charAt(0).toUpperCase() + cat.slice(1) }))}
           />
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: '#333' }}>
+            <input
+              type="checkbox"
+              checked={item.canPull}
+              onChange={(e) => handleChange('canPull', e.target.checked)}
+              style={{ accentColor: '#0D7680' }}
+            />
+            Can Pull
+          </label>
           <div style={{ flex: 1 }}></div>
           {isDraft ? (
             <>
@@ -1127,7 +1119,7 @@ function AnimalForm({ item, isDraft, onSave, onCancel }: { item: any; isDraft?: 
         </FieldRow>
       </Card>
 
-      {/* Stats and Capabilities in two columns */}
+      {/* Stats and Animal Needs in two columns */}
       <TwoColumnRow>
         <Card title="Stats" style={{ flex: 1 }}>
           <SliderField
@@ -1136,32 +1128,11 @@ function AnimalForm({ item, isDraft, onSave, onCancel }: { item: any; isDraft?: 
             onChange={(e: any) => handleChange('baseSpeed', Number(e.target.value))}
           />
           <SliderField
-            label="Intelligence"
-            value={item.baseIntelligence}
-            onChange={(e: any) => handleChange('baseIntelligence', Number(e.target.value))}
-          />
-          <SliderField
             label="Max Energy"
             value={item.maxEnergy}
             onChange={(e: any) => handleChange('maxEnergy', Number(e.target.value))}
             max={200}
           />
-        </Card>
-
-        <Card title="Capabilities" style={{ flex: 1 }}>
-          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '16px' }}>
-            {capabilities.map((capability) => (
-              <label key={capability} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: '#333' }}>
-                <input
-                  type="checkbox"
-                  checked={item.capabilities.includes(capability)}
-                  onChange={() => handleCapabilityToggle(capability)}
-                  style={{ accentColor: '#0D7680' }}
-                />
-                {capability.charAt(0).toUpperCase() + capability.slice(1)}
-              </label>
-            ))}
-          </div>
           <SliderField
             label={`Taming ${item.tamingDifficulty}/10`}
             value={item.tamingDifficulty}
@@ -1169,6 +1140,29 @@ function AnimalForm({ item, isDraft, onSave, onCancel }: { item: any; isDraft?: 
             min={1}
             max={10}
           />
+        </Card>
+
+        <Card title="Animal Needs" style={{ flex: 1 }}>
+          <FieldRow>
+            <CompactInput
+              label="Food"
+              type="number"
+              value={item.foodNeeds}
+              onChange={(e: any) => handleChange('foodNeeds', Number(e.target.value))}
+              width="60px"
+            />
+            <span style={{ color: '#888', fontSize: '13px' }}>per day</span>
+          </FieldRow>
+          <FieldRow>
+            <CompactInput
+              label="Water"
+              type="number"
+              value={item.waterNeeds}
+              onChange={(e: any) => handleChange('waterNeeds', Number(e.target.value))}
+              width="60px"
+            />
+            <span style={{ color: '#888', fontSize: '13px' }}>per day</span>
+          </FieldRow>
         </Card>
       </TwoColumnRow>
 
@@ -1241,15 +1235,6 @@ function AnimalForm({ item, isDraft, onSave, onCancel }: { item: any; isDraft?: 
                   handleAliveYieldChange(i, { ...ay, seasons: newSeasons });
                 }}
               />
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: '#333' }}>
-                <input
-                  type="checkbox"
-                  checked={ay.requiresFed}
-                  onChange={(e) => handleAliveYieldChange(i, { ...ay, requiresFed: e.target.checked })}
-                  style={{ accentColor: '#0D7680' }}
-                />
-                Fed
-              </label>
             </div>
           ))}
           <button

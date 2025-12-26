@@ -7,7 +7,6 @@ export interface AliveYield {
   amount: number;          // How much per harvest
   interval: number;        // Game days between yields
   seasons: Season[];       // Which seasons this yield is available
-  requiresFed: boolean;
 }
 
 export interface DeadYield {
@@ -44,11 +43,12 @@ export interface AnimalDefinition {
   id: string;
   name: string;
   subCategory: AnimalSubCategory;
-  capabilities: AnimalCapability[];
   baseSpeed: number;
-  baseIntelligence: number;
   maxEnergy: number;
   tamingDifficulty: number; // 1-10
+  canPull: boolean;
+  foodNeeds: number; // Daily food requirement
+  waterNeeds: number; // Daily water requirement
   aliveYields: AliveYield[];
   deadYields: DeadYield[];
   spriteKey: string;
@@ -141,11 +141,12 @@ const defaultAnimal = (): AnimalDefinition => ({
   id: genId('animal'),
   name: 'New Animal',
   subCategory: 'wild',
-  capabilities: ['eat'],
   baseSpeed: 50,
-  baseIntelligence: 30,
   maxEnergy: 100,
   tamingDifficulty: 5,
+  canPull: false,
+  foodNeeds: 5,
+  waterNeeds: 5,
   aliveYields: [],
   deadYields: [],
   spriteKey: 'animal-default',
@@ -172,7 +173,7 @@ const initialDefinitions: GameDefinitions = {
       suitableSoils: ['grass', 'fertile'],
       waterNeed: 40,
       sunNeed: 60,
-      aliveYields: [{ resourceId: 'res-apple', amount: 2, interval: 7, seasons: ['spring', 'summer', 'autumn'], requiresFed: false }],
+      aliveYields: [{ resourceId: 'res-apple', amount: 2, interval: 7, seasons: ['spring', 'summer', 'autumn'] }],
       deadYields: [{ resourceId: 'res-wood', quantity: 10 }],
       spriteKey: 'plant-apple-tree',
     },
@@ -196,12 +197,13 @@ const initialDefinitions: GameDefinitions = {
       id: 'animal-cow',
       name: 'Cow',
       subCategory: 'livestock',
-      capabilities: ['eat', 'produce'],
       baseSpeed: 30,
-      baseIntelligence: 20,
       maxEnergy: 100,
       tamingDifficulty: 3,
-      aliveYields: [{ resourceId: 'res-milk', amount: 1, interval: 1, seasons: ['spring', 'summer', 'autumn', 'winter'], requiresFed: true }],
+      canPull: true,
+      foodNeeds: 8,
+      waterNeeds: 10,
+      aliveYields: [{ resourceId: 'res-milk', amount: 1, interval: 1, seasons: ['spring', 'summer', 'autumn', 'winter'] }],
       deadYields: [
         { resourceId: 'res-meat', quantity: 8 },
         { resourceId: 'res-leather', quantity: 2 },
@@ -212,12 +214,13 @@ const initialDefinitions: GameDefinitions = {
       id: 'animal-chicken',
       name: 'Chicken',
       subCategory: 'poultry',
-      capabilities: ['eat', 'produce'],
       baseSpeed: 50,
-      baseIntelligence: 10,
       maxEnergy: 50,
       tamingDifficulty: 1,
-      aliveYields: [{ resourceId: 'res-egg', amount: 1, interval: 1, seasons: ['spring', 'summer', 'autumn', 'winter'], requiresFed: true }],
+      canPull: false,
+      foodNeeds: 2,
+      waterNeeds: 2,
+      aliveYields: [{ resourceId: 'res-egg', amount: 1, interval: 1, seasons: ['spring', 'summer', 'autumn', 'winter'] }],
       deadYields: [{ resourceId: 'res-meat', quantity: 2 }],
       spriteKey: 'animal-chicken',
     },
