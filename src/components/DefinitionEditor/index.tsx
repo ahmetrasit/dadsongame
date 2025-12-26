@@ -15,7 +15,9 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
     isEditorOpen,
     activeTab,
     selectedId,
-    definitions,
+    plants,
+    animals,
+    resources,
     draftPlant,
     draftAnimal,
     draftResource,
@@ -98,10 +100,10 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
 
   // Get current items based on active tab
   const currentItems = activeTab === 'plants'
-    ? definitions.plants
+    ? plants
     : activeTab === 'animals'
-    ? definitions.animals
-    : definitions.resources;
+    ? animals
+    : resources;
 
   const selectedItem = currentItems.find((item) => item.id === selectedId);
 
@@ -188,7 +190,7 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
           {activeTab === 'resources' && (
             <TreeSidebar
               categories={['food', 'water', 'metal', 'rock', 'wood', 'organics']}
-              items={definitions.resources}
+              items={resources}
               getCategory={(item: any) => item.category}
               expandedCategories={expandedCategories}
               toggleCategory={toggleCategory}
@@ -199,7 +201,7 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
           {activeTab === 'plants' && (
             <TreeSidebar
               categories={['tree', 'crop', 'flower', 'bush']}
-              items={definitions.plants}
+              items={plants}
               getCategory={(item: any) => item.subCategory}
               expandedCategories={expandedCategories}
               toggleCategory={toggleCategory}
@@ -210,7 +212,7 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
           {activeTab === 'animals' && (
             <TreeSidebar
               categories={['livestock', 'poultry', 'wild', 'pet']}
-              items={definitions.animals}
+              items={animals}
               getCategory={(item: any) => item.subCategory}
               expandedCategories={expandedCategories}
               toggleCategory={toggleCategory}

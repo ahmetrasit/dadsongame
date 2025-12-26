@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useDefinitionsStore, Season, SoilType, DeadYield, AliveYield, PlantSubCategory } from '@/stores/definitionsStore';
 import { Card, FieldRow, CompactInput, CompactSelect, TwoColumnRow, SliderField, CheckboxGroup } from './FormComponents';
+import { FaTrashAlt } from 'react-icons/fa';
 
 interface PlantFormProps {
   item: any;
@@ -10,7 +11,7 @@ interface PlantFormProps {
 }
 
 export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
-  const { updatePlant, updateDraftPlant, deletePlant, definitions } = useDefinitionsStore();
+  const { updatePlant, updateDraftPlant, deletePlant, plants, resources } = useDefinitionsStore();
   const [draftDeadYield, setDraftDeadYield] = useState<DeadYield | null>(null);
 
   const handleChange = (field: string, value: any) => {
@@ -81,45 +82,44 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
   const subCategories: PlantSubCategory[] = ['tree', 'crop', 'flower', 'bush'];
 
   // Check for duplicate name
-  const isDuplicateName = definitions.plants.some(p => p.name.toLowerCase() === item.name.toLowerCase() && p.id !== item.id);
+  const isDuplicateName = plants.some(p => p.name.toLowerCase() === item.name.toLowerCase() && p.id !== item.id);
   const canSave = item.name.trim() !== '' && !isDuplicateName;
 
   return (
     <div style={{ maxWidth: '900px' }}>
       {/* Header Card */}
       <Card>
-        <input
-          type="text"
-          value={item.name}
-          onChange={(e) => handleChange('name', e.target.value)}
-          placeholder="Enter plant name..."
-          style={{
-            width: '100%',
-            padding: '10px',
-            background: '#FFFFFF',
-            border: `1px solid ${isDuplicateName ? '#990F3D' : '#D4C4B0'}`,
-            borderRadius: '4px',
-            color: '#333',
-            fontSize: '18px',
-            marginBottom: isDuplicateName ? '4px' : '12px',
-          }}
-          onFocus={(e) => e.currentTarget.style.borderColor = isDuplicateName ? '#990F3D' : '#0D7680'}
-          onBlur={(e) => e.currentTarget.style.borderColor = isDuplicateName ? '#990F3D' : '#D4C4B0'}
-        />
         {isDuplicateName && (
-          <div style={{ color: '#990F3D', fontSize: '12px', marginBottom: '12px' }}>
+          <div style={{ color: '#990F3D', fontSize: '12px', marginBottom: '8px' }}>
             A plant with this name already exists
           </div>
         )}
         <FieldRow>
+          <input
+            type="text"
+            value={item.name}
+            onChange={(e) => handleChange('name', e.target.value)}
+            placeholder="Enter plant name..."
+            style={{
+              flex: 1,
+              padding: '10px',
+              background: '#FFFFFF',
+              border: `1px solid ${isDuplicateName ? '#990F3D' : '#D4C4B0'}`,
+              borderRadius: '4px',
+              color: '#333',
+              fontSize: '18px',
+              marginRight: '12px',
+            }}
+            onFocus={(e) => e.currentTarget.style.borderColor = isDuplicateName ? '#990F3D' : '#0D7680'}
+            onBlur={(e) => e.currentTarget.style.borderColor = isDuplicateName ? '#990F3D' : '#D4C4B0'}
+          />
           <CompactSelect
-            label="Category"
+            label=""
             value={item.subCategory}
             onChange={(e) => handleChange('subCategory', e.target.value)}
             width="150px"
             options={subCategories.map(cat => ({ value: cat, label: cat.charAt(0).toUpperCase() + cat.slice(1) }))}
           />
-          <div style={{ flex: 1 }}></div>
           {isDraft ? (
             <>
               <button
@@ -132,6 +132,7 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
                   color: '#666',
                   cursor: 'pointer',
                   fontSize: '13px',
+                  marginLeft: '8px',
                   marginRight: '8px',
                 }}
               >
@@ -169,9 +170,10 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
                 color: '#990F3D',
                 cursor: 'pointer',
                 fontSize: '13px',
+                marginLeft: '8px',
               }}
             >
-              Delete
+              <FaTrashAlt />
             </button>
           )}
         </FieldRow>
@@ -179,7 +181,7 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
 
       {/* Growth and Needs in two columns */}
       <TwoColumnRow>
-        <Card title="Growth" style={{ flex: 1 }}>
+        <Card title="Growth" style={{ flex: '0 0 55%' }}>
           <FieldRow>
             <CompactInput
               label="Growth Time"
@@ -214,7 +216,7 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
           />
         </Card>
 
-        <Card title="Needs" style={{ flex: 1 }}>
+        <Card title="Needs" style={{ flex: '0 0 calc(45% - 16px)' }}>
           <SliderField
             label="Water"
             value={item.waterNeed}
@@ -230,19 +232,26 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
 
       {/* Alive Yields and Dead Yields in two columns */}
       <TwoColumnRow>
-        <Card title="Alive Yields" style={{ flex: 1 }}>
+        <Card title="Alive Yields" style={{ flex: '0 0 55%' }}>
           {item.aliveYields.map((ay: AliveYield, i: number) => (
             <div
               key={i}
               style={{
                 background: '#FFF8F0',
                 borderRadius: '6px',
-                padding: '12px',
-                marginBottom: '12px',
+                padding: '8px',
+                marginBottom: '8px',
                 border: '1px solid #E8DDD1',
               }}
             >
-              <FieldRow>
+              <FieldRow style={{ marginBottom: '4px' }}>
+                <CompactInput
+                  label=""
+                  type="number"
+                  value={ay.amount}
+                  onChange={(e) => handleAliveYieldChange(i, { ...ay, amount: Number(e.target.value) })}
+                  width="60px"
+                />
                 <CompactSelect
                   label=""
                   value={ay.resourceId}
@@ -250,26 +259,31 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
                   width="150px"
                   options={[
                     { value: '', label: '-- Select --' },
-                    ...definitions.resources.map(res => ({ value: res.id, label: res.name }))
+                    ...resources.map(res => ({ value: res.id, label: res.name }))
                   ]}
                 />
+                <span style={{ color: '#888', fontSize: '13px', marginLeft: '8px' }}>Every</span>
                 <CompactInput
-                  label="Quantity"
-                  type="number"
-                  value={ay.amount}
-                  onChange={(e) => handleAliveYieldChange(i, { ...ay, amount: Number(e.target.value) })}
-                  width="60px"
-                />
-              </FieldRow>
-              <FieldRow>
-                <CompactInput
-                  label="Every"
+                  label=""
                   type="number"
                   value={ay.interval}
                   onChange={(e) => handleAliveYieldChange(i, { ...ay, interval: Number(e.target.value) })}
                   width="60px"
                 />
                 <span style={{ color: '#888', fontSize: '13px' }}>days</span>
+              </FieldRow>
+              <FieldRow style={{ marginBottom: '0' }}>
+                <CheckboxGroup
+                  label=""
+                  options={seasons}
+                  selected={ay.seasons}
+                  onChange={(season: string) => {
+                    const newSeasons = ay.seasons.includes(season as Season)
+                      ? ay.seasons.filter(s => s !== season)
+                      : [...ay.seasons, season as Season];
+                    handleAliveYieldChange(i, { ...ay, seasons: newSeasons });
+                  }}
+                />
                 <div style={{ flex: 1 }}></div>
                 <button
                   onClick={() => handleRemoveAliveYield(i)}
@@ -280,23 +294,13 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
                     borderRadius: '4px',
                     color: '#666',
                     cursor: 'pointer',
-                    fontSize: '12px',
+                    fontSize: '16px',
+                    lineHeight: 1,
                   }}
                 >
-                  Remove
+                  <FaTrashAlt />
                 </button>
               </FieldRow>
-              <CheckboxGroup
-                label="Seasons"
-                options={seasons}
-                selected={ay.seasons}
-                onChange={(season: string) => {
-                  const newSeasons = ay.seasons.includes(season as Season)
-                    ? ay.seasons.filter(s => s !== season)
-                    : [...ay.seasons, season as Season];
-                  handleAliveYieldChange(i, { ...ay, seasons: newSeasons });
-                }}
-              />
             </div>
           ))}
           <button
@@ -316,9 +320,16 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
           </button>
         </Card>
 
-        <Card title="Dead Yields" style={{ flex: 1 }}>
+        <Card title="Dead Yields" style={{ flex: '0 0 calc(45% - 16px)' }}>
           {draftDeadYield && (
-            <FieldRow>
+            <FieldRow style={{ marginBottom: '12px' }}>
+              <CompactInput
+                label=""
+                type="number"
+                value={draftDeadYield.quantity}
+                onChange={(e) => setDraftDeadYield({ ...draftDeadYield, quantity: Number(e.target.value) })}
+                width="60px"
+              />
               <CompactSelect
                 label=""
                 value={draftDeadYield.resourceId}
@@ -326,17 +337,9 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
                 width="150px"
                 options={[
                   { value: '', label: '-- Select --' },
-                  ...definitions.resources.map(res => ({ value: res.id, label: res.name }))
+                  ...resources.map(res => ({ value: res.id, label: res.name }))
                 ]}
               />
-              <CompactInput
-                label="Quantity"
-                type="number"
-                value={draftDeadYield.quantity}
-                onChange={(e) => setDraftDeadYield({ ...draftDeadYield, quantity: Number(e.target.value) })}
-                width="60px"
-              />
-              <div style={{ flex: 1 }}></div>
               <button
                 onClick={handleCancelDraftDeadYield}
                 style={{
@@ -347,6 +350,7 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
                   color: '#666',
                   cursor: 'pointer',
                   fontSize: '12px',
+                  marginLeft: '8px',
                   marginRight: '8px',
                 }}
               >
@@ -370,7 +374,14 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
             </FieldRow>
           )}
           {item.deadYields.map((dy: DeadYield, i: number) => (
-            <FieldRow key={i}>
+            <FieldRow key={i} style={{ marginBottom: '8px' }}>
+              <CompactInput
+                label=""
+                type="number"
+                value={dy.quantity}
+                onChange={(e) => handleDeadYieldChange(i, 'quantity', Number(e.target.value))}
+                width="60px"
+              />
               <CompactSelect
                 label=""
                 value={dy.resourceId}
@@ -378,17 +389,9 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
                 width="150px"
                 options={[
                   { value: '', label: '-- Select --' },
-                  ...definitions.resources.map(res => ({ value: res.id, label: res.name }))
+                  ...resources.map(res => ({ value: res.id, label: res.name }))
                 ]}
               />
-              <CompactInput
-                label="Quantity"
-                type="number"
-                value={dy.quantity}
-                onChange={(e) => handleDeadYieldChange(i, 'quantity', Number(e.target.value))}
-                width="60px"
-              />
-              <div style={{ flex: 1 }}></div>
               <button
                 onClick={() => handleRemoveDeadYield(i)}
                 style={{
@@ -398,10 +401,12 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
                   borderRadius: '4px',
                   color: '#666',
                   cursor: 'pointer',
-                  fontSize: '12px',
+                  fontSize: '16px',
+                  lineHeight: 1,
+                  marginLeft: '8px',
                 }}
               >
-                Remove
+                <FaTrashAlt />
               </button>
             </FieldRow>
           ))}

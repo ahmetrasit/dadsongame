@@ -72,14 +72,11 @@ export const useDefinitionsStore = create<DefinitionsState>()(
       activeTab: 'plants' as const,
       selectedId: null,
 
-      // Backward compatibility: computed definitions object
-      get definitions() {
-        const state = get();
-        return {
-          plants: state.plants,
-          animals: state.animals,
-          resources: state.resources,
-        };
+      // Backward compatibility: definitions object (computed via selector)
+      definitions: {
+        plants: initialPlants,
+        animals: initialAnimals,
+        resources: initialResources,
       },
 
       // UI Actions

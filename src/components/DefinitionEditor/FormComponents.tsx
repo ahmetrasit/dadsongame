@@ -15,6 +15,7 @@ export const Card = ({ title, children, style }: { title?: string; children: Rea
     padding: '16px',
     marginBottom: '16px',
     border: '1px solid #D4C4B0',
+    overflow: 'visible',
     ...style,
   }}>
     {title && (
@@ -35,8 +36,8 @@ export const Card = ({ title, children, style }: { title?: string; children: Rea
   </div>
 );
 
-export const FieldRow = ({ children }: { children: React.ReactNode }) => (
-  <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
+export const FieldRow = ({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) => (
+  <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', ...style }}>
     {children}
   </div>
 );
@@ -82,22 +83,26 @@ interface CompactSelectProps {
   onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   options: SelectOption[];
   width?: string;
+  disabled?: boolean;
 }
 
-export const CompactSelect = ({ label, value, onChange, options, width = '120px' }: CompactSelectProps) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-    <span style={{ color: '#666', fontSize: '13px' }}>{label}</span>
+export const CompactSelect = ({ label, value, onChange, options, width = '120px', disabled = false }: CompactSelectProps) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative', zIndex: 1 }}>
+    {label && <span style={{ color: '#666', fontSize: '13px' }}>{label}</span>}
     <select
       value={value}
       onChange={onChange}
+      disabled={disabled}
       style={{
         width,
         padding: '6px 10px',
-        background: '#FFFFFF',
+        background: disabled ? '#F5F5F5' : '#FFFFFF',
         border: '1px solid #D4C4B0',
         borderRadius: '4px',
-        color: '#333',
+        color: disabled ? '#999' : '#333',
         fontSize: '13px',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        position: 'relative',
       }}
       onFocus={(e) => e.currentTarget.style.borderColor = '#0D7680'}
       onBlur={(e) => e.currentTarget.style.borderColor = '#D4C4B0'}

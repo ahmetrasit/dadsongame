@@ -1,8 +1,8 @@
-# Progress & Gap Analysis (v0.010)
+# Progress & Gap Analysis (v0.015)
 
 ## ✅ Complete (100%)
 - **Map Editor** - Rivers (Catmull-Rom), trees, spawn, export/import
-- **Definition Editor** - Plants/Animals/Resources CRUD, persistence
+- **Definition Editor** - Plants/Animals/Resources CRUD, persistence, compact 55%/45% layout
 
 ## 🟡 Partial (40-70%)
 | System | Done | Missing |

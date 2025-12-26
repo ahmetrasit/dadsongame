@@ -1,4 +1,5 @@
 import { useInventoryStore, useInventorySlots, useSelectedSlot, ITEM_DEFINITIONS } from '@/stores/inventoryStore';
+import { FaTrashAlt } from 'react-icons/fa';
 
 export function Inventory() {
   const isOpen = useInventoryStore((s) => s.isOpen);
@@ -17,7 +18,7 @@ export function Inventory() {
         <div className="inventory-header">
           <h2>Inventory</h2>
           <button className="close-btn" onClick={() => setOpen(false)}>
-            ×
+            <FaTrashAlt />
           </button>
         </div>
 

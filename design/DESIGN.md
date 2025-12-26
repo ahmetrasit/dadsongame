@@ -1,11 +1,10 @@
 # Dad & Son Game - Design Spec
 
 ## CRITICAL: AI Assistant Rules
-- **Two sonnet agents always** - one for implementation, one for review
+- **Implement directly** - no task agents unless user explicitly requests
+- **Task agents use Opus only** - when explicitly requested
 - **Never implement before confirmation** - confirm understanding concisely first
 - **Concise summaries only** - just "Done (vX.XXX)" with bullet points
-- **Batch related changes** into single agent calls when possible
-- **Use agents for exploration** - Opus or Sonnet, return summaries only
 - **Never show code snippets** in responses to user
 - **Always run dev server on 0.0.0.0**
 - **Increment version** with each change (src/version.ts)
@@ -144,8 +143,8 @@ Teams(no size limit), shared resources, division of labor. Marketplace for inter
 - src/components/EditorToolbar.tsx - map editor toolbar
 - src/game/scenes/MainScene.ts - Phaser game scene
 
-## Current Phase: Editor Foundation (v0.010)
-**Version:** v0.010
+## Current Phase: Editor Foundation (v0.015)
+**Version:** v0.015
 **Theme:** FT salmon (#FFF1E5) with Avenir font
 **Main Menu:** New Game, Resume, Editor (Map Editor, Object Editor)
 **Object Editor:**
