@@ -185,14 +185,11 @@ export class MainScene extends Phaser.Scene {
     const gameStateStore = useGameStateStore.getState();
     const interactionStore = useInteractionStore.getState();
 
+    // E key is used only for interaction (not editor toggle)
     if (Phaser.Input.Keyboard.JustDown(this.editorKeys.E)) {
-      // If not in editor mode and there's an interaction target, trigger interaction
       if (!mapStore.isEditing && !defStore.isEditorOpen && interactionStore.currentTarget) {
         const primaryAction = interactionStore.currentTarget.interactionTypes[0];
         interactionStore.executeInteraction(primaryAction);
-      } else {
-        // Otherwise toggle the map editor
-        mapStore.toggleEditor();
       }
     }
 
@@ -207,33 +204,6 @@ export class MainScene extends Phaser.Scene {
       if (!mapStore.isEditing && !defStore.isEditorOpen) {
         gameStateStore.returnToMenu();
         return;
-      }
-    }
-
-    if (mapStore.isEditing) {
-      if (Phaser.Input.Keyboard.JustDown(this.editorKeys.ONE)) {
-        mapStore.setTool('plant');
-      }
-      if (Phaser.Input.Keyboard.JustDown(this.editorKeys.TWO)) {
-        mapStore.setTool('animal');
-      }
-      if (Phaser.Input.Keyboard.JustDown(this.editorKeys.THREE)) {
-        mapStore.setTool('water');
-      }
-      if (Phaser.Input.Keyboard.JustDown(this.editorKeys.FOUR)) {
-        mapStore.setTool('river');
-      }
-      if (Phaser.Input.Keyboard.JustDown(this.editorKeys.FIVE)) {
-        mapStore.setTool('spawn');
-      }
-      if (Phaser.Input.Keyboard.JustDown(this.editorKeys.SIX)) {
-        mapStore.setTool('eraser');
-      }
-      if (Phaser.Input.Keyboard.JustDown(this.editorKeys.ENTER)) {
-        mapStore.closeRiver();
-      }
-      if (Phaser.Input.Keyboard.JustDown(this.editorKeys.ESC)) {
-        mapStore.cancelRiver();
       }
     }
   }

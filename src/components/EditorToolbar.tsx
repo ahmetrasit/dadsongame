@@ -2,13 +2,13 @@ import { useEffect } from 'react';
 import { useMapEditorStore, EditorTool } from '@/stores/mapEditorStore';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
 
-const tools: { id: EditorTool; label: string; key: string }[] = [
-  { id: 'plant', label: 'Plant', key: '1' },
-  { id: 'animal', label: 'Animal', key: '2' },
-  { id: 'water', label: 'Water', key: '3' },
-  { id: 'river', label: 'River', key: '4' },
-  { id: 'spawn', label: 'Spawn', key: '5' },
-  { id: 'eraser', label: 'Eraser', key: '6' },
+const tools: { id: EditorTool; label: string }[] = [
+  { id: 'plant', label: 'Plant' },
+  { id: 'animal', label: 'Animal' },
+  { id: 'water', label: 'Water' },
+  { id: 'river', label: 'River' },
+  { id: 'spawn', label: 'Spawn' },
+  { id: 'eraser', label: 'Eraser' },
 ];
 
 export function EditorToolbar() {
@@ -97,7 +97,7 @@ export function EditorToolbar() {
       onMouseDown={stopProp}
     >
       <div style={{ marginBottom: '10px', fontWeight: 'bold', borderBottom: '1px solid #444', paddingBottom: '8px' }}>
-        Map Editor (E to toggle)
+        Map Editor
       </div>
 
       {/* Tool buttons */}
@@ -116,7 +116,7 @@ export function EditorToolbar() {
               fontSize: '12px',
             }}
           >
-            {tool.label} ({tool.key})
+            {tool.label}
           </button>
         ))}
       </div>
@@ -211,7 +211,7 @@ export function EditorToolbar() {
               fontSize: '12px',
             }}
           >
-            Close (Enter)
+            Close
           </button>
           <button
             onClick={cancelRiver}
@@ -225,7 +225,7 @@ export function EditorToolbar() {
               fontSize: '12px',
             }}
           >
-            Cancel (Esc)
+            Cancel
           </button>
         </div>
       )}
