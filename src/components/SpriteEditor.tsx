@@ -243,6 +243,58 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     return () => viewport.removeEventListener('wheel', handleWheel);
   }, [handleWheel]);
 
+  // Center canvas in viewport
+  const centerCanvas = useCallback(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const canvasWidth = BASE_CANVAS_SIZE * zoom;
+    const canvasHeight = BASE_CANVAS_SIZE * zoom;
+    const viewportWidth = VIEWPORT_SIZE;
+    const viewportHeight = VIEWPORT_SIZE;
+
+    // Calculate scroll position to center the canvas
+    const scrollLeft = Math.max(0, (canvasWidth - viewportWidth) / 2 + 10 * zoom);
+    const scrollTop = Math.max(0, (canvasHeight - viewportHeight) / 2 + 10 * zoom);
+
+    viewport.scrollLeft = scrollLeft;
+    viewport.scrollTop = scrollTop;
+  }, [zoom]);
+
+  // Lock scroll position while painting to prevent annoying scroll during paint
+  const scrollLockRef = useRef<{ left: number; top: number } | null>(null);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const handleScroll = () => {
+      // If we're painting/drawing, lock the scroll position
+      if ((isMouseDown || isRightMouseDown) && scrollLockRef.current) {
+        viewport.scrollLeft = scrollLockRef.current.left;
+        viewport.scrollTop = scrollLockRef.current.top;
+      }
+    };
+
+    viewport.addEventListener('scroll', handleScroll);
+    return () => viewport.removeEventListener('scroll', handleScroll);
+  }, [isMouseDown, isRightMouseDown]);
+
+  // Store scroll position when starting to paint
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    if (isMouseDown || isRightMouseDown) {
+      scrollLockRef.current = {
+        left: viewport.scrollLeft,
+        top: viewport.scrollTop,
+      };
+    } else {
+      scrollLockRef.current = null;
+    }
+  }, [isMouseDown, isRightMouseDown]);
+
   // Paint or erase with brush size
   const paintPixels = (centerRow: number, centerCol: number, erase: boolean) => {
     setPixels(prev => {
@@ -997,22 +1049,39 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                     Zoom: {Math.round(zoom * 100)}%
                     <span style={{ fontSize: '11px', color: '#666', marginLeft: '8px' }}>(scroll on canvas)</span>
                   </label>
-                  <button
-                    onClick={() => setZoom(1)}
-                    style={{
-                      padding: '6px 12px',
-                      background: zoom === 1 ? '#ccc' : '#0D0D0D',
-                      border: 'none',
-                      borderRadius: '4px',
-                      color: zoom === 1 ? '#666' : '#FFF1E5',
-                      cursor: zoom === 1 ? 'default' : 'pointer',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                    }}
-                    disabled={zoom === 1}
-                  >
-                    Reset Zoom
-                  </button>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      onClick={() => setZoom(1)}
+                      style={{
+                        padding: '6px 12px',
+                        background: zoom === 1 ? '#ccc' : '#0D0D0D',
+                        border: 'none',
+                        borderRadius: '4px',
+                        color: zoom === 1 ? '#666' : '#FFF1E5',
+                        cursor: zoom === 1 ? 'default' : 'pointer',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                      }}
+                      disabled={zoom === 1}
+                    >
+                      Reset
+                    </button>
+                    <button
+                      onClick={centerCanvas}
+                      style={{
+                        padding: '6px 12px',
+                        background: '#0D0D0D',
+                        border: 'none',
+                        borderRadius: '4px',
+                        color: '#FFF1E5',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      Center
+                    </button>
+                  </div>
                 </div>
               </div>
 
