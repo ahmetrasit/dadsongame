@@ -151,10 +151,15 @@ export function TileEditor({ onClose }: TileEditorProps) {
   // Gallery
   const [gallery, setGallery] = useState<GallerySprite[]>([]);
   const [galleryGroups, setGalleryGroups] = useState<string[]>(['Tiles', 'Characters', 'Objects', 'Nature']);
-  const [showGallery, setShowGallery] = useState(false);
+  const [showGalleryScreen, setShowGalleryScreen] = useState(false);
   const [spriteName, setSpriteName] = useState('');
   const [selectedGalleryGroup, setSelectedGalleryGroup] = useState('Tiles');
   const [newGroupName, setNewGroupName] = useState('');
+  const [editingSpriteName, setEditingSpriteName] = useState<string | null>(null);
+
+  // Tile selection for splitting
+  const [selectedTiles, setSelectedTiles] = useState<Set<number>>(new Set());
+  const [tileSelectMode, setTileSelectMode] = useState(false);
 
   // Reference sprites (ghosts beside canvas)
   const [referenceSprites, setReferenceSprites] = useState<ReferenceSprite[]>([]);
@@ -250,11 +255,21 @@ export function TileEditor({ onClose }: TileEditorProps) {
 
   // Handle canvas mouse events
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    setIsMouseDown(true);
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     const x = Math.floor((e.clientX - rect.left) / DISPLAY_SCALE);
     const y = Math.floor((e.clientY - rect.top) / DISPLAY_SCALE);
+
+    // Handle tile selection mode
+    if (tileSelectMode) {
+      const tileX = Math.floor(x / TILE_SIZE);
+      const tileY = Math.floor(y / TILE_SIZE);
+      const tileIndex = tileY * GRID_TILES + tileX;
+      toggleTileSelection(tileIndex);
+      return;
+    }
+
+    setIsMouseDown(true);
     drawPixel(x, y);
   };
 
@@ -326,7 +341,27 @@ export function TileEditor({ onClose }: TileEditorProps) {
       ctx.stroke();
     }
 
-  }, [layers, activeLayerId, ghostMode]);
+    // Draw selected tiles overlay
+    if (tileSelectMode) {
+      for (let ty = 0; ty < GRID_TILES; ty++) {
+        for (let tx = 0; tx < GRID_TILES; tx++) {
+          const tileIndex = ty * GRID_TILES + tx;
+          const x = tx * TILE_SIZE * DISPLAY_SCALE;
+          const y = ty * TILE_SIZE * DISPLAY_SCALE;
+          const size = TILE_SIZE * DISPLAY_SCALE;
+
+          if (selectedTiles.has(tileIndex)) {
+            ctx.fillStyle = 'rgba(76, 175, 80, 0.4)';
+            ctx.fillRect(x, y, size, size);
+            ctx.strokeStyle = '#4CAF50';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(x + 1, y + 1, size - 2, size - 2);
+          }
+        }
+      }
+    }
+
+  }, [layers, activeLayerId, ghostMode, tileSelectMode, selectedTiles]);
 
   // Generate thumbnail for full canvas
   const generateThumbnail = (targetLayers?: Layer[]): string => {
@@ -405,43 +440,49 @@ export function TileEditor({ onClose }: TileEditorProps) {
     });
   };
 
-  // Split tiles - save each tile as separate sprite
-  const splitTilesToGallery = () => {
+  // Toggle tile selection
+  const toggleTileSelection = (tileIndex: number) => {
+    const newSelected = new Set(selectedTiles);
+    if (newSelected.has(tileIndex)) {
+      newSelected.delete(tileIndex);
+    } else {
+      newSelected.add(tileIndex);
+    }
+    setSelectedTiles(newSelected);
+  };
+
+  // Split selected tiles to gallery
+  const splitSelectedTilesToGallery = () => {
+    if (selectedTiles.size === 0) {
+      alert('Select tiles first by clicking on them');
+      return;
+    }
+
     const newSprites: GallerySprite[] = [];
 
-    for (let ty = 0; ty < GRID_TILES; ty++) {
-      for (let tx = 0; tx < GRID_TILES; tx++) {
-        const thumbnail = generateTileThumbnail(tx, ty);
+    selectedTiles.forEach(tileIndex => {
+      const tx = tileIndex % GRID_TILES;
+      const ty = Math.floor(tileIndex / GRID_TILES);
+      const thumbnail = generateTileThumbnail(tx, ty);
 
-        // Check if tile has any content
-        const hasContent = layers.some(layer => {
-          for (let y = 0; y < TILE_SIZE; y++) {
-            for (let x = 0; x < TILE_SIZE; x++) {
-              const color = layer.pixels[ty * TILE_SIZE + y]?.[tx * TILE_SIZE + x];
-              if (color && color !== 'transparent') return true;
-            }
-          }
-          return false;
-        });
+      newSprites.push({
+        id: `sprite-${Date.now()}-${tx}-${ty}`,
+        name: `Tile ${tx + 1},${ty + 1}`,
+        group: selectedGalleryGroup,
+        layers: extractTileLayers(tx, ty),
+        thumbnail,
+      });
+    });
 
-        if (hasContent) {
-          newSprites.push({
-            id: `sprite-${Date.now()}-${tx}-${ty}`,
-            name: `Tile ${tx + 1},${ty + 1}`,
-            group: selectedGalleryGroup,
-            layers: extractTileLayers(tx, ty),
-            thumbnail,
-          });
-        }
-      }
-    }
+    setGallery([...gallery, ...newSprites]);
+    setSelectedTiles(new Set());
+    setTileSelectMode(false);
+  };
 
-    if (newSprites.length > 0) {
-      setGallery([...gallery, ...newSprites]);
-      alert(`Split ${newSprites.length} tiles into gallery!`);
-    } else {
-      alert('No tiles with content to split');
-    }
+  // Rename sprite in gallery
+  const renameSprite = (id: string, newName: string) => {
+    setGallery(gallery.map(s => s.id === id ? { ...s, name: newName } : s));
+    setEditingSpriteName(null);
   };
 
   // Save to gallery
@@ -467,7 +508,7 @@ export function TileEditor({ onClose }: TileEditorProps) {
   const loadFromGallery = (sprite: GallerySprite) => {
     setLayers(sprite.layers.map(l => ({ ...l, pixels: l.pixels.map(row => [...row]) })));
     setActiveLayerId(sprite.layers[0]?.id || 'layer-1');
-    setShowGallery(false);
+    setShowGalleryScreen(false);
   };
 
   // Delete from gallery
@@ -880,22 +921,41 @@ export function TileEditor({ onClose }: TileEditorProps) {
               Save
             </button>
             <button
-              onClick={splitTilesToGallery}
+              onClick={() => {
+                setTileSelectMode(!tileSelectMode);
+                if (tileSelectMode) setSelectedTiles(new Set());
+              }}
               style={{
                 padding: '6px 12px',
-                backgroundColor: '#FF9800',
+                backgroundColor: tileSelectMode ? '#4CAF50' : '#FF9800',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
                 fontSize: '12px',
               }}
-              title="Split each tile into separate sprites"
+              title="Select tiles to send to gallery"
             >
-              Split Tiles
+              {tileSelectMode ? `Selected: ${selectedTiles.size}` : 'Select Tiles'}
             </button>
+            {tileSelectMode && selectedTiles.size > 0 && (
+              <button
+                onClick={splitSelectedTilesToGallery}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: '#4CAF50',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                }}
+              >
+                Send to Gallery
+              </button>
+            )}
             <button
-              onClick={() => setShowGallery(!showGallery)}
+              onClick={() => setShowGalleryScreen(true)}
               style={{
                 padding: '6px 12px',
                 backgroundColor: '#9C27B0',
@@ -906,7 +966,7 @@ export function TileEditor({ onClose }: TileEditorProps) {
                 fontSize: '12px',
               }}
             >
-              Gallery
+              Gallery ({gallery.length})
             </button>
           </div>
         </div>
@@ -1048,133 +1108,208 @@ export function TileEditor({ onClose }: TileEditorProps) {
           </div>
         </div>
 
-        {/* Gallery Panel */}
-        {showGallery && (
-          <div style={{ width: '280px', display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: '#2a2a4a', padding: '10px', borderRadius: '8px', maxHeight: '90vh', overflow: 'hidden' }}>
-            <h3 style={{ color: '#fff', margin: 0, fontSize: '14px' }}>Sprite Gallery</h3>
-
-            {/* Add new group */}
-            <div style={{ display: 'flex', gap: '4px' }}>
-              <input
-                type="text"
-                value={newGroupName}
-                onChange={e => setNewGroupName(e.target.value)}
-                placeholder="New group"
-                style={{
-                  padding: '5px',
-                  backgroundColor: '#1a1a2e',
-                  color: '#fff',
-                  border: '1px solid #444',
-                  borderRadius: '4px',
-                  flex: 1,
-                  fontSize: '11px',
-                }}
-              />
-              <button
-                onClick={addGalleryGroup}
-                style={{
-                  padding: '5px 10px',
-                  backgroundColor: '#4CAF50',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '11px',
-                }}
-              >
-                +
-              </button>
-            </div>
-
-            {/* Gallery by group */}
-            <div style={{ overflowY: 'auto', flex: 1 }}>
-              {galleryGroups.map(group => {
-                const groupSprites = gallery.filter(s => s.group === group);
-                if (groupSprites.length === 0) return null;
-
-                return (
-                  <div key={group} style={{ marginBottom: '12px' }}>
-                    <div style={{ color: '#888', fontSize: '11px', marginBottom: '4px', borderBottom: '1px solid #444', paddingBottom: '2px' }}>
-                      {group} ({groupSprites.length})
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                      {groupSprites.map(sprite => (
-                        <div
-                          key={sprite.id}
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            padding: '4px',
-                            backgroundColor: '#1a1a2e',
-                            borderRadius: '4px',
-                          }}
-                        >
-                          <img
-                            src={sprite.thumbnail}
-                            alt={sprite.name}
-                            onClick={() => loadFromGallery(sprite)}
-                            style={{
-                              width: '40px',
-                              height: '40px',
-                              imageRendering: 'pixelated',
-                              border: '1px solid #444',
-                              cursor: 'pointer',
-                            }}
-                            title="Click to load"
-                          />
-                          <span style={{ color: '#ccc', fontSize: '9px', marginTop: '2px', maxWidth: '50px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sprite.name}</span>
-                          <div style={{ display: 'flex', gap: '2px', marginTop: '2px' }}>
-                            <select
-                              onChange={e => {
-                                if (e.target.value) {
-                                  addReferenceSprite(sprite, e.target.value as ReferenceSprite['position']);
-                                  e.target.value = '';
-                                }
-                              }}
-                              style={{
-                                padding: '1px',
-                                backgroundColor: '#333',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: '2px',
-                                fontSize: '8px',
-                                cursor: 'pointer',
-                              }}
-                              defaultValue=""
-                            >
-                              <option value="" disabled>Ref</option>
-                              <option value="left">←</option>
-                              <option value="right">→</option>
-                              <option value="top">↑</option>
-                              <option value="bottom">↓</option>
-                            </select>
-                            <button
-                              onClick={() => deleteFromGallery(sprite.id)}
-                              style={{
-                                padding: '1px 4px',
-                                backgroundColor: '#f44336',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: '2px',
-                                cursor: 'pointer',
-                                fontSize: '8px',
-                              }}
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {gallery.length === 0 && (
-                <div style={{ color: '#666', textAlign: 'center', padding: '20px', fontSize: '12px' }}>
-                  No sprites saved yet
+        {/* Gallery Full Screen */}
+        {showGalleryScreen && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100vw',
+              height: '100vh',
+              backgroundColor: 'rgba(0, 0, 0, 0.95)',
+              zIndex: 2000,
+              display: 'flex',
+              flexDirection: 'column',
+              padding: '40px',
+              overflowY: 'auto',
+            }}
+            onClick={() => setShowGalleryScreen(false)}
+          >
+            <div
+              style={{ maxWidth: '1200px', margin: '0 auto', width: '100%' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+                <h2 style={{ color: '#fff', margin: 0, fontSize: '28px' }}>Sprite Gallery</h2>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    value={newGroupName}
+                    onChange={e => setNewGroupName(e.target.value)}
+                    placeholder="New group name"
+                    style={{
+                      padding: '8px 12px',
+                      backgroundColor: '#2a2a4a',
+                      color: '#fff',
+                      border: '1px solid #444',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                    }}
+                  />
+                  <button
+                    onClick={addGalleryGroup}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#4CAF50',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                    }}
+                  >
+                    Add Group
+                  </button>
+                  <button
+                    onClick={() => setShowGalleryScreen(false)}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#f44336',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                    }}
+                  >
+                    Close
+                  </button>
                 </div>
+              </div>
+
+              {gallery.length === 0 ? (
+                <div style={{ color: '#666', textAlign: 'center', padding: '60px', fontSize: '18px' }}>
+                  No sprites saved yet. Use "Select Tiles" to add sprites to gallery.
+                </div>
+              ) : (
+                galleryGroups.map(group => {
+                  const groupSprites = gallery.filter(s => s.group === group);
+                  if (groupSprites.length === 0) return null;
+
+                  return (
+                    <div key={group} style={{ marginBottom: '30px' }}>
+                      <h3 style={{ color: '#888', fontSize: '16px', marginBottom: '15px', borderBottom: '1px solid #444', paddingBottom: '8px' }}>
+                        {group} ({groupSprites.length})
+                      </h3>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
+                        {groupSprites.map(sprite => (
+                          <div
+                            key={sprite.id}
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              padding: '15px',
+                              backgroundColor: '#1a1a2e',
+                              borderRadius: '8px',
+                              minWidth: '100px',
+                            }}
+                          >
+                            <img
+                              src={sprite.thumbnail}
+                              alt={sprite.name}
+                              onClick={() => loadFromGallery(sprite)}
+                              style={{
+                                width: '64px',
+                                height: '64px',
+                                imageRendering: 'pixelated',
+                                border: '2px solid #444',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                marginBottom: '10px',
+                              }}
+                              title="Click to load into editor"
+                            />
+                            {editingSpriteName === sprite.id ? (
+                              <input
+                                type="text"
+                                defaultValue={sprite.name}
+                                autoFocus
+                                onBlur={e => renameSprite(sprite.id, e.target.value || sprite.name)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    renameSprite(sprite.id, (e.target as HTMLInputElement).value || sprite.name);
+                                  } else if (e.key === 'Escape') {
+                                    setEditingSpriteName(null);
+                                  }
+                                }}
+                                style={{
+                                  backgroundColor: '#2a2a4a',
+                                  color: '#fff',
+                                  border: '1px solid #4CAF50',
+                                  borderRadius: '4px',
+                                  padding: '4px 8px',
+                                  fontSize: '12px',
+                                  textAlign: 'center',
+                                  width: '80px',
+                                }}
+                              />
+                            ) : (
+                              <span
+                                onClick={() => setEditingSpriteName(sprite.id)}
+                                style={{
+                                  color: '#ccc',
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  padding: '4px 8px',
+                                  borderRadius: '4px',
+                                  maxWidth: '90px',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                                title="Click to rename"
+                              >
+                                {sprite.name}
+                              </span>
+                            )}
+                            <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                              <select
+                                onChange={e => {
+                                  if (e.target.value) {
+                                    addReferenceSprite(sprite, e.target.value as ReferenceSprite['position']);
+                                    e.target.value = '';
+                                  }
+                                }}
+                                style={{
+                                  padding: '4px',
+                                  backgroundColor: '#333',
+                                  color: '#fff',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  cursor: 'pointer',
+                                }}
+                                defaultValue=""
+                              >
+                                <option value="" disabled>As Ref</option>
+                                <option value="left">Left</option>
+                                <option value="right">Right</option>
+                                <option value="top">Top</option>
+                                <option value="bottom">Bottom</option>
+                              </select>
+                              <button
+                                onClick={() => deleteFromGallery(sprite.id)}
+                                style={{
+                                  padding: '4px 8px',
+                                  backgroundColor: '#f44336',
+                                  color: '#fff',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  fontSize: '11px',
+                                }}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
