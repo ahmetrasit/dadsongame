@@ -301,71 +301,115 @@ export function EditorToolbar() {
         )}
       </div>
 
-      {/* Load Map Panel */}
+      {/* Load Map Modal */}
       {showLoadPanel && (
-        <div style={{ marginBottom: '12px', padding: '8px', background: '#1a1a1a', borderRadius: '6px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '8px', color: '#ccc' }}>
-            Saved Maps {isLoadingMaps && '(loading...)'}
-          </div>
-          {savedMaps.length === 0 ? (
-            <div style={{ fontSize: '11px', color: '#666', textAlign: 'center', padding: '8px' }}>
-              No saved maps found
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 200,
+          }}
+          onClick={() => setShowLoadPanel(false)}
+        >
+          <div
+            style={{
+              background: '#1a1a1a',
+              borderRadius: '12px',
+              padding: '20px',
+              minWidth: '320px',
+              maxWidth: '400px',
+              maxHeight: '70vh',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: 'white' }}>
+                Load Map
+              </h3>
+              <button
+                onClick={() => setShowLoadPanel(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#888',
+                  cursor: 'pointer',
+                  fontSize: '20px',
+                  padding: '0 4px',
+                }}
+              >
+                ×
+              </button>
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '150px', overflowY: 'auto' }}>
-              {savedMaps.map((map) => (
-                <div
-                  key={map.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
-                >
-                  <button
-                    onClick={() => handleLoad(map.id)}
+
+            {isLoadingMaps ? (
+              <div style={{ textAlign: 'center', padding: '20px', color: '#888' }}>
+                Loading maps...
+              </div>
+            ) : savedMaps.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                No saved maps found
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '50vh', overflowY: 'auto' }}>
+                {savedMaps.map((map) => (
+                  <div
+                    key={map.id}
                     style={{
-                      flex: 1,
-                      padding: '6px 8px',
-                      background: map.id === currentMapId ? '#3b82f6' : '#2a2a2a',
-                      border: map.id === currentMapId ? '1px solid #60a5fa' : '1px solid #444',
-                      borderRadius: '4px',
-                      color: 'white',
-                      cursor: 'pointer',
-                      fontSize: '11px',
-                      textAlign: 'left',
                       display: 'flex',
-                      justifyContent: 'space-between',
                       alignItems: 'center',
-                    }}
-                  >
-                    <span>{map.name}</span>
-                    <span style={{ fontSize: '9px', color: '#888' }}>
-                      {new Date(map.updatedAt).toLocaleDateString()}
-                    </span>
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(map.id, map.name);
-                    }}
-                    style={{
-                      padding: '6px 8px',
-                      background: '#7f1d1d',
-                      border: '1px solid #991b1b',
-                      borderRadius: '4px',
-                      color: 'white',
+                      gap: '8px',
+                      padding: '10px 12px',
+                      background: map.id === currentMapId ? '#3b82f6' : '#2a2a2a',
+                      border: map.id === currentMapId ? '2px solid #60a5fa' : '2px solid transparent',
+                      borderRadius: '8px',
                       cursor: 'pointer',
-                      fontSize: '10px',
+                      transition: 'all 0.15s ease',
                     }}
-                    title="Delete map"
+                    onClick={() => handleLoad(map.id)}
                   >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'white', marginBottom: '2px' }}>
+                        {map.name}
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#888' }}>
+                        Updated: {new Date(map.updatedAt).toLocaleString()}
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(map.id, map.name);
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                        fontSize: '16px',
+                        padding: '6px',
+                        borderRadius: '4px',
+                        opacity: 0.7,
+                        transition: 'opacity 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                      onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.7')}
+                      title="Delete map"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
