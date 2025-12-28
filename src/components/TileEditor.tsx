@@ -56,16 +56,18 @@ const COLOR_PALETTE: { [group: string]: string[] } = {
     '#191970', '#4682B4', '#5F9EA0', '#ADD8E6', '#B0E0E6',
   ],
   'Purples': [
-    '#F8F0FF', '#F0E0FF', '#E8D0FF', '#E0C0FF', '#D8B0FF',
-    '#D0A0FF', '#C890FF', '#C080FF', '#B870FF', '#B060FF',
-    '#A855F7', '#9333EA', '#7C3AED', '#6D28D9', '#5B21B6',
-    '#4C1D95', '#3B0764', '#4B0082', '#8B008B', '#9932CC',
+    '#F5E6FF', '#EBCCFF', '#E0B3FF', '#D699FF', '#CC80FF',
+    '#C266FF', '#B84DFF', '#AD33FF', '#A31AFF', '#9900FF',
+    '#8A00E6', '#7A00CC', '#6B00B3', '#5C0099', '#4D0080',
+    '#3D0066', '#2E004D', '#1F0033', '#8B008B', '#9400D3',
+    '#9932CC', '#BA55D3', '#DA70D6', '#EE82EE', '#DDA0DD',
   ],
   'Indigo & Deep Purple': [
-    '#E8E0F0', '#D1C4E9', '#B39DDB', '#9575CD', '#7E57C2',
-    '#673AB7', '#5E35B1', '#512DA8', '#4527A0', '#311B92',
-    '#1A237E', '#0D47A1', '#2C2C54', '#40407A', '#2F1B41',
-    '#1E0A3C', '#0F0028', '#180033', '#2D004D', '#3D0066',
+    '#4B0082', '#3F0071', '#340060', '#29004F', '#1E003E',
+    '#13002D', '#0A001C', '#05000E', '#2E0854', '#3D0A6B',
+    '#4C0D82', '#5A1099', '#6913B0', '#7816C7', '#1A0033',
+    '#0D001A', '#240047', '#30005C', '#3C0070', '#480085',
+    '#540099', '#6000AD', '#2C003E', '#1E0029', '#0F0014',
   ],
   'Skin Tones': [
     '#FFECD9', '#FFE4C4', '#FFDAB9', '#FFD0A8', '#FFC69A',
@@ -145,7 +147,6 @@ export function TileEditor({ onClose }: TileEditorProps) {
   // Drawing
   const [selectedColor, setSelectedColor] = useState('#000000');
   const [tool, setTool] = useState<'paint' | 'erase'>('paint');
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Greens']));
 
   // Gallery
   const [gallery, setGallery] = useState<GallerySprite[]>([]);
@@ -519,17 +520,6 @@ export function TileEditor({ onClose }: TileEditorProps) {
     setActiveLayerId('layer-1');
   };
 
-  // Toggle color group expansion
-  const toggleGroup = (group: string) => {
-    const newExpanded = new Set(expandedGroups);
-    if (newExpanded.has(group)) {
-      newExpanded.delete(group);
-    } else {
-      newExpanded.add(group);
-    }
-    setExpandedGroups(newExpanded);
-  };
-
   // Get reference sprite for position
   const getReference = (position: ReferenceSprite['position']) => {
     return referenceSprites.find(r => r.position === position);
@@ -565,49 +555,41 @@ export function TileEditor({ onClose }: TileEditorProps) {
         onClick={e => e.stopPropagation()}
       >
         {/* Left Panel - Colors */}
-        <div style={{ width: '180px', display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto' }}>
-          <h3 style={{ color: '#fff', margin: 0, fontSize: '14px' }}>Colors (250)</h3>
+        <div style={{ width: '200px', display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto', paddingRight: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <h3 style={{ color: '#fff', margin: 0, fontSize: '14px' }}>Colors</h3>
+            <div
+              style={{
+                width: '24px',
+                height: '24px',
+                backgroundColor: selectedColor,
+                border: '2px solid #fff',
+                borderRadius: '4px',
+              }}
+              title={selectedColor}
+            />
+          </div>
 
           {Object.entries(COLOR_PALETTE).map(([group, colors]) => (
-            <div key={group}>
-              <div
-                onClick={() => toggleGroup(group)}
-                style={{
-                  color: '#ccc',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  backgroundColor: '#2a2a4a',
-                  borderRadius: '4px',
-                  marginBottom: '4px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  fontSize: '11px',
-                }}
-              >
-                <span>{group}</span>
-                <span>{expandedGroups.has(group) ? '▼' : '▶'}</span>
+            <div key={group} style={{ marginBottom: '2px' }}>
+              <div style={{ color: '#888', fontSize: '9px', marginBottom: '2px' }}>{group}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1px' }}>
+                {colors.map((color, i) => (
+                  <div
+                    key={`${group}-${i}`}
+                    onClick={() => setSelectedColor(color)}
+                    style={{
+                      width: '14px',
+                      height: '14px',
+                      backgroundColor: color,
+                      border: selectedColor === color ? '2px solid #fff' : '1px solid #222',
+                      cursor: 'pointer',
+                      boxSizing: 'border-box',
+                    }}
+                    title={color}
+                  />
+                ))}
               </div>
-
-              {expandedGroups.has(group) && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px', marginBottom: '8px' }}>
-                  {colors.map((color, i) => (
-                    <div
-                      key={`${group}-${i}`}
-                      onClick={() => setSelectedColor(color)}
-                      style={{
-                        width: '16px',
-                        height: '16px',
-                        backgroundColor: color,
-                        border: selectedColor === color ? '2px solid #fff' : '1px solid #333',
-                        borderRadius: '2px',
-                        cursor: 'pointer',
-                      }}
-                      title={color}
-                    />
-                  ))}
-                </div>
-              )}
             </div>
           ))}
         </div>
