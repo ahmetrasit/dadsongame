@@ -19,6 +19,12 @@ export interface DeadYield {
   quantity: number;
 }
 
+export interface SpriteVersion {
+  imageUrl: string;
+  createdAt: number;
+  version: number;
+}
+
 export interface PlantDefinition {
   id: string;
   name: string;
@@ -32,6 +38,8 @@ export interface PlantDefinition {
   aliveYields: AliveYield[];
   deadYields: DeadYield[];
   spriteKey: string;
+  imageUrl?: string;
+  spriteVersions?: SpriteVersion[];
   // Interaction properties
   interactionRadius: number;
   interactionTypes: PlantInteractionType[];

@@ -7,6 +7,7 @@ import { useInteractionStore } from '@/stores/interactionStore';
 import { smoothPolygon } from '@/game/utils/splineUtils';
 import { checkCollision } from '@/game/utils/collisionDetection';
 import { findNearestInteractable } from '@/game/utils/interactionDetection';
+import { generatePlantPreview, generateAnimalPreview } from '@/utils/generatePreviewImage';
 
 export class MainScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite;
@@ -81,26 +82,26 @@ export class MainScene extends Phaser.Scene {
     this.cameras.main.setZoom(1);
     this.cameras.main.centerOn(spawn.x, spawn.y);
 
-    // Input setup
+    // Input setup - use enableCapture=false to allow typing in HTML inputs
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.wasd = {
-      W: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-      A: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-      S: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-      D: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D)
+      W: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W, false),
+      A: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A, false),
+      S: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S, false),
+      D: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D, false)
     };
 
     this.editorKeys = {
-      E: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E),
+      E: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E, false),
       D_KEY: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D, false),
-      ONE: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
-      TWO: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
-      THREE: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
-      FOUR: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR),
-      FIVE: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE),
-      SIX: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SIX),
-      ENTER: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER),
-      ESC: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC),
+      ONE: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ONE, false),
+      TWO: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.TWO, false),
+      THREE: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.THREE, false),
+      FOUR: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR, false),
+      FIVE: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE, false),
+      SIX: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SIX, false),
+      ENTER: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER, false),
+      ESC: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC, false),
     };
 
     // Mouse wheel zoom
@@ -119,26 +120,54 @@ export class MainScene extends Phaser.Scene {
       this.handleEditorClick(pointer);
     });
 
+    // Disable Phaser keyboard when HTML inputs are focused
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        this.input.keyboard!.enabled = false;
+      }
+    };
+    const handleFocusOut = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        this.input.keyboard!.enabled = true;
+      }
+    };
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+
     // Initial render (force full render)
     this.renderMapData(true);
   }
 
   update(_time: number, delta: number): void {
-    this.handleEditorKeys();
+    // Skip keyboard handling if an input element is focused
+    const activeElement = document.activeElement;
+    const isInputFocused = activeElement && (
+      activeElement.tagName === 'INPUT' ||
+      activeElement.tagName === 'TEXTAREA' ||
+      (activeElement as HTMLElement).isContentEditable
+    );
+
+    if (!isInputFocused) {
+      this.handleEditorKeys();
+    }
 
     const mapStore = useMapEditorStore.getState();
     const defStore = useDefinitionsStore.getState();
 
-    // Only allow player movement and interaction when neither editor is open
-    if (!mapStore.isEditing && !defStore.isEditorOpen) {
+    // Only allow player movement and interaction when neither editor is open and no input focused
+    if (!mapStore.isEditing && !defStore.isEditorOpen && !isInputFocused) {
       this.handlePlayerMovement(delta);
       this.updateInteractionDetection(mapStore, defStore);
-    } else {
+    } else if (mapStore.isEditing || defStore.isEditorOpen) {
       // Clear interaction target when in editor mode
       useInteractionStore.getState().clearTarget();
     }
 
-    this.handleCameraPan(delta);
+    if (!isInputFocused) {
+      this.handleCameraPan(delta);
+    }
     this.renderMapData();
   }
 
@@ -304,12 +333,13 @@ export class MainScene extends Phaser.Scene {
 
   private renderRivers(rivers: { points: { x: number; y: number }[] }[]): void {
     this.riverGraphics.clear();
-    this.riverGraphics.fillStyle(0x3b82f6, 0.8);
-    this.riverGraphics.lineStyle(2, 0x2563eb, 1);
 
     for (const river of rivers) {
       if (river.points.length >= 3) {
         const smoothed = smoothPolygon(river.points);
+
+        // Fill with blue only (no border)
+        this.riverGraphics.fillStyle(0x3b82f6, 1);
         this.riverGraphics.beginPath();
         this.riverGraphics.moveTo(smoothed[0].x, smoothed[0].y);
         for (let i = 1; i < smoothed.length; i++) {
@@ -317,7 +347,6 @@ export class MainScene extends Phaser.Scene {
         }
         this.riverGraphics.closePath();
         this.riverGraphics.fillPath();
-        this.riverGraphics.strokePath();
       }
     }
   }
@@ -343,7 +372,7 @@ export class MainScene extends Phaser.Scene {
 
   private updatePlants(
     placements: PlantPlacement[],
-    definitions: { id: string; name: string; subCategory: string }[],
+    definitions: { id: string; name: string; subCategory: string; imageUrl?: string }[],
     isEditing: boolean
   ): void {
     const currentIds = new Set(placements.map(p => p.id));
@@ -377,18 +406,46 @@ export class MainScene extends Phaser.Scene {
 
   private createPlantSprite(
     placement: PlantPlacement,
-    definitions: { id: string; name: string; subCategory: string }[],
+    definitions: { id: string; name: string; subCategory: string; imageUrl?: string }[],
     isEditing: boolean
   ): Phaser.GameObjects.Container {
     const definition = definitions.find(p => p.id === placement.definitionId);
     const container = this.add.container(placement.x, placement.y);
 
-    // Create sprite
-    const spriteKey = definition?.subCategory === 'tree' ? 'tile-tree-top' : 'tile-grass';
-    const sprite = this.add.sprite(0, 0, spriteKey);
+    // Get sprite image (custom or generated)
+    const textureKey = `plant-sprite-${placement.definitionId}`;
 
-    // Add tint based on plant type
-    if (definition) {
+    if (!this.textures.exists(textureKey) && definition) {
+      // Create texture from imageUrl or generate one
+      const imageUrl = definition.imageUrl || generatePlantPreview(definition.subCategory, definition.name);
+      if (imageUrl) {
+        const img = new Image();
+        img.onload = () => {
+          if (!this.textures.exists(textureKey)) {
+            this.textures.addImage(textureKey, img);
+            // Update sprite once texture is loaded
+            const existingSprite = container.first;
+            if (existingSprite && existingSprite instanceof Phaser.GameObjects.Sprite) {
+              existingSprite.setTexture(textureKey);
+              existingSprite.setDisplaySize(32, 32); // Re-apply size after texture change
+              existingSprite.clearTint();
+            }
+          }
+        };
+        img.src = imageUrl;
+      }
+    }
+
+    // Create sprite with texture if available, otherwise use fallback
+    const sprite = this.textures.exists(textureKey)
+      ? this.add.sprite(0, 0, textureKey)
+      : this.add.sprite(0, 0, 'tile-grass');
+
+    // Always set size to 32x32 (1 meter)
+    sprite.setDisplaySize(32, 32);
+
+    // Apply tint only if using fallback texture
+    if (!this.textures.exists(textureKey) && definition) {
       const colorMap: Record<string, number> = {
         tree: 0x22c55e,
         crop: 0xeab308,
@@ -397,12 +454,12 @@ export class MainScene extends Phaser.Scene {
       };
       sprite.setTint(colorMap[definition.subCategory] || 0xffffff);
     }
-
     container.add(sprite);
 
     // Add label if editing
     if (isEditing && definition) {
       const label = this.add.text(0, 20, definition.name, {
+        fontFamily: 'Avenir, system-ui, sans-serif',
         fontSize: '10px',
         color: '#ffffff',
         backgroundColor: '#000000aa',
@@ -420,7 +477,7 @@ export class MainScene extends Phaser.Scene {
   private updatePlantLabel(
     container: Phaser.GameObjects.Container,
     placement: PlantPlacement,
-    definitions: { id: string; name: string; subCategory: string }[],
+    definitions: { id: string; name: string; subCategory: string; imageUrl?: string }[],
     isEditing: boolean
   ): void {
     const existingLabel = container.getByName('label') as Phaser.GameObjects.Text | null;
@@ -429,6 +486,7 @@ export class MainScene extends Phaser.Scene {
     if (isEditing && definition) {
       if (!existingLabel) {
         const label = this.add.text(0, 20, definition.name, {
+          fontFamily: 'Avenir, system-ui, sans-serif',
           fontSize: '10px',
           color: '#ffffff',
           backgroundColor: '#000000aa',
@@ -445,7 +503,7 @@ export class MainScene extends Phaser.Scene {
 
   private updateAnimals(
     placements: AnimalPlacement[],
-    definitions: { id: string; name: string; subCategory: string }[],
+    definitions: { id: string; name: string; subCategory: string; imageUrl?: string }[],
     isEditing: boolean
   ): void {
     const currentIds = new Set(placements.map(p => p.id));
@@ -479,32 +537,67 @@ export class MainScene extends Phaser.Scene {
 
   private createAnimalSprite(
     placement: AnimalPlacement,
-    definitions: { id: string; name: string; subCategory: string }[],
+    definitions: { id: string; name: string; subCategory: string; imageUrl?: string }[],
     isEditing: boolean
   ): Phaser.GameObjects.Container {
     const definition = definitions.find(a => a.id === placement.definitionId);
     const container = this.add.container(placement.x, placement.y);
 
-    // Create colored circle
-    const graphics = this.add.graphics();
-    const colorMap: Record<string, number> = {
-      livestock: 0x8b4513,
-      poultry: 0xffa500,
-      wild: 0x808080,
-      pet: 0xff69b4,
-    };
-    const color = definition ? (colorMap[definition.subCategory] || 0xffffff) : 0xffffff;
+    // Get sprite image (custom or generated)
+    const textureKey = `animal-sprite-${placement.definitionId}`;
 
-    graphics.fillStyle(color, 1);
-    graphics.fillCircle(0, 0, 12);
-    graphics.lineStyle(2, 0x000000, 1);
-    graphics.strokeCircle(0, 0, 12);
+    if (!this.textures.exists(textureKey) && definition) {
+      // Create texture from imageUrl or generate one
+      const imageUrl = definition.imageUrl || generateAnimalPreview(definition.subCategory, definition.name);
+      if (imageUrl) {
+        const img = new Image();
+        img.onload = () => {
+          if (!this.textures.exists(textureKey)) {
+            this.textures.addImage(textureKey, img);
+            // Update sprite once texture is loaded
+            const existingSprite = container.first;
+            if (existingSprite && existingSprite instanceof Phaser.GameObjects.Sprite) {
+              existingSprite.setTexture(textureKey);
+              existingSprite.setDisplaySize(32, 32); // Re-apply size after texture change
+            } else if (existingSprite && existingSprite instanceof Phaser.GameObjects.Graphics) {
+              // Replace graphics with sprite
+              existingSprite.destroy();
+              const sprite = this.add.sprite(0, 0, textureKey);
+              sprite.setDisplaySize(32, 32);
+              container.addAt(sprite, 0);
+            }
+          }
+        };
+        img.src = imageUrl;
+      }
+    }
 
-    container.add(graphics);
+    // Create sprite with texture if available, otherwise use fallback graphics
+    if (this.textures.exists(textureKey)) {
+      const sprite = this.add.sprite(0, 0, textureKey);
+      sprite.setDisplaySize(32, 32);
+      container.add(sprite);
+    } else {
+      // Fallback: colored circle (16px radius = 32px diameter = 1 meter)
+      const graphics = this.add.graphics();
+      const colorMap: Record<string, number> = {
+        livestock: 0x8b4513,
+        poultry: 0xffa500,
+        wild: 0x808080,
+        pet: 0xff69b4,
+      };
+      const color = definition ? (colorMap[definition.subCategory] || 0xffffff) : 0xffffff;
+      graphics.fillStyle(color, 1);
+      graphics.fillCircle(0, 0, 16);
+      graphics.lineStyle(2, 0x000000, 1);
+      graphics.strokeCircle(0, 0, 16);
+      container.add(graphics);
+    }
 
     // Add label if editing
     if (isEditing && definition) {
-      const label = this.add.text(0, 18, definition.name, {
+      const label = this.add.text(0, 20, definition.name, {
+        fontFamily: 'Avenir, system-ui, sans-serif',
         fontSize: '10px',
         color: '#ffffff',
         backgroundColor: '#000000aa',
@@ -522,7 +615,7 @@ export class MainScene extends Phaser.Scene {
   private updateAnimalLabel(
     container: Phaser.GameObjects.Container,
     placement: AnimalPlacement,
-    definitions: { id: string; name: string; subCategory: string }[],
+    definitions: { id: string; name: string; subCategory: string; imageUrl?: string }[],
     isEditing: boolean
   ): void {
     const existingLabel = container.getByName('label') as Phaser.GameObjects.Text | null;
@@ -531,6 +624,7 @@ export class MainScene extends Phaser.Scene {
     if (isEditing && definition) {
       if (!existingLabel) {
         const label = this.add.text(0, 18, definition.name, {
+          fontFamily: 'Avenir, system-ui, sans-serif',
           fontSize: '10px',
           color: '#ffffff',
           backgroundColor: '#000000aa',
@@ -547,7 +641,7 @@ export class MainScene extends Phaser.Scene {
 
   private updateWaters(
     placements: WaterPlacement[],
-    definitions: { id: string; name: string; waterType: string }[],
+    definitions: { id: string; name: string; waterType: string; imageUrl?: string }[],
     isEditing: boolean
   ): void {
     const currentIds = new Set(placements.map(p => p.id));
@@ -581,33 +675,60 @@ export class MainScene extends Phaser.Scene {
 
   private createWaterSprite(
     placement: WaterPlacement,
-    definitions: { id: string; name: string; waterType: string }[],
+    definitions: { id: string; name: string; waterType: string; imageUrl?: string }[],
     isEditing: boolean
   ): Phaser.GameObjects.Container {
     const definition = definitions.find(w => w.id === placement.definitionId);
     const container = this.add.container(placement.x, placement.y);
 
-    // Create colored circle for water
-    const graphics = this.add.graphics();
-    const colorMap: Record<string, number> = {
-      river: 0x3b82f6,
-      pond: 0x60a5fa,
-      lake: 0x2563eb,
-      ocean: 0x1d4ed8,
-      well: 0x6b7280,
-    };
-    const color = definition ? (colorMap[definition.waterType] || 0x3b82f6) : 0x3b82f6;
+    // Get sprite image if available
+    const textureKey = `water-sprite-${placement.definitionId}`;
 
-    graphics.fillStyle(color, 0.8);
-    graphics.fillCircle(0, 0, 20);
-    graphics.lineStyle(2, 0x1e40af, 1);
-    graphics.strokeCircle(0, 0, 20);
+    if (!this.textures.exists(textureKey) && definition?.imageUrl) {
+      const img = new Image();
+      img.onload = () => {
+        if (!this.textures.exists(textureKey)) {
+          this.textures.addImage(textureKey, img);
+          // Replace graphics with sprite once loaded
+          const existingGraphics = container.first;
+          if (existingGraphics && existingGraphics instanceof Phaser.GameObjects.Graphics) {
+            existingGraphics.destroy();
+            const sprite = this.add.sprite(0, 0, textureKey);
+            sprite.setDisplaySize(32, 32);
+            container.addAt(sprite, 0);
+          }
+        }
+      };
+      img.src = definition.imageUrl;
+    }
 
-    container.add(graphics);
+    // Create sprite with texture if available, otherwise use fallback graphics
+    if (this.textures.exists(textureKey)) {
+      const sprite = this.add.sprite(0, 0, textureKey);
+      sprite.setDisplaySize(32, 32);
+      container.add(sprite);
+    } else {
+      // Fallback: colored circle for water
+      const graphics = this.add.graphics();
+      const colorMap: Record<string, number> = {
+        river: 0x3b82f6,
+        pond: 0x60a5fa,
+        lake: 0x2563eb,
+        ocean: 0x1d4ed8,
+        well: 0x6b7280,
+      };
+      const color = definition ? (colorMap[definition.waterType] || 0x3b82f6) : 0x3b82f6;
+      graphics.fillStyle(color, 0.8);
+      graphics.fillCircle(0, 0, 16);
+      graphics.lineStyle(2, 0x1e40af, 1);
+      graphics.strokeCircle(0, 0, 16);
+      container.add(graphics);
+    }
 
     // Add label if editing
     if (isEditing && definition) {
-      const label = this.add.text(0, 26, definition.name, {
+      const label = this.add.text(0, 20, definition.name, {
+        fontFamily: 'Avenir, system-ui, sans-serif',
         fontSize: '10px',
         color: '#ffffff',
         backgroundColor: '#000000aa',
@@ -625,7 +746,7 @@ export class MainScene extends Phaser.Scene {
   private updateWaterLabel(
     container: Phaser.GameObjects.Container,
     placement: WaterPlacement,
-    definitions: { id: string; name: string; waterType: string }[],
+    definitions: { id: string; name: string; waterType: string; imageUrl?: string }[],
     isEditing: boolean
   ): void {
     const existingLabel = container.getByName('label') as Phaser.GameObjects.Text | null;
@@ -633,7 +754,8 @@ export class MainScene extends Phaser.Scene {
 
     if (isEditing && definition) {
       if (!existingLabel) {
-        const label = this.add.text(0, 26, definition.name, {
+        const label = this.add.text(0, 20, definition.name, {
+          fontFamily: 'Avenir, system-ui, sans-serif',
           fontSize: '10px',
           color: '#ffffff',
           backgroundColor: '#000000aa',

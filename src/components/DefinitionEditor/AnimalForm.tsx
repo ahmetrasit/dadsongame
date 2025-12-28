@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useDefinitionsStore, Season, DeadYield, AliveYield, AnimalSubCategory } from '@/stores/definitionsStore';
 import { Card, FieldRow, CompactInput, CompactSelect, TwoColumnRow, SliderField, CheckboxGroup } from './FormComponents';
 import { FaTrashAlt } from 'react-icons/fa';
+import { generateAnimalPreview } from '@/utils/generatePreviewImage';
 
 interface AnimalFormProps {
   item: any;
@@ -70,6 +71,11 @@ export function AnimalForm({ item, isDraft, onSave, onCancel }: AnimalFormProps)
   const isDuplicateName = animals.some(a => a.name.toLowerCase() === item.name.toLowerCase() && a.id !== item.id);
   const canSave = item.name.trim() !== '' && !isDuplicateName;
 
+  // Generate preview image if no custom image is uploaded
+  const previewImage = useMemo(() => {
+    return item.imageUrl || generateAnimalPreview(item.subCategory, item.name);
+  }, [item.imageUrl, item.subCategory, item.name]);
+
   return (
     <div style={{ maxWidth: '900px' }}>
       {/* Header Card */}
@@ -80,6 +86,43 @@ export function AnimalForm({ item, isDraft, onSave, onCancel }: AnimalFormProps)
           </div>
         )}
         <FieldRow>
+          {/* Image preview and upload */}
+          <div
+            onClick={() => document.getElementById(`animal-image-upload-${item.id}`)?.click()}
+            style={{
+              width: '60px',
+              height: '60px',
+              border: '2px dashed #D4C4B0',
+              borderRadius: '8px',
+              marginRight: '12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundImage: `url(${previewImage})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              flexShrink: 0,
+            }}
+            title={item.imageUrl ? "Click to change image" : "Click to upload custom image (default preview shown)"}
+          >
+          </div>
+          <input
+            id={`animal-image-upload-${item.id}`}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  handleChange('imageUrl', reader.result as string);
+                };
+                reader.readAsDataURL(file);
+              }
+            }}
+          />
           <input
             type="text"
             value={item.name}
