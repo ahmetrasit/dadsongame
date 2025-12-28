@@ -8,110 +8,81 @@ const DISPLAY_SCALE = 6; // Scale up for display
 const DISPLAY_SIZE = CANVAS_PIXELS * DISPLAY_SCALE; // 480px display
 const STORAGE_KEY = 'tileEditor_data';
 
-// Color palette - 250 colors organized in groups
-const COLOR_PALETTE: { [group: string]: string[] } = {
-  'Reds': [
-    '#FFE5E5', '#FFCCCC', '#FFB3B3', '#FF9999', '#FF8080',
-    '#FF6666', '#FF4D4D', '#FF3333', '#FF1A1A', '#FF0000',
-    '#E60000', '#CC0000', '#B30000', '#990000', '#800000',
-    '#660000', '#4D0000', '#330000', '#1A0000', '#FFC0CB',
-    '#FFB6C1', '#FF69B4', '#FF1493', '#DB7093', '#C71585',
-  ],
-  'Oranges': [
-    '#FFF5E6', '#FFECD9', '#FFE0C2', '#FFD4A8', '#FFC78A',
-    '#FFBA6C', '#FFAD4E', '#FFA030', '#FF9312', '#FF8600',
-    '#E67800', '#CC6A00', '#B35C00', '#994E00', '#804000',
-    '#663300', '#F4A460', '#D2691E', '#CD853F', '#A0522D',
-  ],
-  'Yellows': [
-    '#FFFFF0', '#FFFFE0', '#FFFFD0', '#FFFFC0', '#FFFFB0',
-    '#FFFFA0', '#FFFF90', '#FFFF80', '#FFFF60', '#FFFF00',
-    '#FFD700', '#FFC700', '#FFB700', '#FFA700', '#DAA520',
-    '#B8860B', '#CD9B1D', '#EEC900', '#FFD700', '#F0E68C',
-  ],
-  'Browns': [
-    '#FDF5E6', '#FAF0E6', '#F5DEB3', '#DEB887', '#D2B48C',
-    '#C4A882', '#B69B78', '#A88E6E', '#9A8164', '#8C745A',
-    '#8B7355', '#7B6450', '#6B554B', '#5C4640', '#4D3735',
-    '#3E2A2A', '#2F1D1D', '#8B4513', '#A0522D', '#6B4423',
-    '#5D3A1A', '#4E3011', '#3F2608', '#D2691E', '#CD853F',
-    '#BC8F8F', '#A52A2A', '#800000', '#654321', '#3D2314',
-  ],
-  'Greens': [
-    '#F0FFF0', '#E8FFE8', '#D0FFD0', '#B8FFB8', '#A0FFA0',
-    '#88FF88', '#70FF70', '#58FF58', '#40FF40', '#28FF28',
-    '#00FF00', '#00E600', '#00CC00', '#00B300', '#009900',
-    '#008000', '#006600', '#004D00', '#003300', '#001A00',
-    '#98FB98', '#90EE90', '#8FBC8F', '#7CFC00', '#7FFF00',
-    '#ADFF2F', '#32CD32', '#228B22', '#2E8B57', '#3CB371',
-    '#20B2AA', '#66CDAA', '#00FA9A', '#00FF7F', '#006400',
-  ],
-  'Blues': [
-    '#F0F8FF', '#E6F3FF', '#CCE7FF', '#B3DBFF', '#99CFFF',
-    '#80C3FF', '#66B7FF', '#4DABFF', '#339FFF', '#1A93FF',
-    '#0087FF', '#007BEB', '#006FD7', '#0063C3', '#0057AF',
-    '#004B9B', '#003F87', '#003373', '#00275F', '#001B4B',
-    '#87CEEB', '#87CEFA', '#00BFFF', '#1E90FF', '#6495ED',
-    '#4169E1', '#0000FF', '#0000CD', '#00008B', '#000080',
-    '#191970', '#4682B4', '#5F9EA0', '#ADD8E6', '#B0E0E6',
-  ],
-  'Rich Colors': [
-    // Deep Purples & Violets
-    '#4B0082', '#3F0071', '#340060', '#29004F', '#1E003E',
-    '#5B2C6F', '#6C3483', '#7D3C98', '#8E44AD', '#9B59B6',
-    // Royal & Navy Blues
-    '#1A0033', '#0D001A', '#0A1628', '#0F1F3D', '#152952',
-    '#1B3A6D', '#214B87', '#2E5CA2', '#1F4788', '#1A3A6E',
-    // Deep Teals & Cyans
-    '#003333', '#004444', '#005555', '#006666', '#007777',
-    '#008080', '#009999', '#00AAAA', '#0D6B6B', '#0A5252',
-    // Rich Magentas & Wines
-    '#800040', '#990052', '#B30066', '#CC0077', '#990033',
-    '#800020', '#660019', '#4D0013', '#8B0A50', '#C71585',
-    // Deep Forest & Emeralds
-    '#004D00', '#003D00', '#002E00', '#001F00', '#0D3D0D',
-    '#1A4D1A', '#145214', '#0F470F', '#0A3C0A', '#053105',
-    // Burnt & Rich Oranges
-    '#8B2500', '#A52A00', '#BF3000', '#CC3300', '#993D00',
-    '#804000', '#664400', '#B34700', '#E65C00', '#FF6600',
-  ],
-  'Pale Colors': [
-    // Pale Pinks
-    '#FFF0F5', '#FFE4E9', '#FFD9E3', '#FFCED8', '#FFC3CD',
-    '#FFB8C2', '#FFADB7', '#FFA2AC', '#FF97A1', '#FFE4EC',
-    // Pale Blues
-    '#F0F8FF', '#E6F3FF', '#DCF0FF', '#D2EDFF', '#C8EAFF',
-    '#BEE7FF', '#B4E4FF', '#AAE1FF', '#A0DEFF', '#E6F7FF',
-    // Pale Greens
-    '#F0FFF0', '#E6FFE6', '#DCFFDC', '#D2FFD2', '#C8FFC8',
-    '#BEFFBE', '#B4FFB4', '#AAFFAA', '#A0FFA0', '#E6FFE0',
-    // Pale Yellows
-    '#FFFFF0', '#FFFFE6', '#FFFFDC', '#FFFFD2', '#FFFFC8',
-    '#FFFFBE', '#FFFFB4', '#FFFFAA', '#FFFFA0', '#FFF9E6',
-    // Pale Lavenders
-    '#F8F0FF', '#F0E6FF', '#E8DCFF', '#E0D2FF', '#D8C8FF',
-    '#D0BEFF', '#C8B4FF', '#C0AAFF', '#B8A0FF', '#EEE0FF',
-  ],
-  'Skin Tones': [
-    '#FFECD9', '#FFE4C4', '#FFDAB9', '#FFD0A8', '#FFC69A',
-    '#E8BA8C', '#DAAE80', '#CCA274', '#BE9668', '#B08A5C',
-    '#A27E50', '#8D6E46', '#7A5E3C', '#6A5035', '#5A422E',
-    '#4A3527', '#3A2820', '#8B7355', '#A0826D', '#C4A484',
-  ],
-  'Grays': [
-    '#FFFFFF', '#FAFAFA', '#F5F5F5', '#EEEEEE', '#E0E0E0',
-    '#D0D0D0', '#C0C0C0', '#B0B0B0', '#A0A0A0', '#909090',
-    '#808080', '#707070', '#606060', '#505050', '#404040',
-    '#303030', '#202020', '#101010', '#080808', '#000000',
-    '#F8F8FF', '#DCDCDC', '#D3D3D3', '#C0C0C0', '#A9A9A9',
-  ],
-  'Earth & Nature': [
-    '#556B2F', '#6B8E23', '#808000', '#BDB76B', '#F0E68C',
-    '#EEE8AA', '#FAFAD2', '#8FBC8F', '#9ACD32', '#6B4423',
-    '#8B7355', '#A0826D', '#BC8F8F', '#F4A460', '#D2691E',
-    '#CD853F', '#8B4513', '#A52A2A', '#704214', '#5C4033',
-  ],
-};
+// Color palette - flat list of all colors (no groups)
+const ALL_COLORS: string[] = [
+  // Grays & Whites
+  '#FFFFFF', '#FAFAFA', '#F5F5F5', '#EEEEEE', '#E0E0E0',
+  '#D0D0D0', '#C0C0C0', '#B0B0B0', '#A0A0A0', '#909090',
+  '#808080', '#707070', '#606060', '#505050', '#404040',
+  '#303030', '#202020', '#101010', '#080808', '#000000',
+  // Reds
+  '#FFE5E5', '#FFCCCC', '#FFB3B3', '#FF9999', '#FF8080',
+  '#FF6666', '#FF4D4D', '#FF3333', '#FF1A1A', '#FF0000',
+  '#E60000', '#CC0000', '#B30000', '#990000', '#800000',
+  '#660000', '#4D0000', '#330000', '#FFC0CB', '#FFB6C1',
+  '#FF69B4', '#FF1493', '#DB7093', '#C71585',
+  // Oranges
+  '#FFF5E6', '#FFECD9', '#FFE0C2', '#FFD4A8', '#FFC78A',
+  '#FFBA6C', '#FFAD4E', '#FFA030', '#FF9312', '#FF8600',
+  '#E67800', '#CC6A00', '#B35C00', '#994E00', '#804000',
+  '#663300', '#F4A460', '#D2691E', '#CD853F', '#A0522D',
+  // Yellows
+  '#FFFFF0', '#FFFFE0', '#FFFFD0', '#FFFFC0', '#FFFFB0',
+  '#FFFFA0', '#FFFF90', '#FFFF80', '#FFFF60', '#FFFF00',
+  '#FFD700', '#FFC700', '#FFB700', '#FFA700', '#DAA520',
+  '#B8860B', '#CD9B1D', '#EEC900', '#F0E68C',
+  // Browns
+  '#FDF5E6', '#FAF0E6', '#F5DEB3', '#DEB887', '#D2B48C',
+  '#C4A882', '#B69B78', '#A88E6E', '#9A8164', '#8C745A',
+  '#8B7355', '#7B6450', '#6B554B', '#5C4640', '#4D3735',
+  '#3E2A2A', '#2F1D1D', '#8B4513', '#A0522D', '#6B4423',
+  '#5D3A1A', '#4E3011', '#3F2608', '#654321', '#3D2314',
+  // Greens
+  '#F0FFF0', '#E8FFE8', '#D0FFD0', '#B8FFB8', '#A0FFA0',
+  '#88FF88', '#70FF70', '#58FF58', '#40FF40', '#28FF28',
+  '#00FF00', '#00E600', '#00CC00', '#00B300', '#009900',
+  '#008000', '#006600', '#004D00', '#003300', '#001A00',
+  '#98FB98', '#90EE90', '#8FBC8F', '#7CFC00', '#7FFF00',
+  '#ADFF2F', '#32CD32', '#228B22', '#2E8B57', '#3CB371',
+  '#20B2AA', '#66CDAA', '#00FA9A', '#00FF7F', '#006400',
+  // Blues
+  '#F0F8FF', '#E6F3FF', '#CCE7FF', '#B3DBFF', '#99CFFF',
+  '#80C3FF', '#66B7FF', '#4DABFF', '#339FFF', '#1A93FF',
+  '#0087FF', '#007BEB', '#006FD7', '#0063C3', '#0057AF',
+  '#004B9B', '#003F87', '#003373', '#00275F', '#001B4B',
+  '#87CEEB', '#87CEFA', '#00BFFF', '#1E90FF', '#6495ED',
+  '#4169E1', '#0000FF', '#0000CD', '#00008B', '#000080',
+  '#191970', '#4682B4', '#5F9EA0', '#ADD8E6', '#B0E0E6',
+  // Rich Colors (Purples, Deep teals, Magentas, etc.)
+  '#4B0082', '#3F0071', '#340060', '#29004F', '#1E003E',
+  '#5B2C6F', '#6C3483', '#7D3C98', '#8E44AD', '#9B59B6',
+  '#1A0033', '#0D001A', '#0A1628', '#0F1F3D', '#152952',
+  '#1B3A6D', '#214B87', '#2E5CA2', '#1F4788', '#1A3A6E',
+  '#003333', '#004444', '#005555', '#006666', '#007777',
+  '#008080', '#009999', '#00AAAA', '#0D6B6B', '#0A5252',
+  '#800040', '#990052', '#B30066', '#CC0077', '#990033',
+  '#800020', '#660019', '#4D0013', '#8B0A50', '#C71585',
+  '#8B2500', '#A52A00', '#BF3000', '#CC3300', '#993D00',
+  '#804000', '#664400', '#B34700', '#E65C00', '#FF6600',
+  // Pale Colors
+  '#FFF0F5', '#FFE4E9', '#FFD9E3', '#FFCED8', '#FFC3CD',
+  '#FFB8C2', '#FFADB7', '#FFA2AC', '#FF97A1', '#FFE4EC',
+  '#DCF0FF', '#D2EDFF', '#C8EAFF', '#BEE7FF', '#B4E4FF',
+  '#AAE1FF', '#A0DEFF', '#E6F7FF', '#DCFFDC', '#D2FFD2',
+  '#C8FFC8', '#BEFFBE', '#B4FFB4', '#AAFFAA', '#A0FFA0',
+  '#E6FFE0', '#FFFFDC', '#FFFFD2', '#FFFFC8', '#FFFFBE',
+  '#FFFFB4', '#FFFFAA', '#FFFFA0', '#FFF9E6', '#F8F0FF',
+  '#F0E6FF', '#E8DCFF', '#E0D2FF', '#D8C8FF', '#D0BEFF',
+  '#C8B4FF', '#C0AAFF', '#B8A0FF', '#EEE0FF',
+  // Skin Tones
+  '#FFECD9', '#FFE4C4', '#FFDAB9', '#FFD0A8', '#FFC69A',
+  '#E8BA8C', '#DAAE80', '#CCA274', '#BE9668', '#B08A5C',
+  '#A27E50', '#8D6E46', '#7A5E3C', '#6A5035', '#5A422E',
+  '#4A3527', '#3A2820', '#8B7355', '#A0826D', '#C4A484',
+  // Earth & Nature
+  '#556B2F', '#6B8E23', '#808000', '#BDB76B', '#EEE8AA',
+  '#FAFAD2', '#9ACD32', '#BC8F8F', '#A52A2A', '#704214', '#5C4033',
+];
 
 // Layer interface
 interface Layer {
@@ -187,6 +158,7 @@ export function TileEditor({ onClose }: TileEditorProps) {
   // K-key region selection for saving to gallery
   const [regionSelectMode, setRegionSelectMode] = useState(false);
   const [regionPoint1, setRegionPoint1] = useState<{ x: number; y: number } | null>(null);
+  const [regionPoint2, setRegionPoint2] = useState<{ x: number; y: number } | null>(null);
 
   // Zoom and pan
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -235,17 +207,20 @@ export function TileEditor({ onClose }: TileEditorProps) {
         if (!regionSelectMode) {
           setRegionSelectMode(true);
           setRegionPoint1(null);
+          setRegionPoint2(null);
           setTileSelectMode(false); // Turn off tile select mode
         } else {
           // Cancel region select mode
           setRegionSelectMode(false);
           setRegionPoint1(null);
+          setRegionPoint2(null);
         }
       }
       // Escape to cancel
       if (e.key === 'Escape' && regionSelectMode) {
         setRegionSelectMode(false);
         setRegionPoint1(null);
+        setRegionPoint2(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -333,9 +308,10 @@ export function TileEditor({ onClose }: TileEditorProps) {
         if (!regionPoint1) {
           // First click - set first point
           setRegionPoint1({ x, y });
-        } else {
-          // Second click - save region to gallery
-          saveRegionToGallery(regionPoint1.x, regionPoint1.y, x, y);
+          setRegionPoint2(null);
+        } else if (!regionPoint2) {
+          // Second click - set second point (don't auto-save, show button)
+          setRegionPoint2({ x, y });
         }
       }
       return;
@@ -501,17 +477,35 @@ export function TileEditor({ onClose }: TileEditorProps) {
       const p1x = regionPoint1.x * DISPLAY_SCALE;
       const p1y = regionPoint1.y * DISPLAY_SCALE;
 
-      // Draw first point marker
-      ctx.fillStyle = '#FF5722';
-      ctx.beginPath();
-      ctx.arc(p1x + DISPLAY_SCALE / 2, p1y + DISPLAY_SCALE / 2, 8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
-      ctx.stroke();
+      if (regionPoint2) {
+        // Both points selected - draw orange overlay
+        const p2x = regionPoint2.x * DISPLAY_SCALE;
+        const p2y = regionPoint2.y * DISPLAY_SCALE;
+        const minX = Math.min(p1x, p2x);
+        const minY = Math.min(p1y, p2y);
+        const width = Math.abs(p2x - p1x) + DISPLAY_SCALE;
+        const height = Math.abs(p2y - p1y) + DISPLAY_SCALE;
+
+        // Orange overlay
+        ctx.fillStyle = 'rgba(255, 152, 0, 0.35)';
+        ctx.fillRect(minX, minY, width, height);
+        // Orange border
+        ctx.strokeStyle = '#FF9800';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(minX, minY, width, height);
+      } else {
+        // Only first point - draw orange dot marker
+        ctx.fillStyle = '#FF5722';
+        ctx.beginPath();
+        ctx.arc(p1x + DISPLAY_SCALE / 2, p1y + DISPLAY_SCALE / 2, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
     }
 
-  }, [layers, activeLayerId, ghostMode, tileSelectMode, selectedTiles, regionSelectMode, regionPoint1]);
+  }, [layers, activeLayerId, ghostMode, tileSelectMode, selectedTiles, regionSelectMode, regionPoint1, regionPoint2]);
 
   // Generate thumbnail for full canvas
   const generateThumbnail = (targetLayers?: Layer[]): string => {
@@ -654,13 +648,15 @@ export function TileEditor({ onClose }: TileEditorProps) {
     setSpriteName('');
   };
 
-  // Save selected region to gallery (K key selection)
-  const saveRegionToGallery = (x1: number, y1: number, x2: number, y2: number) => {
+  // Save selected region to gallery (K key selection) - called by button
+  const saveSelectedRegionToGallery = () => {
+    if (!regionPoint1 || !regionPoint2) return;
+
     // Get bounding box
-    const minX = Math.min(x1, x2);
-    const maxX = Math.max(x1, x2);
-    const minY = Math.min(y1, y2);
-    const maxY = Math.max(y1, y2);
+    const minX = Math.min(regionPoint1.x, regionPoint2.x);
+    const maxX = Math.max(regionPoint1.x, regionPoint2.x);
+    const minY = Math.min(regionPoint1.y, regionPoint2.y);
+    const maxY = Math.max(regionPoint1.y, regionPoint2.y);
     const width = maxX - minX + 1;
     const height = maxY - minY + 1;
 
@@ -709,6 +705,14 @@ export function TileEditor({ onClose }: TileEditorProps) {
     // Reset region selection
     setRegionSelectMode(false);
     setRegionPoint1(null);
+    setRegionPoint2(null);
+  };
+
+  // Cancel region selection
+  const cancelRegionSelection = () => {
+    setRegionSelectMode(false);
+    setRegionPoint1(null);
+    setRegionPoint2(null);
   };
 
   // Load from gallery
@@ -775,146 +779,10 @@ export function TileEditor({ onClose }: TileEditorProps) {
         bottom: 0,
         backgroundColor: '#0a0a14',
         display: 'flex',
+        flexDirection: 'column',
         zIndex: 1000,
       }}
     >
-      {/* LEFT PANEL - Colors */}
-      <div
-        style={{
-          width: '320px',
-          height: '100vh',
-          backgroundColor: '#1a1a2e',
-          borderRight: '2px solid #333',
-          display: 'flex',
-          flexDirection: 'column',
-          padding: '20px',
-          overflowY: 'auto',
-        }}
-      >
-        {/* Selected Color Preview */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
-          <div
-            style={{
-              width: '60px',
-              height: '60px',
-              backgroundColor: selectedColor,
-              border: '3px solid #fff',
-              borderRadius: '8px',
-            }}
-            title={selectedColor}
-          />
-          <div>
-            <h2 style={{ color: '#fff', margin: 0, fontSize: '20px' }}>Colors</h2>
-            <span style={{ color: '#888', fontSize: '12px' }}>{selectedColor}</span>
-          </div>
-        </div>
-
-        {/* Color Palette - Scrollable */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          {Object.entries(COLOR_PALETTE).map(([group, colors]) => (
-            <div key={group} style={{ marginBottom: '15px' }}>
-              <div style={{ color: '#aaa', fontSize: '12px', marginBottom: '6px', fontWeight: 'bold' }}>{group}</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                {colors.map((color, i) => (
-                  <div
-                    key={`${group}-${i}`}
-                    onClick={() => setSelectedColor(color)}
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      backgroundColor: color,
-                      border: selectedColor === color ? '3px solid #fff' : '2px solid #333',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      boxSizing: 'border-box',
-                    }}
-                    title={color}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Tools at bottom of color panel */}
-        <div style={{ borderTop: '1px solid #444', paddingTop: '15px', marginTop: '15px' }}>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-            <button
-              onClick={() => setTool('paint')}
-              style={{
-                flex: 1,
-                padding: '10px',
-                backgroundColor: tool === 'paint' ? '#4CAF50' : '#333',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '14px',
-              }}
-            >
-              Paint
-            </button>
-            <button
-              onClick={() => setTool('erase')}
-              style={{
-                flex: 1,
-                padding: '10px',
-                backgroundColor: tool === 'erase' ? '#f44336' : '#333',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '14px',
-              }}
-            >
-              Erase
-            </button>
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              onClick={clearCanvas}
-              style={{
-                flex: 1,
-                padding: '8px',
-                backgroundColor: '#666',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '12px',
-              }}
-            >
-              Clear Layer
-            </button>
-            <button
-              onClick={clearAllLayers}
-              style={{
-                flex: 1,
-                padding: '8px',
-                backgroundColor: '#8B0000',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '12px',
-              }}
-            >
-              Clear All
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* RIGHT PANEL - Canvas */}
-      <div
-        style={{
-          flex: 1,
-          height: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          backgroundColor: '#0a0a14',
-        }}
-      >
         {/* Top Toolbar */}
         <div
           style={{
@@ -1059,11 +927,62 @@ export function TileEditor({ onClose }: TileEditorProps) {
             />
           </div>
 
+          {/* Save Region Button - appears when region selected */}
+          {regionSelectMode && regionPoint1 && regionPoint2 && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '20px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                display: 'flex',
+                gap: '10px',
+                backgroundColor: 'rgba(0,0,0,0.8)',
+                padding: '12px 20px',
+                borderRadius: '8px',
+              }}
+            >
+              <button
+                onClick={saveSelectedRegionToGallery}
+                style={{
+                  padding: '10px 24px',
+                  backgroundColor: '#FF9800',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                }}
+              >
+                Save to Gallery
+              </button>
+              <button
+                onClick={cancelRegionSelection}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#666',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
           {/* Mode indicator and hint */}
           <div style={{ position: 'absolute', bottom: '20px', left: '20px', color: '#666', fontSize: '12px' }}>
             {regionSelectMode ? (
               <span style={{ color: '#FF5722' }}>
-                {regionPoint1 ? 'Click second point to save region • ESC to cancel' : 'Click first point • ESC to cancel'}
+                {regionPoint1 && regionPoint2
+                  ? 'Click Save to Gallery or Cancel'
+                  : regionPoint1
+                    ? 'Click second point to select region'
+                    : 'Click first point • ESC to cancel'}
               </span>
             ) : (
               'Scroll to zoom • Middle-click drag to pan • Right-click to erase • K to select region'
@@ -1197,7 +1116,120 @@ export function TileEditor({ onClose }: TileEditorProps) {
             </button>
           </div>
         </div>
-      </div>
+
+        {/* Color Palette - Bottom Bar (horizontal scroll, big swatches, no groups) */}
+        <div
+          style={{
+            backgroundColor: '#1a1a2e',
+            borderTop: '2px solid #333',
+            padding: '12px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '15px',
+          }}
+        >
+          {/* Selected color preview */}
+          <div
+            style={{
+              width: '48px',
+              height: '48px',
+              backgroundColor: selectedColor,
+              border: '3px solid #fff',
+              borderRadius: '6px',
+              flexShrink: 0,
+            }}
+            title={selectedColor}
+          />
+
+          {/* Tool buttons */}
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            <button
+              onClick={() => setTool('paint')}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: tool === 'paint' ? '#4CAF50' : '#333',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+              }}
+            >
+              Paint
+            </button>
+            <button
+              onClick={() => setTool('erase')}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: tool === 'erase' ? '#f44336' : '#333',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+              }}
+            >
+              Erase
+            </button>
+            <button
+              onClick={clearCanvas}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: '#666',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+              }}
+            >
+              Clear
+            </button>
+            <button
+              onClick={clearAllLayers}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: '#8B0000',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+              }}
+            >
+              All
+            </button>
+          </div>
+
+          {/* Scrollable color swatches */}
+          <div
+            style={{
+              flex: 1,
+              overflowX: 'auto',
+              display: 'flex',
+              gap: '6px',
+              paddingBottom: '4px',
+            }}
+          >
+            {ALL_COLORS.map((color, i) => (
+              <div
+                key={i}
+                onClick={() => setSelectedColor(color)}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  backgroundColor: color,
+                  border: selectedColor === color ? '3px solid #fff' : '2px solid #444',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                  flexShrink: 0,
+                }}
+                title={color}
+              />
+            ))}
+          </div>
+        </div>
 
       {/* Gallery Full Screen */}
         {showGalleryScreen && (
