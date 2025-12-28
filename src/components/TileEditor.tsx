@@ -1105,22 +1105,32 @@ export function TileEditor({ onClose }: TileEditorProps) {
                   position: 'relative',
                 }}
               >
-                <canvas
-                  ref={canvasRef}
-                  width={DISPLAY_SIZE}
-                  height={DISPLAY_SIZE}
-                  onMouseDown={handleCanvasMouseDownWithButton}
-                  onMouseMove={handleCanvasMouseMove}
-                  onMouseUp={handleCanvasMouseUp}
-                  onMouseLeave={handleCanvasMouseUp}
-                  onWheel={handleWheel}
-                  onContextMenu={handleContextMenu}
+                {/* Canvas container with overflow hidden to clip zoomed content */}
+                <div
                   style={{
-                    cursor: regionSelectMode ? 'crosshair' : (tileSelectMode ? 'pointer' : (isPanning ? 'grabbing' : 'crosshair')),
-                    transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
-                    transformOrigin: 'center center',
+                    width: DISPLAY_SIZE,
+                    height: DISPLAY_SIZE,
+                    overflow: 'hidden',
+                    position: 'relative',
                   }}
-                />
+                >
+                  <canvas
+                    ref={canvasRef}
+                    width={DISPLAY_SIZE}
+                    height={DISPLAY_SIZE}
+                    onMouseDown={handleCanvasMouseDownWithButton}
+                    onMouseMove={handleCanvasMouseMove}
+                    onMouseUp={handleCanvasMouseUp}
+                    onMouseLeave={handleCanvasMouseUp}
+                    onWheel={handleWheel}
+                    onContextMenu={handleContextMenu}
+                    style={{
+                      cursor: regionSelectMode ? 'crosshair' : (tileSelectMode ? 'pointer' : (isPanning ? 'grabbing' : 'crosshair')),
+                      transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
+                      transformOrigin: 'center center',
+                    }}
+                  />
+                </div>
 
                 {/* Save Region Button - appears when region selected */}
                 {regionSelectMode && regionPoint1 && regionPoint2 && (

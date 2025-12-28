@@ -1,2 +1,2 @@
 // Increment this with each change
-export const VERSION = 'v0.043';
+export const VERSION = 'v0.044';
