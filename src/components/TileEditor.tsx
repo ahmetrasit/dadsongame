@@ -611,7 +611,7 @@ export function TileEditor({ onClose }: TileEditorProps) {
 
       newSprites.push({
         id: `sprite-${Date.now()}-${tx}-${ty}`,
-        name: `Tile ${tx + 1},${ty + 1}`,
+        name: `Sprite ${gallery.length + newSprites.length + 1}`,
         group: selectedGalleryGroup,
         layers: extractTileLayers(tx, ty),
         thumbnail,
@@ -694,7 +694,7 @@ export function TileEditor({ onClose }: TileEditorProps) {
 
     const sprite: GallerySprite = {
       id: `sprite-${Date.now()}`,
-      name: `Region ${width}x${height}`,
+      name: `Sprite ${gallery.length + 1}`,
       group: selectedGalleryGroup,
       layers: regionLayers,
       thumbnail: tempCanvas.toDataURL(),
@@ -727,19 +727,6 @@ export function TileEditor({ onClose }: TileEditorProps) {
     setGallery(gallery.filter(s => s.id !== id));
     setReferenceSprites(referenceSprites.filter(r => r.spriteId !== id));
   };
-
-  // Add reference sprite
-  const addReferenceSprite = (sprite: GallerySprite, position: ReferenceSprite['position']) => {
-    // Remove existing reference at same position
-    const filtered = referenceSprites.filter(r => r.position !== position);
-    setReferenceSprites([...filtered, {
-      id: `ref-${Date.now()}`,
-      spriteId: sprite.id,
-      position,
-      thumbnail: sprite.thumbnail,
-    }]);
-  };
-
 
   // Add new gallery group
   const addGalleryGroup = () => {
@@ -777,9 +764,9 @@ export function TileEditor({ onClose }: TileEditorProps) {
         left: 0,
         width: '100vw',
         height: '100vh',
-        background: '#1a1a2e',
+        background: '#FFF1E5',
         zIndex: 1000,
-        color: '#e0e0e0',
+        color: '#333',
         fontFamily: '"Avenir", "Avenir Next", -apple-system, BlinkMacSystemFont, sans-serif',
         fontSize: '14px',
         overflow: 'auto',
@@ -788,7 +775,7 @@ export function TileEditor({ onClose }: TileEditorProps) {
       }}
     >
       {/* Header */}
-      <div style={{ padding: '20px', borderBottom: '1px solid #333', background: '#0f0f1e' }}>
+      <div style={{ padding: '20px', borderBottom: '1px solid #ddd', background: '#F5E6D3' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>Tile Editor (80×80px • 5×5 tiles)</h1>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -829,7 +816,7 @@ export function TileEditor({ onClose }: TileEditorProps) {
       {/* Main layout */}
       <div style={{ display: 'flex', flex: 1, overflow: 'auto' }}>
         {/* Left Sidebar - Layers & Save */}
-        <div style={{ width: '280px', padding: '20px', borderRight: '1px solid #333', overflowY: 'auto', background: '#0f0f1e' }}>
+        <div style={{ width: '280px', padding: '20px', borderRight: '1px solid #ddd', overflowY: 'auto', background: '#F5E6D3' }}>
           <h2 style={{ fontSize: '18px', marginBottom: '15px' }}>Layers</h2>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
@@ -839,8 +826,8 @@ export function TileEditor({ onClose }: TileEditorProps) {
                 onClick={() => setActiveLayerId(layer.id)}
                 style={{
                   padding: '10px 12px',
-                  backgroundColor: activeLayerId === layer.id ? '#3b82f6' : '#2a2a3e',
-                  color: '#fff',
+                  backgroundColor: activeLayerId === layer.id ? '#0D0D0D' : '#E8DDD1',
+                  color: activeLayerId === layer.id ? '#FFF1E5' : '#333',
                   borderRadius: '4px',
                   cursor: 'pointer',
                   fontSize: '14px',
@@ -860,7 +847,7 @@ export function TileEditor({ onClose }: TileEditorProps) {
                 {layers.length > 1 && (
                   <span
                     onClick={(e) => { e.stopPropagation(); deleteLayer(layer.id); }}
-                    style={{ color: '#f44336', cursor: 'pointer' }}
+                    style={{ color: '#c00', cursor: 'pointer' }}
                   >
                     ×
                   </span>
@@ -875,8 +862,8 @@ export function TileEditor({ onClose }: TileEditorProps) {
               style={{
                 flex: 1,
                 padding: '8px 12px',
-                backgroundColor: '#3b82f6',
-                color: '#fff',
+                backgroundColor: '#0D0D0D',
+                color: '#FFF1E5',
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
@@ -889,7 +876,7 @@ export function TileEditor({ onClose }: TileEditorProps) {
               onClick={() => setGhostMode(!ghostMode)}
               style={{
                 padding: '8px 12px',
-                backgroundColor: ghostMode ? '#9C27B0' : '#444',
+                backgroundColor: ghostMode ? '#9C27B0' : '#666',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '4px',
@@ -901,7 +888,7 @@ export function TileEditor({ onClose }: TileEditorProps) {
             </button>
           </div>
 
-          <hr style={{ border: 'none', borderTop: '1px solid #444', margin: '20px 0' }} />
+          <hr style={{ border: 'none', borderTop: '1px solid #ccc', margin: '20px 0' }} />
 
           <h2 style={{ fontSize: '18px', marginBottom: '15px' }}>Save to Gallery</h2>
 
@@ -915,9 +902,9 @@ export function TileEditor({ onClose }: TileEditorProps) {
               style={{
                 width: '100%',
                 padding: '8px',
-                backgroundColor: '#2a2a3e',
-                color: '#fff',
-                border: '1px solid #555',
+                backgroundColor: '#fff',
+                color: '#333',
+                border: '1px solid #ccc',
                 borderRadius: '4px',
                 boxSizing: 'border-box',
               }}
@@ -932,9 +919,9 @@ export function TileEditor({ onClose }: TileEditorProps) {
               style={{
                 width: '100%',
                 padding: '8px',
-                backgroundColor: '#2a2a3e',
-                color: '#fff',
-                border: '1px solid #555',
+                backgroundColor: '#fff',
+                color: '#333',
+                border: '1px solid #ccc',
                 borderRadius: '4px',
               }}
             >
@@ -949,10 +936,10 @@ export function TileEditor({ onClose }: TileEditorProps) {
             style={{
               width: '100%',
               padding: '12px',
-              background: '#22c55e',
+              background: '#0D0D0D',
               border: 'none',
               borderRadius: '4px',
-              color: 'white',
+              color: '#FFF1E5',
               cursor: 'pointer',
               fontSize: '16px',
               fontWeight: 'bold',
@@ -962,7 +949,7 @@ export function TileEditor({ onClose }: TileEditorProps) {
             Save Full Canvas
           </button>
 
-          <hr style={{ border: 'none', borderTop: '1px solid #444', margin: '20px 0' }} />
+          <hr style={{ border: 'none', borderTop: '1px solid #ccc', margin: '20px 0' }} />
 
           <h2 style={{ fontSize: '18px', marginBottom: '15px' }}>Selection Tools</h2>
 
@@ -974,8 +961,8 @@ export function TileEditor({ onClose }: TileEditorProps) {
             style={{
               width: '100%',
               padding: '10px',
-              backgroundColor: tileSelectMode ? '#4CAF50' : '#FF9800',
-              color: '#fff',
+              backgroundColor: tileSelectMode ? '#4CAF50' : '#0D0D0D',
+              color: tileSelectMode ? '#fff' : '#FFF1E5',
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
@@ -991,7 +978,7 @@ export function TileEditor({ onClose }: TileEditorProps) {
               style={{
                 width: '100%',
                 padding: '10px',
-                backgroundColor: '#22c55e',
+                backgroundColor: '#4CAF50',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '4px',
@@ -1003,7 +990,7 @@ export function TileEditor({ onClose }: TileEditorProps) {
             </button>
           )}
 
-          <div style={{ color: '#888', fontSize: '12px', marginTop: '10px' }}>
+          <div style={{ color: '#666', fontSize: '12px', marginTop: '10px' }}>
             Press <strong>K</strong> to select region with clicks
           </div>
         </div>
@@ -1017,10 +1004,10 @@ export function TileEditor({ onClose }: TileEditorProps) {
                 onClick={() => setTool('paint')}
                 style={{
                   padding: '8px 16px',
-                  background: tool === 'paint' ? '#3b82f6' : '#444',
+                  background: tool === 'paint' ? '#0D0D0D' : '#E8DDD1',
                   border: 'none',
                   borderRadius: '4px',
-                  color: 'white',
+                  color: tool === 'paint' ? '#FFF1E5' : '#333',
                   cursor: 'pointer',
                 }}
               >
@@ -1030,10 +1017,10 @@ export function TileEditor({ onClose }: TileEditorProps) {
                 onClick={() => setTool('erase')}
                 style={{
                   padding: '8px 16px',
-                  background: tool === 'erase' ? '#3b82f6' : '#444',
+                  background: tool === 'erase' ? '#0D0D0D' : '#E8DDD1',
                   border: 'none',
                   borderRadius: '4px',
-                  color: 'white',
+                  color: tool === 'erase' ? '#FFF1E5' : '#333',
                   cursor: 'pointer',
                 }}
               >
@@ -1043,7 +1030,7 @@ export function TileEditor({ onClose }: TileEditorProps) {
                 onClick={clearCanvas}
                 style={{
                   padding: '8px 16px',
-                  background: '#ef4444',
+                  background: '#c00',
                   border: 'none',
                   borderRadius: '4px',
                   color: 'white',
@@ -1056,7 +1043,7 @@ export function TileEditor({ onClose }: TileEditorProps) {
                 onClick={clearAllLayers}
                 style={{
                   padding: '8px 16px',
-                  background: '#8B0000',
+                  background: '#800',
                   border: 'none',
                   borderRadius: '4px',
                   color: 'white',
@@ -1069,23 +1056,23 @@ export function TileEditor({ onClose }: TileEditorProps) {
 
             {/* Zoom Controls */}
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginLeft: 'auto' }}>
-              <span style={{ color: '#888', fontSize: '12px' }}>Zoom:</span>
+              <span style={{ color: '#666', fontSize: '12px' }}>Zoom:</span>
               <button
                 onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.25))}
-                style={{ padding: '6px 12px', backgroundColor: '#444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                style={{ padding: '6px 12px', backgroundColor: '#E8DDD1', color: '#333', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
               >
                 −
               </button>
-              <span style={{ color: '#fff', minWidth: '50px', textAlign: 'center' }}>{Math.round(zoomLevel * 100)}%</span>
+              <span style={{ color: '#333', minWidth: '50px', textAlign: 'center' }}>{Math.round(zoomLevel * 100)}%</span>
               <button
                 onClick={() => setZoomLevel(Math.min(4, zoomLevel + 0.25))}
-                style={{ padding: '6px 12px', backgroundColor: '#444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                style={{ padding: '6px 12px', backgroundColor: '#E8DDD1', color: '#333', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
               >
                 +
               </button>
               <button
                 onClick={resetZoom}
-                style={{ padding: '6px 12px', backgroundColor: '#555', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}
+                style={{ padding: '6px 12px', backgroundColor: '#ccc', color: '#333', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}
               >
                 Reset
               </button>
@@ -1098,8 +1085,8 @@ export function TileEditor({ onClose }: TileEditorProps) {
               <div
                 style={{
                   display: 'inline-block',
-                  border: '2px solid #444',
-                  background: '#2a2a3e',
+                  border: '2px solid #ccc',
+                  background: '#fff',
                   padding: '10px',
                   borderRadius: '8px',
                   position: 'relative',
@@ -1210,11 +1197,11 @@ export function TileEditor({ onClose }: TileEditorProps) {
                     width: '40px',
                     height: '40px',
                     backgroundColor: selectedColor,
-                    border: '2px solid #555',
+                    border: '2px solid #999',
                     borderRadius: '4px',
                   }}
                 />
-                <span style={{ fontFamily: 'monospace', fontSize: '14px' }}>{selectedColor}</span>
+                <span style={{ fontFamily: 'monospace', fontSize: '14px', color: '#333' }}>{selectedColor}</span>
               </div>
             </div>
 
@@ -1226,6 +1213,9 @@ export function TileEditor({ onClose }: TileEditorProps) {
                 maxHeight: '200px',
                 overflowY: 'auto',
                 padding: '5px',
+                background: '#fff',
+                borderRadius: '4px',
+                border: '1px solid #ddd',
               }}
             >
               {ALL_COLORS.map((color, index) => (
@@ -1236,10 +1226,10 @@ export function TileEditor({ onClose }: TileEditorProps) {
                     width: '40px',
                     height: '40px',
                     backgroundColor: color,
-                    border: selectedColor === color ? '3px solid #3b82f6' : '2px solid #555',
+                    border: selectedColor === color ? '3px solid #0D0D0D' : '2px solid #ccc',
                     borderRadius: '4px',
                     cursor: 'pointer',
-                    boxShadow: selectedColor === color ? '0 0 10px #3b82f6' : 'none',
+                    boxShadow: selectedColor === color ? '0 0 8px rgba(0,0,0,0.3)' : 'none',
                   }}
                   title={color}
                 />
@@ -1258,7 +1248,7 @@ export function TileEditor({ onClose }: TileEditorProps) {
               left: 0,
               width: '100vw',
               height: '100vh',
-              backgroundColor: 'rgba(0, 0, 0, 0.95)',
+              backgroundColor: '#FFF1E5',
               zIndex: 2000,
               display: 'flex',
               flexDirection: 'column',
@@ -1268,11 +1258,11 @@ export function TileEditor({ onClose }: TileEditorProps) {
             onClick={() => setShowGalleryScreen(false)}
           >
             <div
-              style={{ maxWidth: '1200px', margin: '0 auto', width: '100%' }}
+              style={{ maxWidth: '1400px', margin: '0 auto', width: '100%' }}
               onClick={e => e.stopPropagation()}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-                <h2 style={{ color: '#fff', margin: 0, fontSize: '28px' }}>Sprite Gallery</h2>
+                <h2 style={{ color: '#333', margin: 0, fontSize: '28px' }}>Sprite Gallery</h2>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                   <input
                     type="text"
@@ -1281,9 +1271,9 @@ export function TileEditor({ onClose }: TileEditorProps) {
                     placeholder="New group name"
                     style={{
                       padding: '8px 12px',
-                      backgroundColor: '#2a2a4a',
-                      color: '#fff',
-                      border: '1px solid #444',
+                      backgroundColor: '#fff',
+                      color: '#333',
+                      border: '1px solid #ccc',
                       borderRadius: '4px',
                       fontSize: '14px',
                     }}
@@ -1292,8 +1282,8 @@ export function TileEditor({ onClose }: TileEditorProps) {
                     onClick={addGalleryGroup}
                     style={{
                       padding: '8px 16px',
-                      backgroundColor: '#4CAF50',
-                      color: '#fff',
+                      backgroundColor: '#0D0D0D',
+                      color: '#FFF1E5',
                       border: 'none',
                       borderRadius: '4px',
                       cursor: 'pointer',
@@ -1306,7 +1296,7 @@ export function TileEditor({ onClose }: TileEditorProps) {
                     onClick={() => setShowGalleryScreen(false)}
                     style={{
                       padding: '8px 16px',
-                      backgroundColor: '#f44336',
+                      backgroundColor: '#c00',
                       color: '#fff',
                       border: 'none',
                       borderRadius: '4px',
@@ -1321,7 +1311,7 @@ export function TileEditor({ onClose }: TileEditorProps) {
 
               {gallery.length === 0 ? (
                 <div style={{ color: '#666', textAlign: 'center', padding: '60px', fontSize: '18px' }}>
-                  No sprites saved yet. Use "Select Tiles" to add sprites to gallery.
+                  No sprites saved yet. Use "Select Tiles" or press K to select region.
                 </div>
               ) : (
                 galleryGroups.map(group => {
@@ -1330,123 +1320,123 @@ export function TileEditor({ onClose }: TileEditorProps) {
 
                   return (
                     <div key={group} style={{ marginBottom: '30px' }}>
-                      <h3 style={{ color: '#888', fontSize: '16px', marginBottom: '15px', borderBottom: '1px solid #444', paddingBottom: '8px' }}>
+                      <h3 style={{ color: '#666', fontSize: '18px', marginBottom: '15px', borderBottom: '1px solid #ddd', paddingBottom: '8px' }}>
                         {group} ({groupSprites.length})
                       </h3>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
-                        {groupSprites.map(sprite => (
-                          <div
-                            key={sprite.id}
-                            style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              padding: '15px',
-                              backgroundColor: '#1a1a2e',
-                              borderRadius: '8px',
-                              minWidth: '100px',
-                            }}
-                          >
-                            <img
-                              src={sprite.thumbnail}
-                              alt={sprite.name}
-                              onClick={() => loadFromGallery(sprite)}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '25px' }}>
+                        {groupSprites.map(sprite => {
+                          // Calculate display size based on sprite dimensions (larger sprites = larger display)
+                          const spriteWidth = sprite.layers[0]?.pixels[0]?.length || 16;
+                          const spriteHeight = sprite.layers[0]?.pixels.length || 16;
+                          const maxDim = Math.max(spriteWidth, spriteHeight);
+                          // Base size 80px, scale up for larger sprites, max 160px
+                          const displaySize = Math.min(160, Math.max(80, maxDim * 2));
+
+                          return (
+                            <div
+                              key={sprite.id}
                               style={{
-                                width: '64px',
-                                height: '64px',
-                                imageRendering: 'pixelated',
-                                border: '2px solid #444',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                marginBottom: '10px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                padding: '20px',
+                                backgroundColor: '#F5E6D3',
+                                borderRadius: '8px',
+                                minWidth: '140px',
                               }}
-                              title="Click to load into editor"
-                            />
-                            {editingSpriteName === sprite.id ? (
-                              <input
-                                type="text"
-                                defaultValue={sprite.name}
-                                autoFocus
-                                onBlur={e => renameSprite(sprite.id, e.target.value || sprite.name)}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') {
-                                    renameSprite(sprite.id, (e.target as HTMLInputElement).value || sprite.name);
-                                  } else if (e.key === 'Escape') {
-                                    setEditingSpriteName(null);
-                                  }
-                                }}
+                            >
+                              <img
+                                src={sprite.thumbnail}
+                                alt={sprite.name}
+                                onClick={() => loadFromGallery(sprite)}
                                 style={{
-                                  backgroundColor: '#2a2a4a',
-                                  color: '#fff',
-                                  border: '1px solid #4CAF50',
+                                  width: `${displaySize}px`,
+                                  height: `${displaySize}px`,
+                                  objectFit: 'contain',
+                                  imageRendering: 'pixelated',
+                                  border: '2px solid #ccc',
                                   borderRadius: '4px',
-                                  padding: '4px 8px',
-                                  fontSize: '12px',
-                                  textAlign: 'center',
-                                  width: '80px',
+                                  cursor: 'pointer',
+                                  marginBottom: '12px',
+                                  backgroundColor: '#fff',
                                 }}
+                                title="Click to load into editor"
                               />
-                            ) : (
-                              <span
-                                onClick={() => setEditingSpriteName(sprite.id)}
-                                style={{
-                                  color: '#ccc',
-                                  fontSize: '12px',
-                                  cursor: 'pointer',
-                                  padding: '4px 8px',
-                                  borderRadius: '4px',
-                                  maxWidth: '90px',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                }}
-                                title="Click to rename"
-                              >
-                                {sprite.name}
-                              </span>
-                            )}
-                            <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                              <select
-                                onChange={e => {
-                                  if (e.target.value) {
-                                    addReferenceSprite(sprite, e.target.value as ReferenceSprite['position']);
-                                    e.target.value = '';
-                                  }
-                                }}
-                                style={{
-                                  padding: '4px',
-                                  backgroundColor: '#333',
-                                  color: '#fff',
-                                  border: 'none',
-                                  borderRadius: '4px',
-                                  fontSize: '11px',
-                                  cursor: 'pointer',
-                                }}
-                                defaultValue=""
-                              >
-                                <option value="" disabled>As Ref</option>
-                                <option value="left">Left</option>
-                                <option value="right">Right</option>
-                                <option value="top">Top</option>
-                                <option value="bottom">Bottom</option>
-                              </select>
-                              <button
-                                onClick={() => deleteFromGallery(sprite.id)}
-                                style={{
-                                  padding: '4px 8px',
-                                  backgroundColor: '#f44336',
-                                  color: '#fff',
-                                  border: 'none',
-                                  borderRadius: '4px',
-                                  cursor: 'pointer',
-                                  fontSize: '11px',
-                                }}
-                              >
-                                Delete
-                              </button>
+                              {editingSpriteName === sprite.id ? (
+                                <input
+                                  type="text"
+                                  defaultValue={sprite.name}
+                                  autoFocus
+                                  onBlur={e => renameSprite(sprite.id, e.target.value || sprite.name)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                      renameSprite(sprite.id, (e.target as HTMLInputElement).value || sprite.name);
+                                    } else if (e.key === 'Escape') {
+                                      setEditingSpriteName(null);
+                                    }
+                                  }}
+                                  style={{
+                                    backgroundColor: '#fff',
+                                    color: '#333',
+                                    border: '2px solid #0D0D0D',
+                                    borderRadius: '4px',
+                                    padding: '6px 10px',
+                                    fontSize: '14px',
+                                    textAlign: 'center',
+                                    width: '120px',
+                                  }}
+                                />
+                              ) : (
+                                <span
+                                  style={{
+                                    color: '#333',
+                                    fontSize: '14px',
+                                    padding: '6px 10px',
+                                    borderRadius: '4px',
+                                    maxWidth: '130px',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    fontWeight: 'bold',
+                                  }}
+                                  title={sprite.name}
+                                >
+                                  {sprite.name}
+                                </span>
+                              )}
+                              <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                                <button
+                                  onClick={() => setEditingSpriteName(sprite.id)}
+                                  style={{
+                                    padding: '6px 12px',
+                                    backgroundColor: '#0D0D0D',
+                                    color: '#FFF1E5',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                  }}
+                                >
+                                  Rename
+                                </button>
+                                <button
+                                  onClick={() => deleteFromGallery(sprite.id)}
+                                  style={{
+                                    padding: '6px 12px',
+                                    backgroundColor: '#c00',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   );
