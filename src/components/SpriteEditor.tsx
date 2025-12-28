@@ -9,10 +9,9 @@ interface SpriteEditorProps {
 const TILE_SIZE = 16; // 16x16 pixels per tile
 const TILES_PER_ROW = 3; // 3x3 grid of tiles
 const GRID_SIZE = TILE_SIZE * TILES_PER_ROW; // 48x48 total pixels
-const PIXEL_SIZE = 12; // Display size of each pixel
+const BASE_PIXEL_SIZE = 12; // Base display size of each pixel
 const TILE_BORDER = 2; // Black border between tiles
 const NUM_BORDERS = TILES_PER_ROW - 1; // 2 borders for 3 tiles
-const CANVAS_SIZE = GRID_SIZE * PIXEL_SIZE + NUM_BORDERS * TILE_BORDER; // 576 + 4 = 580px
 
 const DEFAULT_PALETTE = [
   // Blacks & Whites
@@ -63,10 +62,15 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
   );
   const [selectedColor, setSelectedColor] = useState('#000000');
   const [brushSize, setBrushSize] = useState(1);
+  const [zoom, setZoom] = useState(1); // Zoom level: 0.5x to 2x
   const [isMouseDown, setIsMouseDown] = useState(false);
   const [isRightMouseDown, setIsRightMouseDown] = useState(false);
   const [selectedObjectType, setSelectedObjectType] = useState<'plant' | 'animal' | 'resource'>('plant');
   const [selectedObjectId, setSelectedObjectId] = useState<string>('');
+
+  // Calculate sizes based on zoom
+  const pixelSize = BASE_PIXEL_SIZE * zoom;
+  const canvasSize = GRID_SIZE * pixelSize + NUM_BORDERS * TILE_BORDER;
 
   // Prevent default behavior
   const stopProp = (e: React.MouseEvent) => e.stopPropagation();
@@ -512,8 +516,8 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                 <div
                   style={{
                     position: 'relative',
-                    width: CANVAS_SIZE,
-                    height: CANVAS_SIZE,
+                    width: canvasSize,
+                    height: canvasSize,
                     background: '#000', // Black background for tile borders
                     border: '1px solid #000',
                   }}
@@ -521,8 +525,8 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                   {/* Render 3x3 tiles */}
                   {Array.from({ length: TILES_PER_ROW }).map((_, tileRow) =>
                     Array.from({ length: TILES_PER_ROW }).map((_, tileCol) => {
-                      const tileX = tileCol * (TILE_SIZE * PIXEL_SIZE + TILE_BORDER);
-                      const tileY = tileRow * (TILE_SIZE * PIXEL_SIZE + TILE_BORDER);
+                      const tileX = tileCol * (TILE_SIZE * pixelSize + TILE_BORDER);
+                      const tileY = tileRow * (TILE_SIZE * pixelSize + TILE_BORDER);
                       return (
                         <div
                           key={`tile-${tileRow}-${tileCol}`}
@@ -530,11 +534,11 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                             position: 'absolute',
                             left: tileX,
                             top: tileY,
-                            width: TILE_SIZE * PIXEL_SIZE,
-                            height: TILE_SIZE * PIXEL_SIZE,
+                            width: TILE_SIZE * pixelSize,
+                            height: TILE_SIZE * pixelSize,
                             display: 'grid',
-                            gridTemplateColumns: `repeat(${TILE_SIZE}, ${PIXEL_SIZE}px)`,
-                            gridTemplateRows: `repeat(${TILE_SIZE}, ${PIXEL_SIZE}px)`,
+                            gridTemplateColumns: `repeat(${TILE_SIZE}, ${pixelSize}px)`,
+                            gridTemplateRows: `repeat(${TILE_SIZE}, ${pixelSize}px)`,
                           }}
                         >
                           {/* Pixels within this tile */}
@@ -551,8 +555,8 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                                 <div
                                   key={`${localRow}-${localCol}`}
                                   style={{
-                                    width: PIXEL_SIZE,
-                                    height: PIXEL_SIZE,
+                                    width: pixelSize,
+                                    height: pixelSize,
                                     backgroundColor: color === 'transparent' ? transparentColor : color,
                                   }}
                                 />
@@ -567,8 +571,8 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                   {/* Interaction grid overlay */}
                   {Array.from({ length: TILES_PER_ROW }).map((_, tileRow) =>
                     Array.from({ length: TILES_PER_ROW }).map((_, tileCol) => {
-                      const tileX = tileCol * (TILE_SIZE * PIXEL_SIZE + TILE_BORDER);
-                      const tileY = tileRow * (TILE_SIZE * PIXEL_SIZE + TILE_BORDER);
+                      const tileX = tileCol * (TILE_SIZE * pixelSize + TILE_BORDER);
+                      const tileY = tileRow * (TILE_SIZE * pixelSize + TILE_BORDER);
                       return (
                         <div
                           key={`interact-tile-${tileRow}-${tileCol}`}
@@ -576,11 +580,11 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                             position: 'absolute',
                             left: tileX,
                             top: tileY,
-                            width: TILE_SIZE * PIXEL_SIZE,
-                            height: TILE_SIZE * PIXEL_SIZE,
+                            width: TILE_SIZE * pixelSize,
+                            height: TILE_SIZE * pixelSize,
                             display: 'grid',
-                            gridTemplateColumns: `repeat(${TILE_SIZE}, ${PIXEL_SIZE}px)`,
-                            gridTemplateRows: `repeat(${TILE_SIZE}, ${PIXEL_SIZE}px)`,
+                            gridTemplateColumns: `repeat(${TILE_SIZE}, ${pixelSize}px)`,
+                            gridTemplateRows: `repeat(${TILE_SIZE}, ${pixelSize}px)`,
                           }}
                         >
                           {Array.from({ length: TILE_SIZE }).map((_, localRow) =>
@@ -593,8 +597,8 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                                   onMouseDown={(e) => handleMouseDown(globalRow, globalCol, e)}
                                   onMouseEnter={() => handleMouseEnter(globalRow, globalCol)}
                                   style={{
-                                    width: PIXEL_SIZE,
-                                    height: PIXEL_SIZE,
+                                    width: pixelSize,
+                                    height: pixelSize,
                                     pointerEvents: 'all',
                                   }}
                                 />
@@ -633,20 +637,71 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
               <h3 style={{ fontSize: '16px', marginBottom: '10px', color: '#0D0D0D' }}>Color Palette</h3>
               <p style={{ fontSize: '12px', color: '#666', marginBottom: '15px' }}>Left-click to paint, right-click to erase</p>
 
-              {/* Brush Size */}
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', color: '#0D0D0D' }}>Brush Size: {brushSize}px</label>
-                <input
-                  type="range"
-                  min="1"
-                  max="8"
-                  value={brushSize}
-                  onChange={(e) => setBrushSize(parseInt(e.target.value))}
-                  style={{
-                    width: '200px',
-                    cursor: 'pointer',
-                  }}
-                />
+              {/* Brush Size & Zoom */}
+              <div style={{ display: 'flex', gap: '30px', marginBottom: '15px' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', color: '#0D0D0D' }}>Brush Size: {brushSize}px</label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="8"
+                    value={brushSize}
+                    onChange={(e) => setBrushSize(parseInt(e.target.value))}
+                    style={{
+                      width: '150px',
+                      cursor: 'pointer',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', color: '#0D0D0D' }}>Zoom: {Math.round(zoom * 100)}%</label>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                      onClick={() => setZoom(z => Math.max(0.5, z - 0.25))}
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        background: '#0D0D0D',
+                        border: 'none',
+                        borderRadius: '4px',
+                        color: '#FFF1E5',
+                        cursor: 'pointer',
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      -
+                    </button>
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="2"
+                      step="0.25"
+                      value={zoom}
+                      onChange={(e) => setZoom(parseFloat(e.target.value))}
+                      style={{
+                        width: '100px',
+                        cursor: 'pointer',
+                      }}
+                    />
+                    <button
+                      onClick={() => setZoom(z => Math.min(2, z + 0.25))}
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        background: '#0D0D0D',
+                        border: 'none',
+                        borderRadius: '4px',
+                        color: '#FFF1E5',
+                        cursor: 'pointer',
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div
