@@ -161,6 +161,12 @@ export function TileEditor({ onClose }: TileEditorProps) {
   const [selectedTiles, setSelectedTiles] = useState<Set<number>>(new Set());
   const [tileSelectMode, setTileSelectMode] = useState(false);
 
+  // Zoom and pan
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [lastPanPos, setLastPanPos] = useState({ x: 0, y: 0 });
+
   // Reference sprites (ghosts beside canvas)
   const [referenceSprites, setReferenceSprites] = useState<ReferenceSprite[]>([]);
 
@@ -222,24 +228,6 @@ export function TileEditor({ onClose }: TileEditorProps) {
     setLayers(layers.map(l => l.id === id ? { ...l, visible: !l.visible } : l));
   };
 
-  // Rename layer
-  const renameLayer = (id: string, name: string) => {
-    setLayers(layers.map(l => l.id === id ? { ...l, name } : l));
-  };
-
-  // Move layer up/down
-  const moveLayer = (id: string, direction: 'up' | 'down') => {
-    const index = layers.findIndex(l => l.id === id);
-    if (direction === 'up' && index > 0) {
-      const newLayers = [...layers];
-      [newLayers[index - 1], newLayers[index]] = [newLayers[index], newLayers[index - 1]];
-      setLayers(newLayers);
-    } else if (direction === 'down' && index < layers.length - 1) {
-      const newLayers = [...layers];
-      [newLayers[index], newLayers[index + 1]] = [newLayers[index + 1], newLayers[index]];
-      setLayers(newLayers);
-    }
-  };
 
   // Draw pixel
   const drawPixel = useCallback((x: number, y: number) => {
@@ -253,37 +241,78 @@ export function TileEditor({ onClose }: TileEditorProps) {
     }));
   }, [activeLayerId, selectedColor, tool]);
 
-  // Handle canvas mouse events
-  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Handle canvas mouse events with zoom
+  const getCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const x = Math.floor((e.clientX - rect.left) / DISPLAY_SCALE);
-    const y = Math.floor((e.clientY - rect.top) / DISPLAY_SCALE);
+    if (!rect) return null;
+    const scale = DISPLAY_SCALE * zoomLevel;
+    const x = Math.floor(((e.clientX - rect.left) - panOffset.x) / scale);
+    const y = Math.floor(((e.clientY - rect.top) - panOffset.y) / scale);
+    return { x, y };
+  };
+
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Middle mouse or space+click for panning
+    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+      setIsPanning(true);
+      setLastPanPos({ x: e.clientX, y: e.clientY });
+      return;
+    }
+
+    const coords = getCanvasCoords(e);
+    if (!coords) return;
+    const { x, y } = coords;
 
     // Handle tile selection mode
     if (tileSelectMode) {
       const tileX = Math.floor(x / TILE_SIZE);
       const tileY = Math.floor(y / TILE_SIZE);
-      const tileIndex = tileY * GRID_TILES + tileX;
-      toggleTileSelection(tileIndex);
+      if (tileX >= 0 && tileX < GRID_TILES && tileY >= 0 && tileY < GRID_TILES) {
+        const tileIndex = tileY * GRID_TILES + tileX;
+        toggleTileSelection(tileIndex);
+      }
       return;
     }
 
     setIsMouseDown(true);
-    drawPixel(x, y);
+    if (x >= 0 && x < CANVAS_PIXELS && y >= 0 && y < CANVAS_PIXELS) {
+      drawPixel(x, y);
+    }
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (isPanning) {
+      const dx = e.clientX - lastPanPos.x;
+      const dy = e.clientY - lastPanPos.y;
+      setPanOffset({ x: panOffset.x + dx, y: panOffset.y + dy });
+      setLastPanPos({ x: e.clientX, y: e.clientY });
+      return;
+    }
+
     if (!isMouseDown) return;
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const x = Math.floor((e.clientX - rect.left) / DISPLAY_SCALE);
-    const y = Math.floor((e.clientY - rect.top) / DISPLAY_SCALE);
-    drawPixel(x, y);
+    const coords = getCanvasCoords(e);
+    if (!coords) return;
+    const { x, y } = coords;
+    if (x >= 0 && x < CANVAS_PIXELS && y >= 0 && y < CANVAS_PIXELS) {
+      drawPixel(x, y);
+    }
   };
 
   const handleCanvasMouseUp = () => {
     setIsMouseDown(false);
+    setIsPanning(false);
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.25 : 0.25;
+    const newZoom = Math.max(0.5, Math.min(4, zoomLevel + delta));
+    setZoomLevel(newZoom);
+  };
+
+  const resetZoom = () => {
+    setZoomLevel(1);
+    setPanOffset({ x: 0, y: 0 });
   };
 
   // Render canvas
@@ -529,10 +558,6 @@ export function TileEditor({ onClose }: TileEditorProps) {
     }]);
   };
 
-  // Remove reference sprite
-  const removeReferenceSprite = (position: ReferenceSprite['position']) => {
-    setReferenceSprites(referenceSprites.filter(r => r.position !== position));
-  };
 
   // Add new gallery group
   const addGalleryGroup = () => {
@@ -561,10 +586,6 @@ export function TileEditor({ onClose }: TileEditorProps) {
     setActiveLayerId('layer-1');
   };
 
-  // Get reference sprite for position
-  const getReference = (position: ReferenceSprite['position']) => {
-    return referenceSprites.find(r => r.position === position);
-  };
 
   return (
     <div
@@ -574,56 +595,58 @@ export function TileEditor({ onClose }: TileEditorProps) {
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.9)',
+        backgroundColor: '#0a0a14',
         display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
         zIndex: 1000,
       }}
-      onClick={onClose}
     >
+      {/* LEFT PANEL - Colors */}
       <div
         style={{
+          width: '320px',
+          height: '100vh',
           backgroundColor: '#1a1a2e',
-          borderRadius: '12px',
-          padding: '20px',
+          borderRight: '2px solid #333',
           display: 'flex',
-          gap: '20px',
-          maxHeight: '95vh',
-          maxWidth: '98vw',
-          overflow: 'hidden',
+          flexDirection: 'column',
+          padding: '20px',
+          overflowY: 'auto',
         }}
-        onClick={e => e.stopPropagation()}
       >
-        {/* Left Panel - Colors */}
-        <div style={{ width: '200px', display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto', paddingRight: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <h3 style={{ color: '#fff', margin: 0, fontSize: '14px' }}>Colors</h3>
-            <div
-              style={{
-                width: '24px',
-                height: '24px',
-                backgroundColor: selectedColor,
-                border: '2px solid #fff',
-                borderRadius: '4px',
-              }}
-              title={selectedColor}
-            />
+        {/* Selected Color Preview */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
+          <div
+            style={{
+              width: '60px',
+              height: '60px',
+              backgroundColor: selectedColor,
+              border: '3px solid #fff',
+              borderRadius: '8px',
+            }}
+            title={selectedColor}
+          />
+          <div>
+            <h2 style={{ color: '#fff', margin: 0, fontSize: '20px' }}>Colors</h2>
+            <span style={{ color: '#888', fontSize: '12px' }}>{selectedColor}</span>
           </div>
+        </div>
 
+        {/* Color Palette - Scrollable */}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
           {Object.entries(COLOR_PALETTE).map(([group, colors]) => (
-            <div key={group} style={{ marginBottom: '2px' }}>
-              <div style={{ color: '#888', fontSize: '9px', marginBottom: '2px' }}>{group}</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1px' }}>
+            <div key={group} style={{ marginBottom: '15px' }}>
+              <div style={{ color: '#aaa', fontSize: '12px', marginBottom: '6px', fontWeight: 'bold' }}>{group}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                 {colors.map((color, i) => (
                   <div
                     key={`${group}-${i}`}
                     onClick={() => setSelectedColor(color)}
                     style={{
-                      width: '14px',
-                      height: '14px',
+                      width: '28px',
+                      height: '28px',
                       backgroundColor: color,
-                      border: selectedColor === color ? '2px solid #fff' : '1px solid #222',
+                      border: selectedColor === color ? '3px solid #fff' : '2px solid #333',
+                      borderRadius: '4px',
                       cursor: 'pointer',
                       boxSizing: 'border-box',
                     }}
@@ -635,25 +658,20 @@ export function TileEditor({ onClose }: TileEditorProps) {
           ))}
         </div>
 
-        {/* Center - Canvas with References */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <h3 style={{ color: '#fff', margin: 0 }}>Tile Editor</h3>
-            <span style={{ color: '#888', fontSize: '12px' }}>80×80px (5×5 tiles) • Autosave ON</span>
-          </div>
-
-          {/* Tools */}
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+        {/* Tools at bottom of color panel */}
+        <div style={{ borderTop: '1px solid #444', paddingTop: '15px', marginTop: '15px' }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
             <button
               onClick={() => setTool('paint')}
               style={{
-                padding: '6px 12px',
+                flex: 1,
+                padding: '10px',
                 backgroundColor: tool === 'paint' ? '#4CAF50' : '#333',
                 color: '#fff',
                 border: 'none',
-                borderRadius: '4px',
+                borderRadius: '6px',
                 cursor: 'pointer',
-                fontSize: '12px',
+                fontSize: '14px',
               }}
             >
               Paint
@@ -661,25 +679,29 @@ export function TileEditor({ onClose }: TileEditorProps) {
             <button
               onClick={() => setTool('erase')}
               style={{
-                padding: '6px 12px',
+                flex: 1,
+                padding: '10px',
                 backgroundColor: tool === 'erase' ? '#f44336' : '#333',
                 color: '#fff',
                 border: 'none',
-                borderRadius: '4px',
+                borderRadius: '6px',
                 cursor: 'pointer',
-                fontSize: '12px',
+                fontSize: '14px',
               }}
             >
               Erase
             </button>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
             <button
               onClick={clearCanvas}
               style={{
-                padding: '6px 12px',
+                flex: 1,
+                padding: '8px',
                 backgroundColor: '#666',
                 color: '#fff',
                 border: 'none',
-                borderRadius: '4px',
+                borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '12px',
               }}
@@ -689,8 +711,250 @@ export function TileEditor({ onClose }: TileEditorProps) {
             <button
               onClick={clearAllLayers}
               style={{
-                padding: '6px 12px',
+                flex: 1,
+                padding: '8px',
                 backgroundColor: '#8B0000',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '12px',
+              }}
+            >
+              Clear All
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* RIGHT PANEL - Canvas */}
+      <div
+        style={{
+          flex: 1,
+          height: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          backgroundColor: '#0a0a14',
+        }}
+      >
+        {/* Top Toolbar */}
+        <div
+          style={{
+            padding: '15px 20px',
+            backgroundColor: '#1a1a2e',
+            borderBottom: '2px solid #333',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <h2 style={{ color: '#fff', margin: 0 }}>Tile Editor</h2>
+            <span style={{ color: '#888', fontSize: '12px' }}>80×80px (5×5 tiles) • Autosave ON</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {/* Zoom Controls */}
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginRight: '20px' }}>
+              <button
+                onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.5))}
+                style={{ padding: '6px 12px', backgroundColor: '#333', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+              >
+                −
+              </button>
+              <span style={{ color: '#fff', minWidth: '50px', textAlign: 'center' }}>{Math.round(zoomLevel * 100)}%</span>
+              <button
+                onClick={() => setZoomLevel(Math.min(4, zoomLevel + 0.5))}
+                style={{ padding: '6px 12px', backgroundColor: '#333', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+              >
+                +
+              </button>
+              <button
+                onClick={resetZoom}
+                style={{ padding: '6px 12px', backgroundColor: '#555', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}
+              >
+                Reset
+              </button>
+            </div>
+
+            {/* Tile Select Mode */}
+            <button
+              onClick={() => {
+                setTileSelectMode(!tileSelectMode);
+                if (tileSelectMode) setSelectedTiles(new Set());
+              }}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: tileSelectMode ? '#4CAF50' : '#FF9800',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+              }}
+            >
+              {tileSelectMode ? `Selected: ${selectedTiles.size}` : 'Select Tiles'}
+            </button>
+            {tileSelectMode && selectedTiles.size > 0 && (
+              <button
+                onClick={splitSelectedTilesToGallery}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#4CAF50',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                }}
+              >
+                Send to Gallery
+              </button>
+            )}
+
+            {/* Gallery Button */}
+            <button
+              onClick={() => setShowGalleryScreen(true)}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#9C27B0',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+              }}
+            >
+              Gallery ({gallery.length})
+            </button>
+
+            {/* Close Button */}
+            <button
+              onClick={onClose}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#f44336',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                marginLeft: '10px',
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+
+        {/* Canvas Area */}
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            overflow: 'hidden',
+            position: 'relative',
+          }}
+        >
+          <div
+            style={{
+              position: 'relative',
+              overflow: 'hidden',
+              border: '3px solid #333',
+              borderRadius: '8px',
+              backgroundColor: '#2a2a4a',
+            }}
+          >
+            <canvas
+              ref={canvasRef}
+              width={DISPLAY_SIZE}
+              height={DISPLAY_SIZE}
+              onMouseDown={handleCanvasMouseDown}
+              onMouseMove={handleCanvasMouseMove}
+              onMouseUp={handleCanvasMouseUp}
+              onMouseLeave={handleCanvasMouseUp}
+              onWheel={handleWheel}
+              style={{
+                cursor: tileSelectMode ? 'pointer' : (isPanning ? 'grabbing' : 'crosshair'),
+                transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
+                transformOrigin: 'center center',
+              }}
+            />
+          </div>
+
+          {/* Zoom hint */}
+          <div style={{ position: 'absolute', bottom: '20px', left: '20px', color: '#666', fontSize: '12px' }}>
+            Scroll to zoom • Alt+drag to pan
+          </div>
+        </div>
+
+        {/* Bottom Bar - Layers & Save */}
+        <div
+          style={{
+            padding: '15px 20px',
+            backgroundColor: '#1a1a2e',
+            borderTop: '2px solid #333',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          {/* Layers */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ color: '#888', fontSize: '12px' }}>Layers:</span>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {layers.map((layer) => (
+                <div
+                  key={layer.id}
+                  onClick={() => setActiveLayerId(layer.id)}
+                  style={{
+                    padding: '6px 12px',
+                    backgroundColor: activeLayerId === layer.id ? '#4CAF50' : '#333',
+                    color: '#fff',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    opacity: layer.visible ? 1 : 0.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <span
+                    onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(layer.id); }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {layer.visible ? '👁' : '○'}
+                  </span>
+                  {layer.name}
+                  {layers.length > 1 && (
+                    <span
+                      onClick={(e) => { e.stopPropagation(); deleteLayer(layer.id); }}
+                      style={{ color: '#f44336', cursor: 'pointer', marginLeft: '4px' }}
+                    >
+                      ×
+                    </span>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={addLayer}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: '#2196F3',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                }}
+              >
+                + Layer
+              </button>
+            </div>
+            <button
+              onClick={() => setGhostMode(!ghostMode)}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: ghostMode ? '#9C27B0' : '#333',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '4px',
@@ -698,208 +962,35 @@ export function TileEditor({ onClose }: TileEditorProps) {
                 fontSize: '12px',
               }}
             >
-              Clear All
+              Ghost: {ghostMode ? 'ON' : 'OFF'}
             </button>
-            <div
-              style={{
-                width: '28px',
-                height: '28px',
-                backgroundColor: selectedColor,
-                border: '2px solid #fff',
-                borderRadius: '4px',
-              }}
-              title={`Selected: ${selectedColor}`}
-            />
           </div>
 
-          {/* Canvas Area with Reference Ghosts */}
+          {/* Save Controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {/* Left Reference */}
-            <div style={{ width: '80px', height: DISPLAY_SIZE, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {getReference('left') ? (
-                <div style={{ position: 'relative' }}>
-                  <img
-                    src={getReference('left')!.thumbnail}
-                    alt="Reference"
-                    style={{ width: '80px', height: '80px', imageRendering: 'pixelated', opacity: 0.4 }}
-                  />
-                  <button
-                    onClick={() => removeReferenceSprite('left')}
-                    style={{
-                      position: 'absolute',
-                      top: -5,
-                      right: -5,
-                      width: '16px',
-                      height: '16px',
-                      backgroundColor: '#f44336',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '50%',
-                      cursor: 'pointer',
-                      fontSize: '10px',
-                      lineHeight: '16px',
-                      padding: 0,
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-              ) : (
-                <div style={{ color: '#444', fontSize: '10px', textAlign: 'center' }}>Left<br/>Ref</div>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-              {/* Top Reference */}
-              <div style={{ height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {getReference('top') ? (
-                  <div style={{ position: 'relative' }}>
-                    <img
-                      src={getReference('top')!.thumbnail}
-                      alt="Reference"
-                      style={{ width: '80px', height: '80px', imageRendering: 'pixelated', opacity: 0.4 }}
-                    />
-                    <button
-                      onClick={() => removeReferenceSprite('top')}
-                      style={{
-                        position: 'absolute',
-                        top: -5,
-                        right: -5,
-                        width: '16px',
-                        height: '16px',
-                        backgroundColor: '#f44336',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '50%',
-                        cursor: 'pointer',
-                        fontSize: '10px',
-                        lineHeight: '16px',
-                        padding: 0,
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ color: '#444', fontSize: '10px' }}>Top Ref</div>
-                )}
-              </div>
-
-              {/* Canvas */}
-              <canvas
-                ref={canvasRef}
-                width={DISPLAY_SIZE}
-                height={DISPLAY_SIZE}
-                onMouseDown={handleCanvasMouseDown}
-                onMouseMove={handleCanvasMouseMove}
-                onMouseUp={handleCanvasMouseUp}
-                onMouseLeave={handleCanvasMouseUp}
-                style={{
-                  border: '3px solid #333',
-                  borderRadius: '4px',
-                  cursor: 'crosshair',
-                }}
-              />
-
-              {/* Bottom Reference */}
-              <div style={{ height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {getReference('bottom') ? (
-                  <div style={{ position: 'relative' }}>
-                    <img
-                      src={getReference('bottom')!.thumbnail}
-                      alt="Reference"
-                      style={{ width: '80px', height: '80px', imageRendering: 'pixelated', opacity: 0.4 }}
-                    />
-                    <button
-                      onClick={() => removeReferenceSprite('bottom')}
-                      style={{
-                        position: 'absolute',
-                        top: -5,
-                        right: -5,
-                        width: '16px',
-                        height: '16px',
-                        backgroundColor: '#f44336',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '50%',
-                        cursor: 'pointer',
-                        fontSize: '10px',
-                        lineHeight: '16px',
-                        padding: 0,
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ color: '#444', fontSize: '10px' }}>Bottom Ref</div>
-                )}
-              </div>
-            </div>
-
-            {/* Right Reference */}
-            <div style={{ width: '80px', height: DISPLAY_SIZE, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {getReference('right') ? (
-                <div style={{ position: 'relative' }}>
-                  <img
-                    src={getReference('right')!.thumbnail}
-                    alt="Reference"
-                    style={{ width: '80px', height: '80px', imageRendering: 'pixelated', opacity: 0.4 }}
-                  />
-                  <button
-                    onClick={() => removeReferenceSprite('right')}
-                    style={{
-                      position: 'absolute',
-                      top: -5,
-                      right: -5,
-                      width: '16px',
-                      height: '16px',
-                      backgroundColor: '#f44336',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '50%',
-                      cursor: 'pointer',
-                      fontSize: '10px',
-                      lineHeight: '16px',
-                      padding: 0,
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-              ) : (
-                <div style={{ color: '#444', fontSize: '10px', textAlign: 'center' }}>Right<br/>Ref</div>
-              )}
-            </div>
-          </div>
-
-          {/* Save to Gallery */}
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
             <input
               type="text"
               value={spriteName}
               onChange={e => setSpriteName(e.target.value)}
               placeholder="Sprite name"
               style={{
-                padding: '6px',
+                padding: '8px 12px',
                 backgroundColor: '#2a2a4a',
                 color: '#fff',
                 border: '1px solid #444',
                 borderRadius: '4px',
-                width: '120px',
-                fontSize: '12px',
+                width: '150px',
               }}
             />
             <select
               value={selectedGalleryGroup}
               onChange={e => setSelectedGalleryGroup(e.target.value)}
               style={{
-                padding: '6px',
+                padding: '8px 12px',
                 backgroundColor: '#2a2a4a',
                 color: '#fff',
                 border: '1px solid #444',
                 borderRadius: '4px',
-                fontSize: '12px',
               }}
             >
               {galleryGroups.map(g => (
@@ -909,206 +1000,21 @@ export function TileEditor({ onClose }: TileEditorProps) {
             <button
               onClick={saveToGallery}
               style={{
-                padding: '6px 12px',
+                padding: '8px 12px',
                 backgroundColor: '#2196F3',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '12px',
               }}
             >
-              Save
-            </button>
-            <button
-              onClick={() => {
-                setTileSelectMode(!tileSelectMode);
-                if (tileSelectMode) setSelectedTiles(new Set());
-              }}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: tileSelectMode ? '#4CAF50' : '#FF9800',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px',
-              }}
-              title="Select tiles to send to gallery"
-            >
-              {tileSelectMode ? `Selected: ${selectedTiles.size}` : 'Select Tiles'}
-            </button>
-            {tileSelectMode && selectedTiles.size > 0 && (
-              <button
-                onClick={splitSelectedTilesToGallery}
-                style={{
-                  padding: '6px 12px',
-                  backgroundColor: '#4CAF50',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                }}
-              >
-                Send to Gallery
-              </button>
-            )}
-            <button
-              onClick={() => setShowGalleryScreen(true)}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: '#9C27B0',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px',
-              }}
-            >
-              Gallery ({gallery.length})
+              Save Full Canvas
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Right Panel - Layers */}
-        <div style={{ width: '180px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ color: '#fff', margin: 0, fontSize: '14px' }}>Layers</h3>
-            <button
-              onClick={addLayer}
-              style={{
-                padding: '3px 8px',
-                backgroundColor: '#4CAF50',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '11px',
-              }}
-            >
-              + Add
-            </button>
-          </div>
-
-          {/* Ghost Mode Toggle */}
-          <div
-            onClick={() => setGhostMode(!ghostMode)}
-            style={{
-              padding: '6px',
-              backgroundColor: ghostMode ? '#673AB7' : '#333',
-              color: '#fff',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              textAlign: 'center',
-              fontSize: '11px',
-            }}
-          >
-            Ghost Mode: {ghostMode ? 'ON' : 'OFF'}
-          </div>
-
-          {/* Layer List */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto', flex: 1 }}>
-            {[...layers].reverse().map((layer, reversedIndex) => {
-              const index = layers.length - 1 - reversedIndex;
-              return (
-                <div
-                  key={layer.id}
-                  onClick={() => setActiveLayerId(layer.id)}
-                  style={{
-                    padding: '6px',
-                    backgroundColor: activeLayerId === layer.id ? '#3a3a6a' : '#2a2a4a',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    border: activeLayerId === layer.id ? '2px solid #7C3AED' : '1px solid #333',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <input
-                      type="text"
-                      value={layer.name}
-                      onChange={e => renameLayer(layer.id, e.target.value)}
-                      onClick={e => e.stopPropagation()}
-                      style={{
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        color: '#fff',
-                        fontSize: '11px',
-                        width: '70px',
-                      }}
-                    />
-                    <button
-                      onClick={e => { e.stopPropagation(); toggleLayerVisibility(layer.id); }}
-                      style={{
-                        padding: '2px 5px',
-                        backgroundColor: layer.visible ? '#4CAF50' : '#666',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '2px',
-                        cursor: 'pointer',
-                        fontSize: '9px',
-                      }}
-                    >
-                      {layer.visible ? '👁' : '—'}
-                    </button>
-                  </div>
-                  <div style={{ display: 'flex', gap: '2px', justifyContent: 'center' }}>
-                    <button
-                      onClick={e => { e.stopPropagation(); moveLayer(layer.id, 'up'); }}
-                      disabled={index === 0}
-                      style={{
-                        padding: '2px 5px',
-                        backgroundColor: '#444',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '2px',
-                        cursor: index === 0 ? 'not-allowed' : 'pointer',
-                        fontSize: '9px',
-                        opacity: index === 0 ? 0.5 : 1,
-                      }}
-                    >
-                      ▲
-                    </button>
-                    <button
-                      onClick={e => { e.stopPropagation(); moveLayer(layer.id, 'down'); }}
-                      disabled={index === layers.length - 1}
-                      style={{
-                        padding: '2px 5px',
-                        backgroundColor: '#444',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '2px',
-                        cursor: index === layers.length - 1 ? 'not-allowed' : 'pointer',
-                        fontSize: '9px',
-                        opacity: index === layers.length - 1 ? 0.5 : 1,
-                      }}
-                    >
-                      ▼
-                    </button>
-                    <button
-                      onClick={e => { e.stopPropagation(); deleteLayer(layer.id); }}
-                      disabled={layers.length <= 1}
-                      style={{
-                        padding: '2px 5px',
-                        backgroundColor: '#f44336',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '2px',
-                        cursor: layers.length <= 1 ? 'not-allowed' : 'pointer',
-                        fontSize: '9px',
-                        opacity: layers.length <= 1 ? 0.5 : 1,
-                      }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Gallery Full Screen */}
+      {/* Gallery Full Screen */}
         {showGalleryScreen && (
           <div
             style={{
@@ -1314,26 +1220,6 @@ export function TileEditor({ onClose }: TileEditorProps) {
             </div>
           </div>
         )}
-
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            top: '10px',
-            right: '10px',
-            padding: '6px 12px',
-            backgroundColor: '#f44336',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-          }}
-        >
-          ✕ Close
-        </button>
-      </div>
     </div>
   );
 }
