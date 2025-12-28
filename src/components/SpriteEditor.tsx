@@ -806,8 +806,8 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(12, 32px)',
-                    gap: '4px',
+                    gridTemplateColumns: 'repeat(auto-fill, 28px)',
+                    gap: '3px',
                   }}
                 >
                   {DEFAULT_PALETTE.map((color, index) => (
@@ -815,13 +815,13 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                       key={index}
                       onClick={() => setSelectedColor(color)}
                       style={{
-                        width: '32px',
-                        height: '32px',
+                        width: '28px',
+                        height: '28px',
                         backgroundColor: color,
-                        border: selectedColor === color ? '3px solid #0D0D0D' : '1px solid #ccc',
-                        borderRadius: '3px',
+                        border: selectedColor === color ? '2px solid #0D0D0D' : '1px solid #ccc',
+                        borderRadius: '2px',
                         cursor: 'pointer',
-                        boxShadow: selectedColor === color ? '0 0 8px rgba(13, 13, 13, 0.5)' : 'none',
+                        boxShadow: selectedColor === color ? '0 0 6px rgba(13, 13, 13, 0.5)' : 'none',
                       }}
                       title={color}
                     />
