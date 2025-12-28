@@ -16,44 +16,74 @@ const BASE_CANVAS_SIZE = GRID_SIZE * PIXEL_SIZE + NUM_BORDERS * TILE_BORDER; // 
 const VIEWPORT_SIZE = 580; // Fixed viewport size
 
 const DEFAULT_PALETTE = [
-  // Grayscale (dark to light)
-  '#000000', '#333333', '#555555', '#777777', '#999999', '#bbbbbb', '#dddddd', '#ffffff',
+  // Grayscale
+  '#000000', '#1a1a1a', '#333333', '#4d4d4d', '#666666', '#808080', '#999999', '#b3b3b3', '#cccccc', '#e6e6e6', '#ffffff',
 
-  // Reds (dark to light)
-  '#330000', '#660000', '#990000', '#cc0000', '#ff3333', '#ff6666', '#ff9999', '#ffcccc',
+  // Reds - dark to light with rich tones
+  '#1a0000', '#330000', '#4d0000', '#660000', '#800000', '#990000', '#b30000', '#cc0000',
+  '#e60000', '#ff0000', '#ff3333', '#ff6666', '#ff9999', '#ffcccc',
+  '#8b0000', '#a52a2a', '#b22222', '#cd5c5c', '#dc143c', '#c41e3a',
 
-  // Oranges (dark to light)
-  '#331400', '#663300', '#994d00', '#cc6600', '#ff8833', '#ffaa66', '#ffcc99', '#ffddbb',
+  // Oranges - including burnt orange, terracotta, rust
+  '#331400', '#4d2600', '#663300', '#804000', '#994d00', '#b35900', '#cc6600', '#e67300',
+  '#ff8000', '#ff9933', '#ffad5c', '#ffc285', '#cc5500', '#e65c00',
+  '#d2691e', '#cd853f', '#ff7f50', '#ff6347', '#e2725b', '#c04000',
 
-  // Yellows (dark to light)
-  '#333300', '#666600', '#999900', '#cccc00', '#ffff33', '#ffff66', '#ffff99', '#ffffcc',
+  // Yellows - including ochre, gold, mustard, amber
+  '#1a1a00', '#333300', '#4d4d00', '#666600', '#808000', '#999900', '#b3b300', '#cccc00',
+  '#e6e600', '#ffff00', '#ffff33', '#ffff66', '#ffff99', '#ffffcc',
+  '#ffd700', '#daa520', '#b8860b', '#cd9b1d', '#eec900', '#f0c420', '#d4a017', '#c5a000',
 
-  // Greens (dark to light)
-  '#003300', '#006600', '#009900', '#00cc00', '#33ff33', '#66ff66', '#99ff99', '#ccffcc',
+  // Earth Tones - clay, terracotta, rust, sand
+  '#8b4513', '#a0522d', '#6b4423', '#8b5a2b', '#cd853f', '#d2691e', '#b8860b',
+  '#deb887', '#d2b48c', '#c4a76c', '#bdb76b', '#f5deb3', '#faebd7', '#ffe4c4',
+  '#cc7722', '#c19a6b', '#e3a857', '#cfb53b', '#daa06d', '#c68e17',
 
-  // Teals (dark to light)
-  '#003333', '#006666', '#009999', '#00cccc', '#33ffff', '#66ffff', '#99ffff', '#ccffff',
+  // Browns - chocolate, coffee, walnut, chestnut, sienna
+  '#1a0f00', '#2d1a00', '#3d2b1f', '#4a2c2a', '#5c4033', '#6b4423', '#7b3f00',
+  '#8b4513', '#964b00', '#a0522d', '#a52a2a', '#6f4e37', '#4b3621', '#3b2f2f',
+  '#8b7355', '#9b7653', '#a67b5b', '#bc8f8f', '#c4a484', '#d2b48c', '#deb887',
 
-  // Blues (dark to light)
-  '#000033', '#000066', '#000099', '#0000cc', '#3333ff', '#6666ff', '#9999ff', '#ccccff',
+  // Greens - forest, olive, moss, sage, hunter
+  '#0a1a00', '#143300', '#1e4d00', '#286600', '#328000', '#3c9900', '#46b300', '#50cc00',
+  '#00ff00', '#33ff33', '#66ff66', '#99ff99', '#ccffcc',
+  '#228b22', '#2e8b57', '#3cb371', '#006400', '#008000', '#355e3b',
+  '#556b2f', '#6b8e23', '#808000', '#9acd32', '#6b8e23', '#4f7942',
+  '#8fbc8f', '#90ee90', '#98fb98', '#adff2f',
 
-  // Purples (dark to light)
-  '#330033', '#660066', '#990099', '#cc00cc', '#ff33ff', '#ff66ff', '#ff99ff', '#ffccff',
+  // Teals & Cyans
+  '#003333', '#004d4d', '#006666', '#008080', '#009999', '#00b3b3', '#00cccc',
+  '#00ffff', '#33ffff', '#66ffff', '#99ffff', '#ccffff',
+  '#008b8b', '#20b2aa', '#40e0d0', '#48d1cc', '#00ced1', '#5f9ea0',
 
-  // Pinks (dark to light)
-  '#330019', '#660033', '#99004d', '#cc0066', '#ff3399', '#ff66b3', '#ff99cc', '#ffcce6',
+  // Blues - navy, midnight, steel, slate
+  '#000033', '#00004d', '#000066', '#000080', '#000099', '#0000b3', '#0000cc', '#0000e6',
+  '#0000ff', '#3333ff', '#6666ff', '#9999ff', '#ccccff',
+  '#191970', '#00008b', '#0000cd', '#4169e1', '#1e90ff', '#4682b4',
+  '#5f9ea0', '#6495ed', '#87ceeb', '#add8e6', '#b0c4de',
 
-  // Browns (dark to light)
-  '#2d1a00', '#4a2c2a', '#664400', '#8b4513', '#a0522d', '#cd853f', '#deb887', '#f5deb3',
+  // Purples & Violets - plum, eggplant, wine
+  '#1a001a', '#330033', '#4d004d', '#660066', '#800080', '#990099', '#b300b3', '#cc00cc',
+  '#ff00ff', '#ff33ff', '#ff66ff', '#ff99ff', '#ffccff',
+  '#4b0082', '#6a0dad', '#8b008b', '#9400d3', '#9932cc', '#ba55d3',
+  '#800020', '#722f37', '#5d3954', '#673147', '#702963',
+
+  // Pinks & Rose
+  '#330019', '#4d0026', '#660033', '#800040', '#99004d', '#b3005a', '#cc0066',
+  '#ff0080', '#ff3399', '#ff66b3', '#ff99cc', '#ffcce6',
+  '#c71585', '#db7093', '#ff69b4', '#ffb6c1', '#ffc0cb',
+  '#e75480', '#de5d83', '#f08080', '#fa8072', '#e9967a',
 
   // Skin Tones
-  '#8d5524', '#a0522d', '#c68642', '#d2a679', '#e0ac69', '#f1c27d', '#ffcd94', '#ffe4c4',
+  '#8d5524', '#a0522d', '#b5651d', '#c68642', '#d2a679', '#e0ac69',
+  '#f1c27d', '#ffcd94', '#ffdbac', '#ffe4c4', '#ffecd9', '#fff5eb',
+  '#4a2c2a', '#6b4423', '#8b5a2b',
 
-  // Nature greens
-  '#1b4d1b', '#228b22', '#2e8b57', '#3cb371', '#556b2f', '#6b8e23', '#9acd32', '#adff2f',
-
-  // Metallics
-  '#2f4f4f', '#708090', '#c0c0c0', '#d4af37', '#ffd700', '#b87333', '#cd7f32',
+  // Metallics & Stone
+  '#2f4f4f', '#36454f', '#4a4a4a', '#696969', '#708090', '#778899', '#808080',
+  '#a9a9a9', '#c0c0c0', '#d3d3d3',
+  '#ffd700', '#daa520', '#b8860b', '#d4af37', '#cfb53b',
+  '#b87333', '#cd7f32', '#b08d57', '#c9ae5d',
 ];
 
 export function SpriteEditor({ onClose }: SpriteEditorProps) {
