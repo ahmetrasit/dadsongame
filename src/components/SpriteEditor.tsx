@@ -6,24 +6,51 @@ interface SpriteEditorProps {
   onClose: () => void;
 }
 
-type Tool = 'paint' | 'erase';
-
-const GRID_SIZE = 14;
-const PIXEL_SIZE = 24; // Display size of each pixel
-const CANVAS_SIZE = GRID_SIZE * PIXEL_SIZE; // 336px
+const TILE_SIZE = 16; // 16x16 pixels per tile
+const TILES_PER_ROW = 3; // 3x3 grid of tiles
+const GRID_SIZE = TILE_SIZE * TILES_PER_ROW; // 48x48 total pixels
+const PIXEL_SIZE = 12; // Display size of each pixel
+const CANVAS_SIZE = GRID_SIZE * PIXEL_SIZE; // 576px
 
 const DEFAULT_PALETTE = [
-  '#000000', '#ffffff', '#f5f5f5', '#d1d5db', '#6b7280', '#1f2937',
-  '#dc2626', '#ef4444', '#f87171', '#fca5a5', '#fecaca',
-  '#ea580c', '#f59e0b', '#fbbf24', '#fde68a', '#fef3c7',
-  '#eab308', '#ca8a04', '#a16207', '#78350f', '#451a03',
-  '#65a30d', '#84cc16', '#a3e635', '#22c55e', '#15803d',
-  '#166534', '#0f4c2a', '#047857', '#059669', '#10b981',
-  '#14b8a6', '#0d9488', '#0f766e', '#115e59', '#134e4a',
-  '#0ea5e9', '#3b82f6', '#60a5fa', '#2563eb', '#1d4ed8',
-  '#7c3aed', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe',
-  '#ec4899', '#f472b6', '#f9a8d4', '#fbcfe8', '#fce7f3',
-  '#92400e', '#b45309', '#d97706', '#e19d2b', '#fcd34d',
+  // Blacks & Whites
+  '#000000', '#1a1a1a', '#333333', '#4d4d4d', '#666666', '#808080',
+  '#999999', '#b3b3b3', '#cccccc', '#e6e6e6', '#f2f2f2', '#ffffff',
+  // Rich Reds
+  '#2d0a0a', '#5c1414', '#8b1e1e', '#b22222', '#dc143c', '#ff0000',
+  '#ff3333', '#ff6666', '#ff9999', '#ffcccc', '#ffe6e6', '#fff0f0',
+  // Rich Oranges
+  '#3d1f00', '#7a3d00', '#b85c00', '#f57c00', '#ff9800', '#ffb74d',
+  '#ffcc80', '#ffe0b2', '#fff3e0', '#ffecd9', '#fff5eb', '#fffaf5',
+  // Rich Yellows
+  '#3d3d00', '#7a7a00', '#b8b800', '#f5f500', '#ffff00', '#ffff4d',
+  '#ffff80', '#ffffb3', '#ffffe6', '#ffffd9', '#ffffeb', '#fffff5',
+  // Rich Greens
+  '#0a2d0a', '#145c14', '#1e8b1e', '#22b222', '#2ecc40', '#4caf50',
+  '#66bb6a', '#81c784', '#a5d6a7', '#c8e6c9', '#e8f5e9', '#f1f8f1',
+  // Teals & Cyans
+  '#0a2d2d', '#145c5c', '#1e8b8b', '#22b2b2', '#00bcd4', '#26c6da',
+  '#4dd0e1', '#80deea', '#b2ebf2', '#e0f7fa', '#e6ffff', '#f0ffff',
+  // Rich Blues
+  '#0a0a2d', '#14145c', '#1e1e8b', '#2222b2', '#1976d2', '#2196f3',
+  '#42a5f5', '#64b5f6', '#90caf9', '#bbdefb', '#e3f2fd', '#f0f7ff',
+  // Rich Purples
+  '#1a0a2d', '#33145c', '#4d1e8b', '#6622b2', '#7b1fa2', '#9c27b0',
+  '#ab47bc', '#ba68c8', '#ce93d8', '#e1bee7', '#f3e5f5', '#faf0ff',
+  // Rich Pinks
+  '#2d0a1a', '#5c1433', '#8b1e4d', '#b22266', '#c2185b', '#e91e63',
+  '#ec407a', '#f06292', '#f48fb1', '#f8bbd9', '#fce4ec', '#fff0f5',
+  // Browns & Tans
+  '#1a0f00', '#3d2200', '#5c3300', '#7a4400', '#8d6e63', '#a1887f',
+  '#bcaaa4', '#d7ccc8', '#efebe9', '#f5f0eb', '#faf5f0', '#fffaf5',
+  // Skin Tones
+  '#8d5524', '#c68642', '#e0ac69', '#f1c27d', '#ffdbac', '#ffe4c4',
+  // Nature Greens
+  '#1b4d1b', '#228b22', '#2e8b57', '#3cb371', '#90ee90', '#98fb98',
+  // Sky Blues
+  '#4682b4', '#5f9ea0', '#87ceeb', '#add8e6', '#b0e0e6', '#e0ffff',
+  // Earth Tones
+  '#8b4513', '#a0522d', '#cd853f', '#deb887', '#f4a460', '#ffdab9',
 ];
 
 export function SpriteEditor({ onClose }: SpriteEditorProps) {
@@ -33,42 +60,58 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill('transparent'))
   );
   const [selectedColor, setSelectedColor] = useState('#000000');
-  const [tool, setTool] = useState<Tool>('paint');
+  const [brushSize, setBrushSize] = useState(1);
   const [isMouseDown, setIsMouseDown] = useState(false);
+  const [isRightMouseDown, setIsRightMouseDown] = useState(false);
   const [selectedObjectType, setSelectedObjectType] = useState<'plant' | 'animal' | 'resource'>('plant');
   const [selectedObjectId, setSelectedObjectId] = useState<string>('');
 
   // Prevent default behavior
   const stopProp = (e: React.MouseEvent) => e.stopPropagation();
 
-  // Handle click to paint pixel
-  const handleClick = (row: number, col: number) => {
+  // Paint or erase with brush size
+  const paintPixels = (centerRow: number, centerCol: number, erase: boolean) => {
     setPixels(prev => {
       const newPixels = prev.map(r => [...r]);
-      newPixels[row][col] = tool === 'paint' ? selectedColor : 'transparent';
+      const halfSize = Math.floor(brushSize / 2);
+      for (let dy = -halfSize; dy < brushSize - halfSize; dy++) {
+        for (let dx = -halfSize; dx < brushSize - halfSize; dx++) {
+          const r = centerRow + dy;
+          const c = centerCol + dx;
+          if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
+            newPixels[r][c] = erase ? 'transparent' : selectedColor;
+          }
+        }
+      }
       return newPixels;
     });
   };
 
-  // Handle mouse down for dragging
-  const handleMouseDown = (row: number, col: number) => {
-    setIsMouseDown(true);
-    handleClick(row, col);
+  // Handle mouse down
+  const handleMouseDown = (row: number, col: number, e: React.MouseEvent) => {
+    if (e.button === 2) {
+      // Right click - erase
+      setIsRightMouseDown(true);
+      paintPixels(row, col, true);
+    } else if (e.button === 0) {
+      // Left click - paint
+      setIsMouseDown(true);
+      paintPixels(row, col, false);
+    }
   };
 
   // Handle mouse enter for dragging
   const handleMouseEnter = (row: number, col: number) => {
     if (isMouseDown) {
-      setPixels(prev => {
-        const newPixels = prev.map(r => [...r]);
-        newPixels[row][col] = tool === 'paint' ? selectedColor : 'transparent';
-        return newPixels;
-      });
+      paintPixels(row, col, false);
+    } else if (isRightMouseDown) {
+      paintPixels(row, col, true);
     }
   };
 
   const handleMouseUp = () => {
     setIsMouseDown(false);
+    setIsRightMouseDown(false);
   };
 
   useEffect(() => {
@@ -223,9 +266,9 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
         left: 0,
         width: '100vw',
         height: '100vh',
-        background: '#1a1a2e',
+        background: '#FFF1E5',
         zIndex: 2000,
-        color: '#e0e0e0',
+        color: '#333',
         fontFamily: '"Avenir", "Avenir Next", -apple-system, BlinkMacSystemFont, sans-serif',
         fontSize: '14px',
         overflow: 'auto',
@@ -234,19 +277,20 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
       }}
       onClick={stopProp}
       onMouseDown={stopProp}
+      onContextMenu={(e) => e.preventDefault()}
     >
       {/* Header */}
-      <div style={{ padding: '20px', borderBottom: '1px solid #333', background: '#0f0f1e' }}>
+      <div style={{ padding: '20px', borderBottom: '1px solid #E8DDD1', background: '#FFF1E5' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>Sprite Editor (14x14 pixels)</h1>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: 0, color: '#0D0D0D' }}>Sprite Editor (3x3 tiles, 16x16 each)</h1>
           <button
             onClick={onClose}
             style={{
               padding: '8px 16px',
-              background: '#dc2626',
+              background: '#0D0D0D',
               border: 'none',
               borderRadius: '4px',
-              color: 'white',
+              color: '#FFF1E5',
               cursor: 'pointer',
               fontSize: '14px',
               fontWeight: 'bold',
@@ -260,8 +304,8 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
       {/* Main layout: Left sidebar + Main content */}
       <div style={{ display: 'flex', flex: 1, overflow: 'auto' }}>
         {/* Left Sidebar - Object Linking (300px) */}
-        <div style={{ width: '300px', padding: '20px', borderRight: '1px solid #333', overflowY: 'auto', background: '#0f0f1e' }}>
-          <h2 style={{ fontSize: '18px', marginBottom: '15px' }}>Link to Object</h2>
+        <div style={{ width: '300px', padding: '20px', borderRight: '1px solid #E8DDD1', overflowY: 'auto', background: '#FFF1E5' }}>
+          <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#0D0D0D' }}>Link to Object</h2>
 
           <div style={{ marginBottom: '15px' }}>
             <label style={{ display: 'block', marginBottom: '8px' }}>Object Type:</label>
@@ -274,10 +318,10 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
               style={{
                 width: '100%',
                 padding: '8px',
-                background: '#1a1a2e',
-                border: '1px solid #555',
+                background: '#fff',
+                border: '1px solid #ccc',
                 borderRadius: '4px',
-                color: '#e0e0e0',
+                color: '#333',
                 cursor: 'pointer',
               }}
             >
@@ -295,10 +339,10 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
               style={{
                 width: '100%',
                 padding: '8px',
-                background: '#1a1a2e',
-                border: '1px solid #555',
+                background: '#fff',
+                border: '1px solid #ccc',
                 borderRadius: '4px',
-                color: '#e0e0e0',
+                color: '#333',
                 cursor: 'pointer',
               }}
             >
@@ -319,14 +363,14 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                 style={{
                   width: '100px',
                   height: '100px',
-                  border: '2px solid #444',
+                  border: '2px solid #ccc',
                   backgroundImage: `url(${currentObjectImage})`,
                   backgroundSize: 'contain',
                   backgroundRepeat: 'no-repeat',
                   backgroundPosition: 'center',
                   imageRendering: 'pixelated',
                   borderRadius: '4px',
-                  backgroundColor: '#1a1a2e',
+                  backgroundColor: '#fff',
                 }}
               />
             </div>
@@ -340,10 +384,10 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                 style={{
                   maxHeight: '300px',
                   overflowY: 'auto',
-                  border: '1px solid #555',
+                  border: '1px solid #ccc',
                   borderRadius: '4px',
                   padding: '8px',
-                  backgroundColor: '#1a1a2e',
+                  backgroundColor: '#fff',
                 }}
               >
                 {[...selectedObject.spriteVersions].reverse().map((version) => {
@@ -360,16 +404,16 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                         gap: '10px',
                         padding: '8px',
                         marginBottom: '8px',
-                        border: isCurrentVersion ? '2px solid #3b82f6' : '1px solid #444',
+                        border: isCurrentVersion ? '2px solid #0D0D0D' : '1px solid #ccc',
                         borderRadius: '4px',
-                        backgroundColor: isCurrentVersion ? '#1e3a5f' : '#2a2a3e',
+                        backgroundColor: isCurrentVersion ? '#E8DDD1' : '#fff',
                       }}
                     >
                       <div
                         style={{
                           width: '40px',
                           height: '40px',
-                          border: '1px solid #666',
+                          border: '1px solid #ccc',
                           backgroundImage: `url(${version.imageUrl})`,
                           backgroundSize: 'contain',
                           backgroundRepeat: 'no-repeat',
@@ -380,21 +424,21 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                           flexShrink: 0,
                         }}
                       />
-                      <div style={{ flex: 1, fontSize: '12px' }}>
+                      <div style={{ flex: 1, fontSize: '12px', color: '#333' }}>
                         <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>
                           v{version.version} {isCurrentVersion && '(Current)'}
                         </div>
-                        <div style={{ color: '#999', fontSize: '11px' }}>{formattedDate}</div>
+                        <div style={{ color: '#666', fontSize: '11px' }}>{formattedDate}</div>
                       </div>
                       {!isCurrentVersion && (
                         <button
                           onClick={() => handleRestoreVersion(version.imageUrl)}
                           style={{
                             padding: '4px 8px',
-                            background: '#3b82f6',
+                            background: '#0D0D0D',
                             border: 'none',
                             borderRadius: '3px',
-                            color: 'white',
+                            color: '#FFF1E5',
                             cursor: 'pointer',
                             fontSize: '11px',
                             fontWeight: 'bold',
@@ -417,13 +461,13 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
               style={{
                 width: '60px',
                 height: '60px',
-                border: '2px solid #444',
+                border: '2px solid #ccc',
                 backgroundImage: `url(${generatePreview()})`,
                 backgroundSize: 'contain',
                 backgroundRepeat: 'no-repeat',
                 imageRendering: 'pixelated',
                 borderRadius: '4px',
-                backgroundColor: '#1a1a2e',
+                backgroundColor: '#fff',
               }}
             />
           </div>
@@ -456,8 +500,8 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
               <div
                 style={{
                   display: 'inline-block',
-                  border: '2px solid #444',
-                  background: '#2a2a3e',
+                  border: '2px solid #ccc',
+                  background: '#E8DDD1',
                   padding: '10px',
                   borderRadius: '8px',
                 }}
@@ -469,7 +513,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                     width: CANVAS_SIZE,
                     height: CANVAS_SIZE,
                     background: '#fff',
-                    border: '1px solid #666',
+                    border: '1px solid #ccc',
                   }}
                 >
                   {/* Pixel grid background */}
@@ -481,7 +525,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                       display: 'grid',
                       gridTemplateColumns: `repeat(${GRID_SIZE}, ${PIXEL_SIZE}px)`,
                       gap: '1px',
-                      background: '#444',
+                      background: '#ccc',
                       width: CANVAS_SIZE,
                       height: CANVAS_SIZE,
                     }}
@@ -524,7 +568,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                       return (
                         <div
                           key={index}
-                          onMouseDown={() => handleMouseDown(rowIndex, colIndex)}
+                          onMouseDown={(e) => handleMouseDown(rowIndex, colIndex, e)}
                           onMouseEnter={() => handleMouseEnter(rowIndex, colIndex)}
                           style={{
                             width: PIXEL_SIZE,
@@ -560,38 +604,23 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
 
           {/* Color Palette */}
           <div>
-              <h3 style={{ fontSize: '16px', marginBottom: '10px' }}>Color Palette</h3>
+              <h3 style={{ fontSize: '16px', marginBottom: '10px', color: '#0D0D0D' }}>Color Palette</h3>
+              <p style={{ fontSize: '12px', color: '#666', marginBottom: '15px' }}>Left-click to paint, right-click to erase</p>
 
-              {/* Tools */}
+              {/* Brush Size */}
               <div style={{ marginBottom: '15px' }}>
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  <button
-                    onClick={() => setTool('paint')}
-                    style={{
-                      padding: '8px 16px',
-                      background: tool === 'paint' ? '#3b82f6' : '#444',
-                      border: 'none',
-                      borderRadius: '4px',
-                      color: 'white',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Paint
-                  </button>
-                  <button
-                    onClick={() => setTool('erase')}
-                    style={{
-                      padding: '8px 16px',
-                      background: tool === 'erase' ? '#3b82f6' : '#444',
-                      border: 'none',
-                      borderRadius: '4px',
-                      color: 'white',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Erase
-                  </button>
-                </div>
+                <label style={{ display: 'block', marginBottom: '8px', color: '#0D0D0D' }}>Brush Size: {brushSize}px</label>
+                <input
+                  type="range"
+                  min="1"
+                  max="8"
+                  value={brushSize}
+                  onChange={(e) => setBrushSize(parseInt(e.target.value))}
+                  style={{
+                    width: '200px',
+                    cursor: 'pointer',
+                  }}
+                />
               </div>
 
               <div
@@ -610,10 +639,10 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                       width: '40px',
                       height: '40px',
                       backgroundColor: color,
-                      border: selectedColor === color ? '3px solid #3b82f6' : '2px solid #555',
+                      border: selectedColor === color ? '3px solid #0D0D0D' : '2px solid #ccc',
                       borderRadius: '4px',
                       cursor: 'pointer',
-                      boxShadow: selectedColor === color ? '0 0 10px #3b82f6' : 'none',
+                      boxShadow: selectedColor === color ? '0 0 10px rgba(13, 13, 13, 0.5)' : 'none',
                     }}
                     title={color}
                   />
@@ -623,7 +652,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
               {/* Custom color picker */}
               <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '8px' }}>Custom Color:</label>
+                  <label style={{ display: 'block', marginBottom: '8px', color: '#0D0D0D' }}>Custom Color:</label>
                   <input
                     type="color"
                     value={selectedColor}
@@ -631,7 +660,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                     style={{
                       width: '80px',
                       height: '40px',
-                      border: '2px solid #555',
+                      border: '2px solid #ccc',
                       borderRadius: '4px',
                       cursor: 'pointer',
                     }}
@@ -640,18 +669,18 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
 
                 {/* Selected color display */}
                 <div>
-                  <label style={{ display: 'block', marginBottom: '8px' }}>Selected:</label>
+                  <label style={{ display: 'block', marginBottom: '8px', color: '#0D0D0D' }}>Selected:</label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div
                       style={{
                         width: '40px',
                         height: '40px',
                         backgroundColor: selectedColor,
-                        border: '2px solid #555',
+                        border: '2px solid #ccc',
                         borderRadius: '4px',
                       }}
                     />
-                    <span style={{ fontFamily: 'monospace', fontSize: '14px' }}>{selectedColor}</span>
+                    <span style={{ fontFamily: 'monospace', fontSize: '14px', color: '#0D0D0D' }}>{selectedColor}</span>
                   </div>
                 </div>
               </div>
