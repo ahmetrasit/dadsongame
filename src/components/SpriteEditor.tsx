@@ -248,14 +248,15 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     const viewport = viewportRef.current;
     if (!viewport) return;
 
-    const canvasWidth = BASE_CANVAS_SIZE * zoom;
-    const canvasHeight = BASE_CANVAS_SIZE * zoom;
-    const viewportWidth = VIEWPORT_SIZE;
-    const viewportHeight = VIEWPORT_SIZE;
+    // Get actual scrollable dimensions
+    const scrollWidth = viewport.scrollWidth;
+    const scrollHeight = viewport.scrollHeight;
+    const clientWidth = viewport.clientWidth;
+    const clientHeight = viewport.clientHeight;
 
-    // Calculate scroll position to center the canvas
-    const scrollLeft = Math.max(0, (canvasWidth - viewportWidth) / 2 + 10 * zoom);
-    const scrollTop = Math.max(0, (canvasHeight - viewportHeight) / 2 + 10 * zoom);
+    // Calculate scroll position to center
+    const scrollLeft = Math.max(0, (scrollWidth - clientWidth) / 2);
+    const scrollTop = Math.max(0, (scrollHeight - clientHeight) / 2);
 
     viewport.scrollLeft = scrollLeft;
     viewport.scrollTop = scrollTop;
