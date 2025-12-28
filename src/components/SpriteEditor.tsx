@@ -10,7 +10,9 @@ const TILE_SIZE = 16; // 16x16 pixels per tile
 const TILES_PER_ROW = 3; // 3x3 grid of tiles
 const GRID_SIZE = TILE_SIZE * TILES_PER_ROW; // 48x48 total pixels
 const PIXEL_SIZE = 12; // Display size of each pixel
-const CANVAS_SIZE = GRID_SIZE * PIXEL_SIZE; // 576px
+const TILE_BORDER = 2; // Black border between tiles
+const NUM_BORDERS = TILES_PER_ROW - 1; // 2 borders for 3 tiles
+const CANVAS_SIZE = GRID_SIZE * PIXEL_SIZE + NUM_BORDERS * TILE_BORDER; // 576 + 4 = 580px
 
 const DEFAULT_PALETTE = [
   // Blacks & Whites
@@ -506,79 +508,103 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                   borderRadius: '8px',
                 }}
               >
-                {/* Canvas with both pixel grid AND canvas overlay */}
+                {/* Canvas with tile borders */}
                 <div
                   style={{
                     position: 'relative',
                     width: CANVAS_SIZE,
                     height: CANVAS_SIZE,
-                    background: '#fff',
-                    border: '1px solid #ccc',
+                    background: '#000', // Black background for tile borders
+                    border: '1px solid #000',
                   }}
                 >
-                  {/* Pixel grid background */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      display: 'grid',
-                      gridTemplateColumns: `repeat(${GRID_SIZE}, ${PIXEL_SIZE}px)`,
-                      gap: '1px',
-                      background: '#ccc',
-                      width: CANVAS_SIZE,
-                      height: CANVAS_SIZE,
-                    }}
-                  >
-                    {pixels.map((row, rowIndex) =>
-                      row.map((color, colIndex) => (
-                        <div
-                          key={`${rowIndex}-${colIndex}`}
-                          style={{
-                            width: PIXEL_SIZE,
-                            height: PIXEL_SIZE,
-                            backgroundColor: color === 'transparent' ? '#fff' : color,
-                            border: '1px solid rgba(0,0,0,0.1)',
-                            backgroundImage: color === 'transparent'
-                              ? 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)'
-                              : 'none',
-                            backgroundSize: color === 'transparent' ? '10px 10px' : 'auto',
-                            backgroundPosition: color === 'transparent' ? '0 0, 0 5px, 5px -5px, -5px 0px' : 'auto',
-                          }}
-                        />
-                      ))
-                    )}
-                  </div>
-
-                  {/* Interaction grid overlay */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      display: 'grid',
-                      gridTemplateColumns: `repeat(${GRID_SIZE}, ${PIXEL_SIZE}px)`,
-                      width: CANVAS_SIZE,
-                      height: CANVAS_SIZE,
-                    }}
-                  >
-                    {Array.from({ length: GRID_SIZE * GRID_SIZE }).map((_, index) => {
-                      const rowIndex = Math.floor(index / GRID_SIZE);
-                      const colIndex = index % GRID_SIZE;
+                  {/* Render 3x3 tiles */}
+                  {Array.from({ length: TILES_PER_ROW }).map((_, tileRow) =>
+                    Array.from({ length: TILES_PER_ROW }).map((_, tileCol) => {
+                      const tileX = tileCol * (TILE_SIZE * PIXEL_SIZE + TILE_BORDER);
+                      const tileY = tileRow * (TILE_SIZE * PIXEL_SIZE + TILE_BORDER);
                       return (
                         <div
-                          key={index}
-                          onMouseDown={(e) => handleMouseDown(rowIndex, colIndex, e)}
-                          onMouseEnter={() => handleMouseEnter(rowIndex, colIndex)}
+                          key={`tile-${tileRow}-${tileCol}`}
                           style={{
-                            width: PIXEL_SIZE,
-                            height: PIXEL_SIZE,
-                            pointerEvents: 'all',
+                            position: 'absolute',
+                            left: tileX,
+                            top: tileY,
+                            width: TILE_SIZE * PIXEL_SIZE,
+                            height: TILE_SIZE * PIXEL_SIZE,
+                            display: 'grid',
+                            gridTemplateColumns: `repeat(${TILE_SIZE}, ${PIXEL_SIZE}px)`,
+                            gridTemplateRows: `repeat(${TILE_SIZE}, ${PIXEL_SIZE}px)`,
                           }}
-                        />
+                        >
+                          {/* Pixels within this tile */}
+                          {Array.from({ length: TILE_SIZE }).map((_, localRow) =>
+                            Array.from({ length: TILE_SIZE }).map((_, localCol) => {
+                              const globalRow = tileRow * TILE_SIZE + localRow;
+                              const globalCol = tileCol * TILE_SIZE + localCol;
+                              const color = pixels[globalRow][globalCol];
+                              // Checkerboard pattern for transparent pixels
+                              const isCheckerWhite = (globalRow + globalCol) % 2 === 0;
+                              const transparentColor = isCheckerWhite ? '#ffffff' : '#cccccc';
+
+                              return (
+                                <div
+                                  key={`${localRow}-${localCol}`}
+                                  style={{
+                                    width: PIXEL_SIZE,
+                                    height: PIXEL_SIZE,
+                                    backgroundColor: color === 'transparent' ? transparentColor : color,
+                                  }}
+                                />
+                              );
+                            })
+                          )}
+                        </div>
                       );
-                    })}
-                  </div>
+                    })
+                  )}
+
+                  {/* Interaction grid overlay */}
+                  {Array.from({ length: TILES_PER_ROW }).map((_, tileRow) =>
+                    Array.from({ length: TILES_PER_ROW }).map((_, tileCol) => {
+                      const tileX = tileCol * (TILE_SIZE * PIXEL_SIZE + TILE_BORDER);
+                      const tileY = tileRow * (TILE_SIZE * PIXEL_SIZE + TILE_BORDER);
+                      return (
+                        <div
+                          key={`interact-tile-${tileRow}-${tileCol}`}
+                          style={{
+                            position: 'absolute',
+                            left: tileX,
+                            top: tileY,
+                            width: TILE_SIZE * PIXEL_SIZE,
+                            height: TILE_SIZE * PIXEL_SIZE,
+                            display: 'grid',
+                            gridTemplateColumns: `repeat(${TILE_SIZE}, ${PIXEL_SIZE}px)`,
+                            gridTemplateRows: `repeat(${TILE_SIZE}, ${PIXEL_SIZE}px)`,
+                          }}
+                        >
+                          {Array.from({ length: TILE_SIZE }).map((_, localRow) =>
+                            Array.from({ length: TILE_SIZE }).map((_, localCol) => {
+                              const globalRow = tileRow * TILE_SIZE + localRow;
+                              const globalCol = tileCol * TILE_SIZE + localCol;
+                              return (
+                                <div
+                                  key={`i-${localRow}-${localCol}`}
+                                  onMouseDown={(e) => handleMouseDown(globalRow, globalCol, e)}
+                                  onMouseEnter={() => handleMouseEnter(globalRow, globalCol)}
+                                  style={{
+                                    width: PIXEL_SIZE,
+                                    height: PIXEL_SIZE,
+                                    pointerEvents: 'all',
+                                  }}
+                                />
+                              );
+                            })
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
