@@ -118,6 +118,9 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
   const [selectedColor, setSelectedColor] = useState('#000000');
   const [brushSize, setBrushSize] = useState(1);
   const [zoom, setZoom] = useState(1); // Zoom level: 0.5x to 2x
+  const [currentTool, setCurrentTool] = useState<'paint' | 'square' | 'circle'>('paint');
+  const [shapeStart, setShapeStart] = useState<{ row: number; col: number } | null>(null);
+  const [shapeEnd, setShapeEnd] = useState<{ row: number; col: number } | null>(null);
   const [isMouseDown, setIsMouseDown] = useState(false);
   const [isRightMouseDown, setIsRightMouseDown] = useState(false);
   const [selectedObjectType, setSelectedObjectType] = useState<'plant' | 'animal' | 'resource'>('plant');
@@ -192,37 +195,135 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     });
   };
 
+  // Get pixels for a rectangle shape
+  const getSquarePixels = (start: { row: number; col: number }, end: { row: number; col: number }) => {
+    const pixels: { row: number; col: number }[] = [];
+    const minRow = Math.min(start.row, end.row);
+    const maxRow = Math.max(start.row, end.row);
+    const minCol = Math.min(start.col, end.col);
+    const maxCol = Math.max(start.col, end.col);
+
+    for (let r = minRow; r <= maxRow; r++) {
+      for (let c = minCol; c <= maxCol; c++) {
+        if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
+          pixels.push({ row: r, col: c });
+        }
+      }
+    }
+    return pixels;
+  };
+
+  // Get pixels for an ellipse/circle shape
+  const getCirclePixels = (start: { row: number; col: number }, end: { row: number; col: number }) => {
+    const pixels: { row: number; col: number }[] = [];
+    const minRow = Math.min(start.row, end.row);
+    const maxRow = Math.max(start.row, end.row);
+    const minCol = Math.min(start.col, end.col);
+    const maxCol = Math.max(start.col, end.col);
+
+    const centerRow = (minRow + maxRow) / 2;
+    const centerCol = (minCol + maxCol) / 2;
+    const radiusRow = (maxRow - minRow) / 2;
+    const radiusCol = (maxCol - minCol) / 2;
+
+    if (radiusRow === 0 || radiusCol === 0) return pixels;
+
+    for (let r = minRow; r <= maxRow; r++) {
+      for (let c = minCol; c <= maxCol; c++) {
+        // Check if point is inside ellipse
+        const normalizedRow = (r - centerRow) / radiusRow;
+        const normalizedCol = (c - centerCol) / radiusCol;
+        if (normalizedRow * normalizedRow + normalizedCol * normalizedCol <= 1) {
+          if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
+            pixels.push({ row: r, col: c });
+          }
+        }
+      }
+    }
+    return pixels;
+  };
+
+  // Draw shape to canvas
+  const drawShape = (erase: boolean) => {
+    if (!shapeStart || !shapeEnd) return;
+
+    const shapePixels = currentTool === 'square'
+      ? getSquarePixels(shapeStart, shapeEnd)
+      : getCirclePixels(shapeStart, shapeEnd);
+
+    setPixels(prev => {
+      const newPixels = prev.map(r => [...r]);
+      shapePixels.forEach(({ row, col }) => {
+        newPixels[row][col] = erase ? 'transparent' : selectedColor;
+      });
+      return newPixels;
+    });
+  };
+
+  // Get preview pixels for current shape
+  const shapePreviewPixels = useMemo(() => {
+    if (!shapeStart || !shapeEnd) return new Set<string>();
+    const pixels = currentTool === 'square'
+      ? getSquarePixels(shapeStart, shapeEnd)
+      : getCirclePixels(shapeStart, shapeEnd);
+    return new Set(pixels.map(p => `${p.row}-${p.col}`));
+  }, [shapeStart, shapeEnd, currentTool]);
+
   // Handle mouse down
   const handleMouseDown = (row: number, col: number, e: React.MouseEvent) => {
-    if (e.button === 2) {
-      // Right click - erase
-      setIsRightMouseDown(true);
-      paintPixels(row, col, true);
-    } else if (e.button === 0) {
-      // Left click - paint
-      setIsMouseDown(true);
-      paintPixels(row, col, false);
+    if (currentTool === 'paint') {
+      if (e.button === 2) {
+        setIsRightMouseDown(true);
+        paintPixels(row, col, true);
+      } else if (e.button === 0) {
+        setIsMouseDown(true);
+        paintPixels(row, col, false);
+      }
+    } else {
+      // Shape tools
+      if (e.button === 0 || e.button === 2) {
+        setShapeStart({ row, col });
+        setShapeEnd({ row, col });
+        if (e.button === 2) {
+          setIsRightMouseDown(true);
+        } else {
+          setIsMouseDown(true);
+        }
+      }
     }
   };
 
   // Handle mouse enter for dragging
   const handleMouseEnter = (row: number, col: number) => {
-    if (isMouseDown) {
-      paintPixels(row, col, false);
-    } else if (isRightMouseDown) {
-      paintPixels(row, col, true);
+    if (currentTool === 'paint') {
+      if (isMouseDown) {
+        paintPixels(row, col, false);
+      } else if (isRightMouseDown) {
+        paintPixels(row, col, true);
+      }
+    } else {
+      // Shape tools - update end point while dragging
+      if (isMouseDown || isRightMouseDown) {
+        setShapeEnd({ row, col });
+      }
     }
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
+    // If using shape tool and we have both points, draw the shape
+    if (currentTool !== 'paint' && shapeStart && shapeEnd) {
+      drawShape(isRightMouseDown);
+    }
     setIsMouseDown(false);
     setIsRightMouseDown(false);
-  };
+    setShapeStart(null);
+    setShapeEnd(null);
+  }, [currentTool, shapeStart, shapeEnd, isRightMouseDown, selectedColor]);
 
   useEffect(() => {
     window.addEventListener('mouseup', handleMouseUp);
     return () => window.removeEventListener('mouseup', handleMouseUp);
-  }, []);
+  }, [handleMouseUp]);
 
   // ESC key to close editor
   useEffect(() => {
@@ -662,6 +763,8 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                                 // Checkerboard pattern for transparent pixels
                                 const isCheckerWhite = (globalRow + globalCol) % 2 === 0;
                                 const transparentColor = isCheckerWhite ? '#ffffff' : '#cccccc';
+                                // Check if pixel is in shape preview
+                                const isInShapePreview = shapePreviewPixels.has(`${globalRow}-${globalCol}`);
 
                                 return (
                                   <div
@@ -669,7 +772,10 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                                     style={{
                                       width: PIXEL_SIZE,
                                       height: PIXEL_SIZE,
-                                      backgroundColor: color === 'transparent' ? transparentColor : color,
+                                      backgroundColor: isInShapePreview
+                                        ? (isRightMouseDown ? 'rgba(255,0,0,0.4)' : selectedColor)
+                                        : (color === 'transparent' ? transparentColor : color),
+                                      opacity: isInShapePreview ? 0.7 : 1,
                                     }}
                                   />
                                 );
@@ -745,10 +851,64 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
             </div>
           </div>
 
-          {/* Color Palette */}
+          {/* Tools & Color Palette */}
           <div>
-              <h3 style={{ fontSize: '16px', marginBottom: '10px', color: '#0D0D0D' }}>Color Palette</h3>
-              <p style={{ fontSize: '12px', color: '#666', marginBottom: '15px' }}>Left-click to paint, right-click to erase</p>
+              <h3 style={{ fontSize: '16px', marginBottom: '10px', color: '#0D0D0D' }}>Tools</h3>
+
+              {/* Tool Selection */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '15px' }}>
+                <button
+                  onClick={() => setCurrentTool('paint')}
+                  style={{
+                    padding: '8px 16px',
+                    background: currentTool === 'paint' ? '#0D0D0D' : '#E8DDD1',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    color: currentTool === 'paint' ? '#FFF1E5' : '#333',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Paint
+                </button>
+                <button
+                  onClick={() => setCurrentTool('square')}
+                  style={{
+                    padding: '8px 16px',
+                    background: currentTool === 'square' ? '#0D0D0D' : '#E8DDD1',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    color: currentTool === 'square' ? '#FFF1E5' : '#333',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Rectangle
+                </button>
+                <button
+                  onClick={() => setCurrentTool('circle')}
+                  style={{
+                    padding: '8px 16px',
+                    background: currentTool === 'circle' ? '#0D0D0D' : '#E8DDD1',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    color: currentTool === 'circle' ? '#FFF1E5' : '#333',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Ellipse
+                </button>
+              </div>
+
+              <p style={{ fontSize: '12px', color: '#666', marginBottom: '15px' }}>
+                {currentTool === 'paint'
+                  ? 'Left-click to paint, right-click to erase'
+                  : 'Click and drag to draw shape, right-click to erase shape'}
+              </p>
 
               {/* Brush Size & Zoom */}
               <div style={{ display: 'flex', gap: '30px', marginBottom: '15px', alignItems: 'flex-end' }}>
