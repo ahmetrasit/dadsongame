@@ -3,6 +3,7 @@ import { Game } from '@/components';
 import { EditorToolbar } from '@/components/EditorToolbar';
 import { DefinitionEditor } from '@/components/DefinitionEditor';
 import { SpriteEditor } from '@/components/SpriteEditor';
+import { TileEditor } from '@/components/TileEditor';
 import { MainMenu } from '@/components/MainMenu';
 import { VersionBadge } from '@/components/VersionBadge';
 import { InteractionPrompt } from '@/components/InteractionPrompt';
@@ -36,7 +37,7 @@ function App() {
         if (currentScreen === 'mapEditor') {
           setEditing(false);
           returnToMenu();
-        } else if (currentScreen === 'materialEditor' || currentScreen === 'creatureEditor' || currentScreen === 'spriteEditor') {
+        } else if (currentScreen === 'materialEditor' || currentScreen === 'creatureEditor' || currentScreen === 'spriteEditor' || currentScreen === 'tileEditor') {
           closeEditor();
           returnToMenu();
         }
@@ -51,6 +52,16 @@ function App() {
     return (
       <>
         <SpriteEditor onClose={returnToMenu} />
+        <VersionBadge />
+      </>
+    );
+  }
+
+  // Show tile editor screen
+  if (currentScreen === 'tileEditor') {
+    return (
+      <>
+        <TileEditor onClose={returnToMenu} />
         <VersionBadge />
       </>
     );

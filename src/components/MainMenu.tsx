@@ -84,6 +84,7 @@ export function MainMenu() {
           <MenuButton onClick={handleMapEditor}>Map Editor</MenuButton>
           <MenuButton onClick={handleObjectEditor}>Object Editor</MenuButton>
           <MenuButton onClick={() => setScreen('spriteEditor')}>Sprite Editor</MenuButton>
+          <MenuButton onClick={() => setScreen('tileEditor')}>Tile Editor</MenuButton>
           <MenuButton onClick={() => setShowEditorMenu(false)} secondary>Back</MenuButton>
         </div>
       )}
