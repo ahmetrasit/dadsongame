@@ -126,11 +126,77 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
   const [selectedObjectType, setSelectedObjectType] = useState<'plant' | 'animal' | 'resource'>('plant');
   const [selectedObjectId, setSelectedObjectId] = useState<string>('');
 
+  // Color management state
+  const [colorNames, setColorNames] = useState<Record<string, string>>({});
+  const [colorGroups, setColorGroups] = useState<{ id: string; name: string; colors: string[] }[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedGroupFilter, setSelectedGroupFilter] = useState<string | null>(null);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [showColorManager, setShowColorManager] = useState(false);
+
   // Ref for viewport to handle scroll-based zoom
   const viewportRef = useRef<HTMLDivElement>(null);
 
   // Calculate scaled canvas size for scrollable area
   const scaledCanvasSize = BASE_CANVAS_SIZE * zoom;
+
+  // Filter colors based on search and group
+  const filteredColors = useMemo(() => {
+    let colors = DEFAULT_PALETTE;
+
+    // Filter by group
+    if (selectedGroupFilter) {
+      const group = colorGroups.find(g => g.id === selectedGroupFilter);
+      if (group) {
+        colors = group.colors.filter(c => DEFAULT_PALETTE.includes(c) || true);
+      }
+    }
+
+    // Filter by search query (search in color names)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      colors = colors.filter(color => {
+        const name = colorNames[color]?.toLowerCase() || '';
+        const hex = color.toLowerCase();
+        return name.includes(query) || hex.includes(query);
+      });
+    }
+
+    return colors;
+  }, [searchQuery, selectedGroupFilter, colorGroups, colorNames]);
+
+  // Color management functions
+  const nameColor = (color: string, name: string) => {
+    setColorNames(prev => ({ ...prev, [color]: name }));
+  };
+
+  const createGroup = () => {
+    if (!newGroupName.trim()) return;
+    const newGroup = {
+      id: Date.now().toString(),
+      name: newGroupName.trim(),
+      colors: [],
+    };
+    setColorGroups(prev => [...prev, newGroup]);
+    setNewGroupName('');
+  };
+
+  const deleteGroup = (groupId: string) => {
+    setColorGroups(prev => prev.filter(g => g.id !== groupId));
+    if (selectedGroupFilter === groupId) {
+      setSelectedGroupFilter(null);
+    }
+  };
+
+  const addColorToGroup = (groupId: string, color: string) => {
+    setColorGroups(prev => prev.map(g => {
+      if (g.id === groupId && !g.colors.includes(color)) {
+        return { ...g, colors: [...g.colors, color] };
+      }
+      return g;
+    }));
+  };
+
 
   // Prevent default behavior
   const stopProp = (e: React.MouseEvent) => e.stopPropagation();
@@ -950,43 +1016,238 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                 </div>
               </div>
 
+              {/* Color Search & Filter */}
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  placeholder="Search colors by name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '6px 10px',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                  }}
+                />
+                <select
+                  value={selectedGroupFilter || ''}
+                  onChange={(e) => setSelectedGroupFilter(e.target.value || null)}
+                  style={{
+                    padding: '6px 10px',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    background: '#fff',
+                  }}
+                >
+                  <option value="">All Colors</option>
+                  {colorGroups.map(group => (
+                    <option key={group.id} value={group.id}>{group.name} ({group.colors.length})</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => setShowColorManager(!showColorManager)}
+                  style={{
+                    padding: '6px 12px',
+                    background: showColorManager ? '#0D0D0D' : '#E8DDD1',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    color: showColorManager ? '#FFF1E5' : '#333',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Manage
+                </button>
+              </div>
+
+              {/* Color Manager Panel */}
+              {showColorManager && (
+                <div style={{
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  padding: '10px',
+                  marginBottom: '10px',
+                  background: '#f9f9f9',
+                }}>
+                  <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#0D0D0D' }}>Color Groups</h4>
+
+                  {/* Create new group */}
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                    <input
+                      type="text"
+                      placeholder="New group name..."
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && createGroup()}
+                      style={{
+                        flex: 1,
+                        padding: '4px 8px',
+                        border: '1px solid #ccc',
+                        borderRadius: '3px',
+                        fontSize: '12px',
+                      }}
+                    />
+                    <button
+                      onClick={createGroup}
+                      style={{
+                        padding: '4px 10px',
+                        background: '#0D0D0D',
+                        border: 'none',
+                        borderRadius: '3px',
+                        color: '#FFF1E5',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                      }}
+                    >
+                      Add Group
+                    </button>
+                  </div>
+
+                  {/* List of groups */}
+                  <div style={{ maxHeight: '120px', overflowY: 'auto' }}>
+                    {colorGroups.length === 0 ? (
+                      <p style={{ fontSize: '11px', color: '#666', margin: 0 }}>No groups yet. Create one above.</p>
+                    ) : (
+                      colorGroups.map(group => (
+                        <div key={group.id} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '4px',
+                          marginBottom: '4px',
+                          background: '#fff',
+                          borderRadius: '3px',
+                          border: '1px solid #ddd',
+                        }}>
+                          <span style={{ flex: 1, fontSize: '12px' }}>{group.name}</span>
+                          <span style={{ fontSize: '11px', color: '#666' }}>{group.colors.length} colors</span>
+                          <button
+                            onClick={() => {
+                              if (selectedColor) addColorToGroup(group.id, selectedColor);
+                            }}
+                            style={{
+                              padding: '2px 6px',
+                              background: '#4CAF50',
+                              border: 'none',
+                              borderRadius: '2px',
+                              color: 'white',
+                              cursor: 'pointer',
+                              fontSize: '10px',
+                            }}
+                            title="Add selected color to this group"
+                          >
+                            +Add
+                          </button>
+                          <button
+                            onClick={() => deleteGroup(group.id)}
+                            style={{
+                              padding: '2px 6px',
+                              background: '#f44336',
+                              border: 'none',
+                              borderRadius: '2px',
+                              color: 'white',
+                              cursor: 'pointer',
+                              fontSize: '10px',
+                            }}
+                          >
+                            Del
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Color naming for selected color */}
+                  <div style={{ marginTop: '10px', borderTop: '1px solid #ddd', paddingTop: '10px' }}>
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#0D0D0D' }}>Name Selected Color</h4>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <div style={{
+                        width: '24px',
+                        height: '24px',
+                        backgroundColor: selectedColor,
+                        border: '1px solid #ccc',
+                        borderRadius: '3px',
+                      }} />
+                      <input
+                        type="text"
+                        placeholder="Enter color name..."
+                        value={colorNames[selectedColor] || ''}
+                        onChange={(e) => nameColor(selectedColor, e.target.value)}
+                        style={{
+                          flex: 1,
+                          padding: '4px 8px',
+                          border: '1px solid #ccc',
+                          borderRadius: '3px',
+                          fontSize: '12px',
+                        }}
+                      />
+                      <span style={{ fontSize: '11px', color: '#666' }}>{selectedColor}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Scrollable color palette */}
               <div
                 style={{
-                  height: '200px',
+                  height: '160px',
                   overflowY: 'auto',
                   overflowX: 'hidden',
                   border: '1px solid #ccc',
                   borderRadius: '4px',
                   padding: '8px',
-                  marginBottom: '20px',
+                  marginBottom: '15px',
                   background: '#fff',
                 }}
               >
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, 28px)',
-                    gap: '3px',
-                  }}
-                >
-                  {DEFAULT_PALETTE.map((color, index) => (
-                    <div
-                      key={index}
-                      onClick={() => setSelectedColor(color)}
-                      style={{
-                        width: '28px',
-                        height: '28px',
-                        backgroundColor: color,
-                        border: selectedColor === color ? '2px solid #0D0D0D' : '1px solid #ccc',
-                        borderRadius: '2px',
-                        cursor: 'pointer',
-                        boxShadow: selectedColor === color ? '0 0 6px rgba(13, 13, 13, 0.5)' : 'none',
-                      }}
-                      title={color}
-                    />
-                  ))}
-                </div>
+                {filteredColors.length === 0 ? (
+                  <p style={{ fontSize: '12px', color: '#666', textAlign: 'center', margin: '20px 0' }}>
+                    No colors found. Try a different search or group.
+                  </p>
+                ) : (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, 28px)',
+                      gap: '3px',
+                    }}
+                  >
+                    {filteredColors.map((color, index) => (
+                      <div
+                        key={index}
+                        onClick={() => setSelectedColor(color)}
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          backgroundColor: color,
+                          border: selectedColor === color ? '2px solid #0D0D0D' : '1px solid #ccc',
+                          borderRadius: '2px',
+                          cursor: 'pointer',
+                          boxShadow: selectedColor === color ? '0 0 6px rgba(13, 13, 13, 0.5)' : 'none',
+                          position: 'relative',
+                        }}
+                        title={colorNames[color] ? `${colorNames[color]} (${color})` : color}
+                      >
+                        {colorNames[color] && (
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '-2px',
+                            right: '-2px',
+                            width: '8px',
+                            height: '8px',
+                            background: '#0D0D0D',
+                            borderRadius: '50%',
+                            border: '1px solid #fff',
+                          }} />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Custom color picker */}
