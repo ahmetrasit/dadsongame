@@ -3,6 +3,7 @@ export { BaseMultiplayerService, EventEmitter, getChunkKey, interpolatePosition 
 export { MockMultiplayerService } from './MockMultiplayerService';
 export { FirebaseMultiplayerService, firebaseConfig } from './FirebaseMultiplayerService';
 export { definitionsService } from './DefinitionsService';
+export { mapService } from './MapService';
 
 import type { MultiplayerService } from './MultiplayerService';
 import { MockMultiplayerService } from './MockMultiplayerService';

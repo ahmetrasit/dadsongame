@@ -83,6 +83,7 @@ export function MainMenu() {
           <h2 style={{ textAlign: 'center', marginBottom: '10px', fontSize: '24px' }}>Editor</h2>
           <MenuButton onClick={handleMapEditor}>Map Editor</MenuButton>
           <MenuButton onClick={handleObjectEditor}>Object Editor</MenuButton>
+          <MenuButton onClick={() => setScreen('spriteEditor')}>Sprite Editor</MenuButton>
           <MenuButton onClick={() => setShowEditorMenu(false)} secondary>Back</MenuButton>
         </div>
       )}

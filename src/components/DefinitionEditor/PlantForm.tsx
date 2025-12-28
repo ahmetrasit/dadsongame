@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useDefinitionsStore, Season, SoilType, DeadYield, AliveYield, PlantSubCategory } from '@/stores/definitionsStore';
 import { Card, FieldRow, CompactInput, CompactSelect, TwoColumnRow, SliderField, CheckboxGroup } from './FormComponents';
 import { FaTrashAlt } from 'react-icons/fa';
+import { generatePlantPreview } from '@/utils/generatePreviewImage';
 
 interface PlantFormProps {
   item: any;
@@ -85,6 +86,11 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
   const isDuplicateName = plants.some(p => p.name.toLowerCase() === item.name.toLowerCase() && p.id !== item.id);
   const canSave = item.name.trim() !== '' && !isDuplicateName;
 
+  // Generate preview image if no custom image is uploaded
+  const previewImage = useMemo(() => {
+    return item.imageUrl || generatePlantPreview(item.subCategory, item.name);
+  }, [item.imageUrl, item.subCategory, item.name]);
+
   return (
     <div style={{ maxWidth: '900px' }}>
       {/* Header Card */}
@@ -95,6 +101,43 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
           </div>
         )}
         <FieldRow>
+          {/* Image preview and upload */}
+          <div
+            onClick={() => document.getElementById(`plant-image-upload-${item.id}`)?.click()}
+            style={{
+              width: '60px',
+              height: '60px',
+              border: '2px dashed #D4C4B0',
+              borderRadius: '8px',
+              marginRight: '12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundImage: `url(${previewImage})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              flexShrink: 0,
+            }}
+            title={item.imageUrl ? "Click to change image" : "Click to upload custom image (default preview shown)"}
+          >
+          </div>
+          <input
+            id={`plant-image-upload-${item.id}`}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  handleChange('imageUrl', reader.result as string);
+                };
+                reader.readAsDataURL(file);
+              }
+            }}
+          />
           <input
             type="text"
             value={item.name}

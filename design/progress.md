@@ -1,8 +1,10 @@
-# Progress & Gap Analysis (v0.015)
+# Progress & Gap Analysis (v0.025)
 
 ## ✅ Complete (100%)
-- **Map Editor** - Rivers (Catmull-Rom), trees, spawn, export/import
-- **Definition Editor** - Plants/Animals/Resources CRUD, persistence, compact 55%/45% layout
+- **Map Editor** - Rivers (Catmull-Rom), plants/animals/water placement, spawn, export/import, Firebase sync
+- **Definition Editor** - Plants/Animals/Resources/Water CRUD, persistence, compact 55%/45% layout, Firebase sync
+- **Firebase Integration** - DefinitionsService + MapService with real-time sync, retry logic, reconnection
+- **Interaction System** - E key detection, interaction properties on definitions
 
 ## 🟡 Partial (40-70%)
 | System | Done | Missing |
@@ -10,7 +12,7 @@
 | Player Movement | WASD, collision, camera | Actions, animations, needs |
 | Inventory | Slots, items, stacking | Gathering, crafting integration |
 | HUD | Time, weather, connection | Quest log, needs bars |
-| Multiplayer | Mock service, interface | Firebase wiring |
+| Multiplayer | Mock + Firebase services, interface | Room management, player sync |
 | Time | Counter, weather | Season cycling, day length |
 
 ## 🔴 Scaffolded Only (Types exist, no implementation)
@@ -33,6 +35,6 @@
 
 ## Architecture Notes
 - Type system is comprehensive (types/index.ts)
-- Service abstraction ready for Firebase swap
-- localStorage persistence works; backend persistence not wired
+- Firebase services: DefinitionsService (definitions), MapService (map data), FirebaseMultiplayerService (players)
+- Hybrid persistence: localStorage + Firestore with real-time sync
 - Placeholder graphics; no real assets yet

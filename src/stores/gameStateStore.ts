@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type GameScreen = 'menu' | 'game' | 'mapEditor' | 'materialEditor' | 'creatureEditor';
+export type GameScreen = 'menu' | 'game' | 'mapEditor' | 'materialEditor' | 'creatureEditor' | 'spriteEditor';
 
 interface GameStateStore {
   currentScreen: GameScreen;

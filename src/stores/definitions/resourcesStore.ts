@@ -1,12 +1,20 @@
 import { StateCreator } from 'zustand';
 
 // Resource-specific types
+export interface SpriteVersion {
+  imageUrl: string;
+  createdAt: number;
+  version: number;
+}
+
 export interface ResourceDefinition {
   id: string;
   name: string;
   category: 'food' | 'water' | 'metal' | 'rock' | 'wood' | 'organics';
   spoilageRate: 'fast' | 'medium' | 'slow' | 'never';
   weight: number;
+  imageUrl?: string;
+  spriteVersions?: SpriteVersion[];
 }
 
 // Resource slice state and actions

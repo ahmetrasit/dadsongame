@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Game } from '@/components';
 import { EditorToolbar } from '@/components/EditorToolbar';
 import { DefinitionEditor } from '@/components/DefinitionEditor';
+import { SpriteEditor } from '@/components/SpriteEditor';
 import { MainMenu } from '@/components/MainMenu';
 import { VersionBadge } from '@/components/VersionBadge';
 import { InteractionPrompt } from '@/components/InteractionPrompt';
@@ -12,13 +13,14 @@ import '@/styles/game.css';
 
 function App() {
   const { currentScreen, returnToMenu } = useGameStateStore();
-  const { setEditing } = useMapEditorStore();
-  const { closeEditor, initFromFirebase } = useDefinitionsStore();
+  const { setEditing, initFromFirebase: initMapFromFirebase } = useMapEditorStore();
+  const { closeEditor, initFromFirebase: initDefinitionsFromFirebase } = useDefinitionsStore();
 
-  // Initialize definitions from Firebase on app start
+  // Initialize from Firebase on app start
   useEffect(() => {
-    initFromFirebase();
-  }, [initFromFirebase]);
+    initDefinitionsFromFirebase();
+    initMapFromFirebase();
+  }, [initDefinitionsFromFirebase, initMapFromFirebase]);
 
   // Open map editor when entering mapEditor screen
   useEffect(() => {
@@ -31,7 +33,10 @@ function App() {
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (currentScreen === 'materialEditor' || currentScreen === 'creatureEditor') {
+        if (currentScreen === 'mapEditor') {
+          setEditing(false);
+          returnToMenu();
+        } else if (currentScreen === 'materialEditor' || currentScreen === 'creatureEditor' || currentScreen === 'spriteEditor') {
           closeEditor();
           returnToMenu();
         }
@@ -39,7 +44,17 @@ function App() {
     };
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
-  }, [currentScreen, closeEditor, returnToMenu]);
+  }, [currentScreen, closeEditor, returnToMenu, setEditing]);
+
+  // Show sprite editor screen
+  if (currentScreen === 'spriteEditor') {
+    return (
+      <>
+        <SpriteEditor onClose={returnToMenu} />
+        <VersionBadge />
+      </>
+    );
+  }
 
   // Show menu screen
   if (currentScreen === 'menu') {

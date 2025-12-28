@@ -6,6 +6,12 @@ export type AnimalCapability = 'eat' | 'carry' | 'transport' | 'produce';
 export type AnimalSubCategory = 'livestock' | 'poultry' | 'wild' | 'pet';
 export type AnimalInteractionType = 'pet' | 'feed' | 'milk' | 'shear' | 'ride' | 'collect' | 'tame' | 'inspect';
 
+export interface SpriteVersion {
+  imageUrl: string;
+  createdAt: number;
+  version: number;
+}
+
 export interface AnimalDefinition {
   id: string;
   name: string;
@@ -19,6 +25,8 @@ export interface AnimalDefinition {
   aliveYields: AliveYield[];
   deadYields: DeadYield[];
   spriteKey: string;
+  imageUrl?: string;
+  spriteVersions?: SpriteVersion[];
   // Interaction properties
   interactionRadius: number;
   interactionTypes: AnimalInteractionType[];

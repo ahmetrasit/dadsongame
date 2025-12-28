@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
 import { Card, FieldRow, CompactInput, CompactSelect } from './FormComponents';
 import { FaTrashAlt } from 'react-icons/fa';
+import { generateResourcePreview } from '@/utils/generatePreviewImage';
 
 interface ResourceFormProps {
   item: any;
@@ -39,6 +41,11 @@ export function ResourceForm({ item, isDraft, onSave, onCancel }: ResourceFormPr
   const isDuplicateName = resources.some(r => r.name.toLowerCase() === item.name.toLowerCase() && r.id !== item.id);
   const canSave = item.name.trim() !== '' && !isDuplicateName;
 
+  // Generate preview image if no custom image is uploaded
+  const previewImage = useMemo(() => {
+    return item.imageUrl || generateResourcePreview(item.category, item.name);
+  }, [item.imageUrl, item.category, item.name]);
+
   return (
     <div style={{ maxWidth: '900px' }}>
       {/* Header Card */}
@@ -49,6 +56,43 @@ export function ResourceForm({ item, isDraft, onSave, onCancel }: ResourceFormPr
           </div>
         )}
         <FieldRow>
+          {/* Image preview and upload */}
+          <div
+            onClick={() => document.getElementById(`resource-image-upload-${item.id}`)?.click()}
+            style={{
+              width: '60px',
+              height: '60px',
+              border: '2px dashed #D4C4B0',
+              borderRadius: '8px',
+              marginRight: '12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundImage: `url(${previewImage})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              flexShrink: 0,
+            }}
+            title={item.imageUrl ? "Click to change image" : "Click to upload custom image (default preview shown)"}
+          >
+          </div>
+          <input
+            id={`resource-image-upload-${item.id}`}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  handleChange('imageUrl', reader.result as string);
+                };
+                reader.readAsDataURL(file);
+              }
+            }}
+          />
           <input
             type="text"
             value={item.name}
