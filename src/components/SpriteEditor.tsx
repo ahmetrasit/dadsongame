@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
 import { generatePlantPreview, generateAnimalPreview, generateResourcePreview } from '@/utils/generatePreviewImage';
 
@@ -70,11 +70,56 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
   const [selectedObjectType, setSelectedObjectType] = useState<'plant' | 'animal' | 'resource'>('plant');
   const [selectedObjectId, setSelectedObjectId] = useState<string>('');
 
+  // Ref for viewport to handle scroll-based zoom
+  const viewportRef = useRef<HTMLDivElement>(null);
+
   // Calculate scaled canvas size for scrollable area
   const scaledCanvasSize = BASE_CANVAS_SIZE * zoom;
 
   // Prevent default behavior
   const stopProp = (e: React.MouseEvent) => e.stopPropagation();
+
+  // Handle scroll wheel zoom centered on cursor
+  const handleWheel = useCallback((e: WheelEvent) => {
+    e.preventDefault();
+
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    // Get mouse position relative to viewport
+    const rect = viewport.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Calculate position in canvas coordinates (accounting for current scroll)
+    const canvasX = (viewport.scrollLeft + mouseX) / zoom;
+    const canvasY = (viewport.scrollTop + mouseY) / zoom;
+
+    // Calculate new zoom level
+    const zoomDelta = e.deltaY > 0 ? -0.1 : 0.1;
+    const newZoom = Math.max(0.5, Math.min(3, zoom + zoomDelta));
+
+    // Update zoom
+    setZoom(newZoom);
+
+    // After zoom, adjust scroll to keep the same canvas point under cursor
+    requestAnimationFrame(() => {
+      if (!viewport) return;
+      const newScrollLeft = canvasX * newZoom - mouseX;
+      const newScrollTop = canvasY * newZoom - mouseY;
+      viewport.scrollLeft = Math.max(0, newScrollLeft);
+      viewport.scrollTop = Math.max(0, newScrollTop);
+    });
+  }, [zoom]);
+
+  // Attach wheel event listener to viewport
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    viewport.addEventListener('wheel', handleWheel, { passive: false });
+    return () => viewport.removeEventListener('wheel', handleWheel);
+  }, [handleWheel]);
 
   // Paint or erase with brush size
   const paintPixels = (centerRow: number, centerCol: number, erase: boolean) => {
@@ -506,6 +551,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
             <div>
               {/* Fixed viewport with scrollable zoomed canvas */}
               <div
+                ref={viewportRef}
                 style={{
                   width: VIEWPORT_SIZE,
                   height: VIEWPORT_SIZE,
@@ -652,7 +698,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
               <p style={{ fontSize: '12px', color: '#666', marginBottom: '15px' }}>Left-click to paint, right-click to erase</p>
 
               {/* Brush Size & Zoom */}
-              <div style={{ display: 'flex', gap: '30px', marginBottom: '15px' }}>
+              <div style={{ display: 'flex', gap: '30px', marginBottom: '15px', alignItems: 'flex-end' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '8px', color: '#0D0D0D' }}>Brush Size: {brushSize}px</label>
                   <input
@@ -668,53 +714,26 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '8px', color: '#0D0D0D' }}>Zoom: {Math.round(zoom * 100)}%</label>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <button
-                      onClick={() => setZoom(z => Math.max(0.5, z - 0.25))}
-                      style={{
-                        width: '32px',
-                        height: '32px',
-                        background: '#0D0D0D',
-                        border: 'none',
-                        borderRadius: '4px',
-                        color: '#FFF1E5',
-                        cursor: 'pointer',
-                        fontSize: '18px',
-                        fontWeight: 'bold',
-                      }}
-                    >
-                      -
-                    </button>
-                    <input
-                      type="range"
-                      min="0.5"
-                      max="2"
-                      step="0.25"
-                      value={zoom}
-                      onChange={(e) => setZoom(parseFloat(e.target.value))}
-                      style={{
-                        width: '100px',
-                        cursor: 'pointer',
-                      }}
-                    />
-                    <button
-                      onClick={() => setZoom(z => Math.min(2, z + 0.25))}
-                      style={{
-                        width: '32px',
-                        height: '32px',
-                        background: '#0D0D0D',
-                        border: 'none',
-                        borderRadius: '4px',
-                        color: '#FFF1E5',
-                        cursor: 'pointer',
-                        fontSize: '18px',
-                        fontWeight: 'bold',
-                      }}
-                    >
-                      +
-                    </button>
-                  </div>
+                  <label style={{ display: 'block', marginBottom: '8px', color: '#0D0D0D' }}>
+                    Zoom: {Math.round(zoom * 100)}%
+                    <span style={{ fontSize: '11px', color: '#666', marginLeft: '8px' }}>(scroll on canvas)</span>
+                  </label>
+                  <button
+                    onClick={() => setZoom(1)}
+                    style={{
+                      padding: '6px 12px',
+                      background: zoom === 1 ? '#ccc' : '#0D0D0D',
+                      border: 'none',
+                      borderRadius: '4px',
+                      color: zoom === 1 ? '#666' : '#FFF1E5',
+                      cursor: zoom === 1 ? 'default' : 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                    }}
+                    disabled={zoom === 1}
+                  >
+                    Reset Zoom
+                  </button>
                 </div>
               </div>
 
