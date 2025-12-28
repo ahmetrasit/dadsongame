@@ -15,75 +15,255 @@ const NUM_BORDERS = TILES_PER_ROW - 1; // 2 borders for 3 tiles
 const BASE_CANVAS_SIZE = GRID_SIZE * PIXEL_SIZE + NUM_BORDERS * TILE_BORDER; // 580px
 const VIEWPORT_SIZE = 580; // Fixed viewport size
 
-const DEFAULT_PALETTE = [
+interface ColorEntry {
+  color: string;
+  tags: string[];
+}
+
+const DEFAULT_PALETTE: ColorEntry[] = [
   // Grayscale
-  '#000000', '#1a1a1a', '#333333', '#4d4d4d', '#666666', '#808080', '#999999', '#b3b3b3', '#cccccc', '#e6e6e6', '#ffffff',
+  { color: '#000000', tags: ['black', 'dark', 'night', 'shadow', 'void', 'coal', 'ink', 'raven', 'obsidian', 'midnight', 'charcoal', 'soot', 'onyx', 'pitch', 'ebony', 'crow', 'bat', 'cave', 'deep', 'noir'] },
+  { color: '#1a1a1a', tags: ['black', 'dark', 'night', 'shadow', 'charcoal', 'coal', 'graphite', 'slate', 'iron', 'storm', 'thunder', 'ash', 'smoke', 'metal', 'steel', 'cave', 'deep', 'noir', 'gothic', 'raven'] },
+  { color: '#333333', tags: ['dark', 'gray', 'grey', 'charcoal', 'graphite', 'stone', 'rock', 'metal', 'iron', 'steel', 'shadow', 'smoke', 'thunder', 'storm', 'wolf', 'slate', 'ash', 'urban', 'concrete', 'asphalt'] },
+  { color: '#4d4d4d', tags: ['gray', 'grey', 'stone', 'rock', 'metal', 'iron', 'steel', 'concrete', 'ash', 'smoke', 'elephant', 'dolphin', 'urban', 'industrial', 'machinery', 'pewter', 'slate', 'boulder', 'gravel', 'neutral'] },
+  { color: '#666666', tags: ['gray', 'grey', 'stone', 'rock', 'metal', 'concrete', 'ash', 'smoke', 'steel', 'iron', 'neutral', 'urban', 'industrial', 'pewter', 'slate', 'machinery', 'robot', 'tech', 'modern', 'elephant'] },
+  { color: '#808080', tags: ['gray', 'grey', 'stone', 'rock', 'metal', 'concrete', 'neutral', 'silver', 'steel', 'iron', 'pewter', 'ash', 'fog', 'mist', 'cloud', 'overcast', 'mouse', 'elephant', 'dolphin', 'medium'] },
+  { color: '#999999', tags: ['gray', 'grey', 'silver', 'metal', 'stone', 'fog', 'mist', 'cloud', 'smoke', 'ash', 'neutral', 'pale', 'light', 'soft', 'gentle', 'moon', 'platinum', 'titanium', 'chrome', 'sleek'] },
+  { color: '#b3b3b3', tags: ['gray', 'grey', 'silver', 'light', 'pale', 'soft', 'cloud', 'fog', 'mist', 'platinum', 'chrome', 'moon', 'pearl', 'silk', 'satin', 'dove', 'feather', 'gentle', 'subtle', 'neutral'] },
+  { color: '#cccccc', tags: ['gray', 'grey', 'silver', 'light', 'pale', 'soft', 'cloud', 'snow', 'fog', 'mist', 'platinum', 'pearl', 'silk', 'dove', 'feather', 'cotton', 'wool', 'gentle', 'subtle', 'clean'] },
+  { color: '#e6e6e6', tags: ['gray', 'grey', 'white', 'light', 'pale', 'soft', 'snow', 'cloud', 'fog', 'pearl', 'bone', 'ivory', 'cream', 'silk', 'cotton', 'wool', 'clean', 'fresh', 'pure', 'minimal'] },
+  { color: '#ffffff', tags: ['white', 'light', 'bright', 'pure', 'clean', 'snow', 'cloud', 'ice', 'pearl', 'ivory', 'bone', 'cream', 'milk', 'cotton', 'paper', 'blank', 'fresh', 'crisp', 'heaven', 'angel'] },
 
-  // Reds - dark to light with rich tones
-  '#1a0000', '#330000', '#4d0000', '#660000', '#800000', '#990000', '#b30000', '#cc0000',
-  '#e60000', '#ff0000', '#ff3333', '#ff6666', '#ff9999', '#ffcccc',
-  '#8b0000', '#a52a2a', '#b22222', '#cd5c5c', '#dc143c', '#c41e3a',
+  // Reds
+  { color: '#1a0000', tags: ['red', 'dark', 'blood', 'wine', 'maroon', 'deep', 'rich', 'vampire', 'gothic', 'noir', 'shadow', 'cherry', 'berry', 'burgundy', 'velvet', 'night', 'mystery', 'drama', 'intense', 'power'] },
+  { color: '#330000', tags: ['red', 'dark', 'blood', 'wine', 'maroon', 'burgundy', 'deep', 'rich', 'cherry', 'berry', 'velvet', 'gothic', 'vampire', 'drama', 'intense', 'power', 'passion', 'love', 'heart', 'ember'] },
+  { color: '#660000', tags: ['red', 'dark', 'blood', 'wine', 'maroon', 'burgundy', 'cherry', 'berry', 'crimson', 'velvet', 'rich', 'deep', 'passion', 'love', 'heart', 'ruby', 'garnet', 'drama', 'power', 'intense'] },
+  { color: '#800000', tags: ['red', 'maroon', 'blood', 'wine', 'burgundy', 'cherry', 'berry', 'crimson', 'brick', 'rust', 'rich', 'deep', 'passion', 'love', 'heart', 'ruby', 'garnet', 'velvet', 'autumn', 'fall'] },
+  { color: '#990000', tags: ['red', 'crimson', 'blood', 'wine', 'cherry', 'berry', 'ruby', 'garnet', 'brick', 'rust', 'passion', 'love', 'heart', 'fire', 'flame', 'hot', 'warm', 'intense', 'power', 'danger'] },
+  { color: '#cc0000', tags: ['red', 'crimson', 'blood', 'cherry', 'berry', 'ruby', 'fire', 'flame', 'hot', 'warm', 'passion', 'love', 'heart', 'danger', 'stop', 'alert', 'apple', 'tomato', 'strawberry', 'intense'] },
+  { color: '#ff0000', tags: ['red', 'bright', 'fire', 'flame', 'hot', 'warm', 'passion', 'love', 'heart', 'danger', 'stop', 'alert', 'apple', 'tomato', 'strawberry', 'cherry', 'berry', 'ruby', 'candy', 'lipstick'] },
+  { color: '#ff3333', tags: ['red', 'bright', 'fire', 'cherry', 'berry', 'strawberry', 'apple', 'tomato', 'candy', 'lipstick', 'passion', 'love', 'heart', 'warm', 'hot', 'vibrant', 'bold', 'electric', 'neon', 'pop'] },
+  { color: '#ff6666', tags: ['red', 'pink', 'coral', 'salmon', 'peach', 'berry', 'strawberry', 'cherry', 'candy', 'bubblegum', 'warm', 'soft', 'gentle', 'sweet', 'romantic', 'blush', 'rose', 'flower', 'petal', 'light'] },
+  { color: '#ff9999', tags: ['red', 'pink', 'coral', 'salmon', 'peach', 'blush', 'rose', 'petal', 'flower', 'candy', 'bubblegum', 'sweet', 'soft', 'gentle', 'romantic', 'baby', 'pale', 'light', 'pastel', 'feminine'] },
+  { color: '#ffcccc', tags: ['pink', 'pale', 'light', 'blush', 'rose', 'petal', 'flower', 'soft', 'gentle', 'romantic', 'baby', 'pastel', 'feminine', 'sweet', 'candy', 'cotton', 'skin', 'peach', 'cream', 'delicate'] },
+  { color: '#8b0000', tags: ['red', 'dark', 'blood', 'wine', 'maroon', 'burgundy', 'cherry', 'berry', 'crimson', 'brick', 'rust', 'rich', 'deep', 'autumn', 'fall', 'velvet', 'leather', 'mahogany', 'ox', 'barn'] },
+  { color: '#a52a2a', tags: ['red', 'brown', 'brick', 'rust', 'auburn', 'chestnut', 'cinnamon', 'clay', 'earth', 'autumn', 'fall', 'leather', 'wood', 'warm', 'rich', 'natural', 'organic', 'spice', 'nutmeg', 'sienna'] },
+  { color: '#b22222', tags: ['red', 'brick', 'fire', 'rust', 'crimson', 'barn', 'clay', 'earth', 'autumn', 'fall', 'warm', 'rich', 'bold', 'intense', 'passion', 'love', 'heart', 'blood', 'ruby', 'garnet'] },
+  { color: '#cd5c5c', tags: ['red', 'pink', 'coral', 'salmon', 'rose', 'dusty', 'muted', 'soft', 'warm', 'earth', 'clay', 'terracotta', 'autumn', 'vintage', 'antique', 'faded', 'romantic', 'gentle', 'subtle', 'natural'] },
+  { color: '#dc143c', tags: ['red', 'crimson', 'cherry', 'berry', 'ruby', 'garnet', 'blood', 'passion', 'love', 'heart', 'fire', 'hot', 'warm', 'intense', 'bold', 'vibrant', 'royal', 'rich', 'jewel', 'lipstick'] },
 
-  // Oranges - including burnt orange, terracotta, rust
-  '#331400', '#4d2600', '#663300', '#804000', '#994d00', '#b35900', '#cc6600', '#e67300',
-  '#ff8000', '#ff9933', '#ffad5c', '#ffc285', '#cc5500', '#e65c00',
-  '#d2691e', '#cd853f', '#ff7f50', '#ff6347', '#e2725b', '#c04000',
+  // Oranges
+  { color: '#331400', tags: ['brown', 'dark', 'chocolate', 'coffee', 'espresso', 'wood', 'bark', 'earth', 'soil', 'mud', 'umber', 'sepia', 'walnut', 'mahogany', 'rich', 'deep', 'warm', 'organic', 'natural', 'rustic'] },
+  { color: '#663300', tags: ['brown', 'orange', 'dark', 'chocolate', 'coffee', 'wood', 'bark', 'earth', 'soil', 'leather', 'saddle', 'caramel', 'toffee', 'amber', 'warm', 'rich', 'organic', 'natural', 'rustic', 'autumn'] },
+  { color: '#994d00', tags: ['orange', 'brown', 'rust', 'copper', 'bronze', 'caramel', 'toffee', 'amber', 'honey', 'wood', 'leather', 'autumn', 'fall', 'warm', 'rich', 'earth', 'spice', 'cinnamon', 'nutmeg', 'maple'] },
+  { color: '#cc6600', tags: ['orange', 'rust', 'copper', 'bronze', 'caramel', 'toffee', 'amber', 'honey', 'maple', 'autumn', 'fall', 'pumpkin', 'squash', 'warm', 'rich', 'fire', 'sunset', 'spice', 'ginger', 'turmeric'] },
+  { color: '#ff8000', tags: ['orange', 'bright', 'fire', 'flame', 'sunset', 'sunrise', 'pumpkin', 'carrot', 'mango', 'tangerine', 'citrus', 'tropical', 'warm', 'hot', 'vibrant', 'bold', 'energy', 'autumn', 'fall', 'halloween'] },
+  { color: '#ff9933', tags: ['orange', 'bright', 'fire', 'sunset', 'sunrise', 'mango', 'tangerine', 'citrus', 'tropical', 'peach', 'apricot', 'warm', 'vibrant', 'bold', 'energy', 'happy', 'cheerful', 'autumn', 'golden', 'honey'] },
+  { color: '#ffad5c', tags: ['orange', 'peach', 'apricot', 'mango', 'tangerine', 'citrus', 'tropical', 'warm', 'soft', 'gentle', 'sunset', 'golden', 'honey', 'caramel', 'butterscotch', 'cream', 'light', 'pale', 'pastel', 'sweet'] },
+  { color: '#ffc285', tags: ['orange', 'peach', 'apricot', 'cream', 'light', 'pale', 'soft', 'gentle', 'warm', 'skin', 'nude', 'blush', 'sunset', 'golden', 'honey', 'caramel', 'butterscotch', 'pastel', 'sweet', 'delicate'] },
+  { color: '#d2691e', tags: ['orange', 'brown', 'chocolate', 'caramel', 'toffee', 'cinnamon', 'spice', 'wood', 'leather', 'saddle', 'autumn', 'fall', 'warm', 'rich', 'earth', 'organic', 'natural', 'rustic', 'copper', 'bronze'] },
+  { color: '#ff7f50', tags: ['orange', 'coral', 'salmon', 'peach', 'tropical', 'beach', 'sunset', 'warm', 'soft', 'vibrant', 'summer', 'mango', 'papaya', 'citrus', 'flower', 'petal', 'romantic', 'feminine', 'pretty', 'sweet'] },
+  { color: '#ff6347', tags: ['orange', 'red', 'tomato', 'coral', 'salmon', 'warm', 'hot', 'fire', 'sunset', 'tropical', 'summer', 'vibrant', 'bold', 'spicy', 'pepper', 'chili', 'fruit', 'vegetable', 'garden', 'fresh'] },
+  { color: '#e2725b', tags: ['orange', 'coral', 'terracotta', 'clay', 'earth', 'warm', 'muted', 'dusty', 'vintage', 'antique', 'rustic', 'mediterranean', 'desert', 'southwest', 'adobe', 'pottery', 'ceramic', 'natural', 'organic', 'autumn'] },
+  { color: '#c04000', tags: ['orange', 'rust', 'burnt', 'brick', 'terracotta', 'clay', 'earth', 'autumn', 'fall', 'warm', 'rich', 'deep', 'fire', 'ember', 'copper', 'bronze', 'vintage', 'antique', 'rustic', 'natural'] },
 
-  // Yellows - including ochre, gold, mustard, amber
-  '#1a1a00', '#333300', '#4d4d00', '#666600', '#808000', '#999900', '#b3b300', '#cccc00',
-  '#e6e600', '#ffff00', '#ffff33', '#ffff66', '#ffff99', '#ffffcc',
-  '#ffd700', '#daa520', '#b8860b', '#cd9b1d', '#eec900', '#f0c420', '#d4a017', '#c5a000',
+  // Yellows
+  { color: '#333300', tags: ['yellow', 'olive', 'dark', 'army', 'military', 'khaki', 'earth', 'mud', 'swamp', 'moss', 'forest', 'jungle', 'camouflage', 'nature', 'organic', 'natural', 'muted', 'vintage', 'antique', 'rustic'] },
+  { color: '#666600', tags: ['yellow', 'olive', 'army', 'military', 'khaki', 'earth', 'moss', 'forest', 'jungle', 'swamp', 'camouflage', 'nature', 'organic', 'natural', 'muted', 'vintage', 'antique', 'rustic', 'safari', 'autumn'] },
+  { color: '#999900', tags: ['yellow', 'olive', 'gold', 'mustard', 'khaki', 'earth', 'autumn', 'fall', 'harvest', 'wheat', 'hay', 'straw', 'grass', 'nature', 'organic', 'natural', 'warm', 'muted', 'vintage', 'rustic'] },
+  { color: '#cccc00', tags: ['yellow', 'gold', 'mustard', 'chartreuse', 'lime', 'acid', 'neon', 'bright', 'vibrant', 'bold', 'electric', 'energy', 'sun', 'sunny', 'happy', 'cheerful', 'spring', 'summer', 'fresh', 'citrus'] },
+  { color: '#ffff00', tags: ['yellow', 'bright', 'sun', 'sunny', 'gold', 'lemon', 'citrus', 'banana', 'canary', 'happy', 'cheerful', 'energy', 'vibrant', 'bold', 'electric', 'neon', 'summer', 'spring', 'fresh', 'warm'] },
+  { color: '#ffff33', tags: ['yellow', 'bright', 'sun', 'sunny', 'gold', 'lemon', 'citrus', 'banana', 'happy', 'cheerful', 'energy', 'vibrant', 'summer', 'spring', 'fresh', 'warm', 'light', 'pale', 'soft', 'gentle'] },
+  { color: '#ffff66', tags: ['yellow', 'light', 'pale', 'soft', 'sunny', 'lemon', 'citrus', 'banana', 'cream', 'butter', 'happy', 'cheerful', 'gentle', 'warm', 'summer', 'spring', 'fresh', 'pastel', 'sweet', 'delicate'] },
+  { color: '#ffff99', tags: ['yellow', 'pale', 'light', 'cream', 'butter', 'vanilla', 'soft', 'gentle', 'warm', 'sunny', 'pastel', 'baby', 'sweet', 'delicate', 'feminine', 'spring', 'summer', 'fresh', 'clean', 'bright'] },
+  { color: '#ffffcc', tags: ['yellow', 'cream', 'pale', 'light', 'butter', 'vanilla', 'ivory', 'soft', 'gentle', 'warm', 'pastel', 'baby', 'sweet', 'delicate', 'feminine', 'clean', 'fresh', 'pure', 'minimal', 'subtle'] },
+  { color: '#ffd700', tags: ['yellow', 'gold', 'golden', 'metal', 'metallic', 'shiny', 'rich', 'luxury', 'royal', 'crown', 'treasure', 'coin', 'sun', 'honey', 'amber', 'warm', 'bright', 'vibrant', 'precious', 'valuable'] },
+  { color: '#daa520', tags: ['yellow', 'gold', 'golden', 'amber', 'honey', 'caramel', 'butterscotch', 'autumn', 'fall', 'harvest', 'wheat', 'warm', 'rich', 'earth', 'natural', 'organic', 'vintage', 'antique', 'mustard', 'ochre'] },
+  { color: '#b8860b', tags: ['yellow', 'gold', 'dark', 'amber', 'honey', 'caramel', 'mustard', 'ochre', 'earth', 'autumn', 'fall', 'harvest', 'warm', 'rich', 'deep', 'natural', 'organic', 'vintage', 'antique', 'rustic'] },
+  { color: '#f0c420', tags: ['yellow', 'gold', 'bright', 'sunny', 'lemon', 'mustard', 'taxi', 'school', 'warning', 'caution', 'energy', 'happy', 'cheerful', 'vibrant', 'bold', 'warm', 'summer', 'spring', 'fresh', 'citrus'] },
 
-  // Earth Tones - clay, terracotta, rust, sand
-  '#8b4513', '#a0522d', '#6b4423', '#8b5a2b', '#cd853f', '#d2691e', '#b8860b',
-  '#deb887', '#d2b48c', '#c4a76c', '#bdb76b', '#f5deb3', '#faebd7', '#ffe4c4',
-  '#cc7722', '#c19a6b', '#e3a857', '#cfb53b', '#daa06d', '#c68e17',
+  // Earth Tones
+  { color: '#8b4513', tags: ['brown', 'earth', 'saddle', 'leather', 'wood', 'bark', 'chocolate', 'coffee', 'cinnamon', 'spice', 'autumn', 'fall', 'warm', 'rich', 'natural', 'organic', 'rustic', 'country', 'western', 'horse'] },
+  { color: '#a0522d', tags: ['brown', 'earth', 'sienna', 'clay', 'terracotta', 'rust', 'copper', 'autumn', 'fall', 'warm', 'rich', 'natural', 'organic', 'rustic', 'pottery', 'ceramic', 'southwest', 'desert', 'adobe', 'brick'] },
+  { color: '#6b4423', tags: ['brown', 'earth', 'wood', 'bark', 'tree', 'forest', 'chocolate', 'coffee', 'espresso', 'dark', 'rich', 'deep', 'natural', 'organic', 'rustic', 'cabin', 'log', 'furniture', 'walnut', 'oak'] },
+  { color: '#cd853f', tags: ['brown', 'tan', 'peru', 'caramel', 'toffee', 'butterscotch', 'sand', 'desert', 'beach', 'warm', 'earth', 'natural', 'organic', 'skin', 'nude', 'leather', 'suede', 'autumn', 'fall', 'harvest'] },
+  { color: '#d2691e', tags: ['brown', 'orange', 'chocolate', 'caramel', 'toffee', 'cinnamon', 'spice', 'autumn', 'fall', 'warm', 'rich', 'earth', 'natural', 'organic', 'rustic', 'wood', 'leather', 'copper', 'bronze', 'harvest'] },
+  { color: '#deb887', tags: ['brown', 'tan', 'beige', 'cream', 'sand', 'desert', 'beach', 'wheat', 'straw', 'hay', 'warm', 'soft', 'gentle', 'natural', 'organic', 'neutral', 'skin', 'nude', 'light', 'pale'] },
+  { color: '#d2b48c', tags: ['brown', 'tan', 'beige', 'sand', 'desert', 'beach', 'khaki', 'camel', 'warm', 'soft', 'natural', 'neutral', 'earth', 'organic', 'safari', 'travel', 'adventure', 'outdoor', 'light', 'pale'] },
+  { color: '#c4a76c', tags: ['brown', 'tan', 'gold', 'khaki', 'sand', 'desert', 'wheat', 'straw', 'hay', 'harvest', 'autumn', 'warm', 'soft', 'natural', 'organic', 'neutral', 'earth', 'vintage', 'antique', 'rustic'] },
+  { color: '#f5deb3', tags: ['brown', 'tan', 'beige', 'cream', 'wheat', 'straw', 'hay', 'sand', 'light', 'pale', 'soft', 'warm', 'gentle', 'natural', 'neutral', 'organic', 'bread', 'grain', 'harvest', 'autumn'] },
+  { color: '#faebd7', tags: ['cream', 'white', 'beige', 'ivory', 'antique', 'vintage', 'lace', 'linen', 'cotton', 'soft', 'gentle', 'warm', 'light', 'pale', 'delicate', 'elegant', 'classic', 'romantic', 'feminine', 'wedding'] },
+  { color: '#ffe4c4', tags: ['cream', 'peach', 'beige', 'bisque', 'skin', 'nude', 'blush', 'soft', 'gentle', 'warm', 'light', 'pale', 'delicate', 'feminine', 'romantic', 'baby', 'sweet', 'natural', 'organic', 'subtle'] },
+  { color: '#cc7722', tags: ['orange', 'brown', 'ochre', 'amber', 'honey', 'caramel', 'butterscotch', 'autumn', 'fall', 'harvest', 'warm', 'rich', 'earth', 'natural', 'organic', 'rustic', 'vintage', 'antique', 'copper', 'bronze'] },
+  { color: '#c19a6b', tags: ['brown', 'tan', 'camel', 'sand', 'desert', 'khaki', 'fawn', 'deer', 'warm', 'soft', 'natural', 'neutral', 'earth', 'organic', 'safari', 'autumn', 'fall', 'leather', 'suede', 'vintage'] },
 
-  // Browns - chocolate, coffee, walnut, chestnut, sienna
-  '#1a0f00', '#2d1a00', '#3d2b1f', '#4a2c2a', '#5c4033', '#6b4423', '#7b3f00',
-  '#8b4513', '#964b00', '#a0522d', '#a52a2a', '#6f4e37', '#4b3621', '#3b2f2f',
-  '#8b7355', '#9b7653', '#a67b5b', '#bc8f8f', '#c4a484', '#d2b48c', '#deb887',
+  // Browns
+  { color: '#1a0f00', tags: ['brown', 'black', 'dark', 'chocolate', 'coffee', 'espresso', 'wood', 'bark', 'earth', 'soil', 'mud', 'deep', 'rich', 'natural', 'organic', 'rustic', 'night', 'shadow', 'umber', 'sepia'] },
+  { color: '#2d1a00', tags: ['brown', 'dark', 'chocolate', 'coffee', 'espresso', 'wood', 'bark', 'earth', 'soil', 'mud', 'umber', 'sepia', 'rich', 'deep', 'natural', 'organic', 'rustic', 'antique', 'vintage', 'walnut'] },
+  { color: '#3d2b1f', tags: ['brown', 'dark', 'chocolate', 'coffee', 'espresso', 'wood', 'bark', 'earth', 'leather', 'rich', 'deep', 'warm', 'natural', 'organic', 'rustic', 'antique', 'vintage', 'walnut', 'mahogany', 'furniture'] },
+  { color: '#4a2c2a', tags: ['brown', 'dark', 'chocolate', 'coffee', 'wood', 'bark', 'earth', 'leather', 'rich', 'deep', 'warm', 'natural', 'organic', 'rustic', 'antique', 'vintage', 'mahogany', 'chestnut', 'auburn', 'wine'] },
+  { color: '#5c4033', tags: ['brown', 'chocolate', 'coffee', 'wood', 'bark', 'earth', 'leather', 'saddle', 'rich', 'warm', 'natural', 'organic', 'rustic', 'antique', 'vintage', 'furniture', 'cabin', 'log', 'walnut', 'oak'] },
+  { color: '#6b4423', tags: ['brown', 'chocolate', 'coffee', 'wood', 'bark', 'earth', 'leather', 'saddle', 'rich', 'warm', 'natural', 'organic', 'rustic', 'antique', 'vintage', 'furniture', 'walnut', 'oak', 'chestnut', 'autumn'] },
+  { color: '#7b3f00', tags: ['brown', 'chocolate', 'coffee', 'caramel', 'toffee', 'wood', 'leather', 'saddle', 'rich', 'warm', 'natural', 'organic', 'rustic', 'autumn', 'fall', 'harvest', 'cinnamon', 'spice', 'copper', 'bronze'] },
+  { color: '#8b4513', tags: ['brown', 'saddle', 'leather', 'wood', 'bark', 'chocolate', 'coffee', 'cinnamon', 'spice', 'earth', 'autumn', 'fall', 'warm', 'rich', 'natural', 'organic', 'rustic', 'western', 'country', 'horse'] },
+  { color: '#6f4e37', tags: ['brown', 'coffee', 'mocha', 'chocolate', 'wood', 'bark', 'earth', 'leather', 'warm', 'rich', 'natural', 'organic', 'rustic', 'antique', 'vintage', 'cafe', 'latte', 'espresso', 'bean', 'roast'] },
+  { color: '#4b3621', tags: ['brown', 'dark', 'coffee', 'chocolate', 'wood', 'bark', 'earth', 'leather', 'rich', 'deep', 'warm', 'natural', 'organic', 'rustic', 'antique', 'vintage', 'walnut', 'mahogany', 'furniture', 'cabin'] },
+  { color: '#8b7355', tags: ['brown', 'tan', 'taupe', 'mushroom', 'stone', 'earth', 'warm', 'muted', 'neutral', 'natural', 'organic', 'rustic', 'antique', 'vintage', 'soft', 'gentle', 'subtle', 'elegant', 'sophisticated', 'cafe'] },
+  { color: '#a67b5b', tags: ['brown', 'tan', 'caramel', 'toffee', 'coffee', 'latte', 'mocha', 'warm', 'soft', 'natural', 'neutral', 'earth', 'organic', 'rustic', 'antique', 'vintage', 'leather', 'suede', 'autumn', 'fall'] },
+  { color: '#bc8f8f', tags: ['brown', 'pink', 'rose', 'dusty', 'muted', 'soft', 'warm', 'gentle', 'romantic', 'vintage', 'antique', 'faded', 'subtle', 'elegant', 'feminine', 'blush', 'mauve', 'neutral', 'natural', 'earth'] },
 
-  // Greens - forest, olive, moss, sage, hunter
-  '#0a1a00', '#143300', '#1e4d00', '#286600', '#328000', '#3c9900', '#46b300', '#50cc00',
-  '#00ff00', '#33ff33', '#66ff66', '#99ff99', '#ccffcc',
-  '#228b22', '#2e8b57', '#3cb371', '#006400', '#008000', '#355e3b',
-  '#556b2f', '#6b8e23', '#808000', '#9acd32', '#6b8e23', '#4f7942',
-  '#8fbc8f', '#90ee90', '#98fb98', '#adff2f',
+  // Greens
+  { color: '#0a1a00', tags: ['green', 'dark', 'forest', 'jungle', 'night', 'shadow', 'deep', 'rich', 'nature', 'tree', 'leaf', 'plant', 'organic', 'natural', 'moss', 'fern', 'pine', 'evergreen', 'mysterious', 'enchanted'] },
+  { color: '#143300', tags: ['green', 'dark', 'forest', 'jungle', 'deep', 'rich', 'nature', 'tree', 'leaf', 'plant', 'organic', 'natural', 'moss', 'fern', 'pine', 'evergreen', 'hunter', 'military', 'army', 'camouflage'] },
+  { color: '#1e4d00', tags: ['green', 'dark', 'forest', 'jungle', 'deep', 'rich', 'nature', 'tree', 'leaf', 'plant', 'organic', 'natural', 'moss', 'fern', 'pine', 'evergreen', 'hunter', 'bottle', 'emerald', 'jewel'] },
+  { color: '#286600', tags: ['green', 'forest', 'jungle', 'nature', 'tree', 'leaf', 'plant', 'grass', 'organic', 'natural', 'moss', 'fern', 'pine', 'evergreen', 'hunter', 'bottle', 'rich', 'deep', 'vibrant', 'fresh'] },
+  { color: '#328000', tags: ['green', 'forest', 'grass', 'nature', 'tree', 'leaf', 'plant', 'organic', 'natural', 'fresh', 'spring', 'summer', 'garden', 'lawn', 'meadow', 'field', 'vibrant', 'alive', 'growth', 'life'] },
+  { color: '#3c9900', tags: ['green', 'grass', 'nature', 'tree', 'leaf', 'plant', 'organic', 'natural', 'fresh', 'spring', 'summer', 'garden', 'lawn', 'meadow', 'field', 'vibrant', 'alive', 'growth', 'life', 'healthy'] },
+  { color: '#46b300', tags: ['green', 'bright', 'grass', 'nature', 'leaf', 'plant', 'organic', 'natural', 'fresh', 'spring', 'summer', 'garden', 'lime', 'kiwi', 'apple', 'vibrant', 'alive', 'growth', 'life', 'healthy'] },
+  { color: '#50cc00', tags: ['green', 'bright', 'lime', 'grass', 'nature', 'leaf', 'plant', 'organic', 'natural', 'fresh', 'spring', 'summer', 'neon', 'electric', 'vibrant', 'bold', 'energy', 'kiwi', 'apple', 'citrus'] },
+  { color: '#00ff00', tags: ['green', 'bright', 'lime', 'neon', 'electric', 'vibrant', 'bold', 'energy', 'spring', 'fresh', 'nature', 'grass', 'leaf', 'plant', 'toxic', 'radioactive', 'glow', 'alien', 'matrix', 'digital'] },
+  { color: '#33ff33', tags: ['green', 'bright', 'lime', 'neon', 'electric', 'vibrant', 'bold', 'energy', 'spring', 'fresh', 'nature', 'grass', 'leaf', 'glow', 'light', 'pale', 'soft', 'gentle', 'mint', 'kiwi'] },
+  { color: '#66ff66', tags: ['green', 'light', 'lime', 'mint', 'spring', 'fresh', 'nature', 'grass', 'leaf', 'plant', 'soft', 'gentle', 'pale', 'pastel', 'sweet', 'candy', 'kiwi', 'apple', 'melon', 'honeydew'] },
+  { color: '#99ff99', tags: ['green', 'light', 'pale', 'mint', 'pastel', 'soft', 'gentle', 'spring', 'fresh', 'nature', 'grass', 'leaf', 'sweet', 'candy', 'baby', 'delicate', 'feminine', 'clean', 'pure', 'melon'] },
+  { color: '#ccffcc', tags: ['green', 'pale', 'light', 'mint', 'pastel', 'soft', 'gentle', 'spring', 'fresh', 'nature', 'clean', 'pure', 'baby', 'delicate', 'feminine', 'sweet', 'subtle', 'minimal', 'cream', 'ice'] },
+  { color: '#228b22', tags: ['green', 'forest', 'nature', 'tree', 'leaf', 'plant', 'grass', 'organic', 'natural', 'fresh', 'spring', 'summer', 'garden', 'park', 'jungle', 'tropical', 'rich', 'vibrant', 'alive', 'growth'] },
+  { color: '#2e8b57', tags: ['green', 'sea', 'ocean', 'water', 'nature', 'forest', 'jungle', 'tropical', 'organic', 'natural', 'fresh', 'cool', 'calm', 'serene', 'peaceful', 'healing', 'jade', 'emerald', 'jewel', 'rich'] },
+  { color: '#3cb371', tags: ['green', 'sea', 'ocean', 'water', 'nature', 'tropical', 'spring', 'fresh', 'cool', 'calm', 'serene', 'peaceful', 'healing', 'mint', 'jade', 'soft', 'gentle', 'natural', 'organic', 'vibrant'] },
+  { color: '#006400', tags: ['green', 'dark', 'forest', 'jungle', 'deep', 'rich', 'nature', 'tree', 'leaf', 'pine', 'evergreen', 'hunter', 'bottle', 'emerald', 'jewel', 'organic', 'natural', 'mysterious', 'enchanted', 'celtic'] },
+  { color: '#008000', tags: ['green', 'grass', 'nature', 'tree', 'leaf', 'plant', 'organic', 'natural', 'fresh', 'spring', 'summer', 'garden', 'lawn', 'meadow', 'field', 'go', 'safe', 'healthy', 'eco', 'environment'] },
+  { color: '#355e3b', tags: ['green', 'dark', 'forest', 'hunter', 'jungle', 'nature', 'tree', 'leaf', 'pine', 'evergreen', 'organic', 'natural', 'deep', 'rich', 'muted', 'sophisticated', 'elegant', 'classic', 'british', 'racing'] },
+  { color: '#556b2f', tags: ['green', 'olive', 'army', 'military', 'khaki', 'camouflage', 'nature', 'earth', 'forest', 'jungle', 'muted', 'dusty', 'vintage', 'antique', 'rustic', 'organic', 'natural', 'autumn', 'fall', 'safari'] },
+  { color: '#6b8e23', tags: ['green', 'olive', 'yellow', 'grass', 'nature', 'meadow', 'field', 'prairie', 'autumn', 'fall', 'harvest', 'organic', 'natural', 'fresh', 'spring', 'summer', 'chartreuse', 'lime', 'pear', 'apple'] },
+  { color: '#808000', tags: ['green', 'olive', 'yellow', 'army', 'military', 'khaki', 'camouflage', 'earth', 'nature', 'autumn', 'fall', 'harvest', 'muted', 'dusty', 'vintage', 'antique', 'rustic', 'organic', 'natural', 'safari'] },
+  { color: '#9acd32', tags: ['green', 'yellow', 'lime', 'chartreuse', 'bright', 'spring', 'fresh', 'nature', 'grass', 'leaf', 'plant', 'organic', 'natural', 'vibrant', 'bold', 'energy', 'citrus', 'pear', 'apple', 'kiwi'] },
+  { color: '#4f7942', tags: ['green', 'fern', 'forest', 'nature', 'tree', 'leaf', 'plant', 'organic', 'natural', 'fresh', 'spring', 'summer', 'garden', 'muted', 'soft', 'gentle', 'calm', 'serene', 'peaceful', 'healing'] },
+  { color: '#8fbc8f', tags: ['green', 'sea', 'sage', 'muted', 'soft', 'gentle', 'pale', 'light', 'nature', 'organic', 'natural', 'calm', 'serene', 'peaceful', 'healing', 'spa', 'zen', 'relaxing', 'soothing', 'fresh'] },
+  { color: '#90ee90', tags: ['green', 'light', 'pale', 'mint', 'spring', 'fresh', 'nature', 'grass', 'leaf', 'soft', 'gentle', 'pastel', 'sweet', 'candy', 'baby', 'delicate', 'feminine', 'clean', 'pure', 'melon'] },
+  { color: '#98fb98', tags: ['green', 'pale', 'light', 'mint', 'pastel', 'soft', 'gentle', 'spring', 'fresh', 'nature', 'clean', 'pure', 'baby', 'delicate', 'feminine', 'sweet', 'candy', 'ice', 'melon', 'honeydew'] },
+  { color: '#adff2f', tags: ['green', 'yellow', 'lime', 'chartreuse', 'neon', 'bright', 'electric', 'vibrant', 'bold', 'energy', 'spring', 'fresh', 'citrus', 'acid', 'toxic', 'radioactive', 'glow', 'kiwi', 'grape', 'unripe'] },
 
   // Teals & Cyans
-  '#003333', '#004d4d', '#006666', '#008080', '#009999', '#00b3b3', '#00cccc',
-  '#00ffff', '#33ffff', '#66ffff', '#99ffff', '#ccffff',
-  '#008b8b', '#20b2aa', '#40e0d0', '#48d1cc', '#00ced1', '#5f9ea0',
+  { color: '#003333', tags: ['teal', 'dark', 'deep', 'ocean', 'sea', 'water', 'night', 'shadow', 'forest', 'jungle', 'mysterious', 'enchanted', 'cool', 'cold', 'winter', 'ice', 'arctic', 'rich', 'jewel', 'emerald'] },
+  { color: '#004d4d', tags: ['teal', 'dark', 'deep', 'ocean', 'sea', 'water', 'forest', 'jungle', 'mysterious', 'cool', 'cold', 'winter', 'ice', 'arctic', 'rich', 'jewel', 'emerald', 'peacock', 'elegant', 'sophisticated'] },
+  { color: '#006666', tags: ['teal', 'dark', 'ocean', 'sea', 'water', 'tropical', 'caribbean', 'cool', 'cold', 'winter', 'ice', 'arctic', 'rich', 'deep', 'jewel', 'emerald', 'peacock', 'elegant', 'sophisticated', 'nature'] },
+  { color: '#008080', tags: ['teal', 'ocean', 'sea', 'water', 'tropical', 'caribbean', 'turquoise', 'aqua', 'cool', 'calm', 'serene', 'peaceful', 'healing', 'spa', 'zen', 'nature', 'beach', 'lagoon', 'paradise', 'exotic'] },
+  { color: '#009999', tags: ['teal', 'cyan', 'ocean', 'sea', 'water', 'tropical', 'caribbean', 'turquoise', 'aqua', 'cool', 'calm', 'serene', 'peaceful', 'fresh', 'clean', 'modern', 'tech', 'digital', 'vibrant', 'bold'] },
+  { color: '#00b3b3', tags: ['teal', 'cyan', 'ocean', 'sea', 'water', 'tropical', 'turquoise', 'aqua', 'cool', 'fresh', 'clean', 'modern', 'tech', 'digital', 'vibrant', 'bold', 'bright', 'electric', 'neon', 'pool'] },
+  { color: '#00cccc', tags: ['cyan', 'teal', 'ocean', 'sea', 'water', 'tropical', 'turquoise', 'aqua', 'cool', 'fresh', 'clean', 'modern', 'tech', 'digital', 'vibrant', 'bright', 'electric', 'neon', 'pool', 'ice'] },
+  { color: '#00ffff', tags: ['cyan', 'aqua', 'bright', 'neon', 'electric', 'vibrant', 'bold', 'water', 'ocean', 'sea', 'pool', 'ice', 'cool', 'fresh', 'clean', 'modern', 'tech', 'digital', 'futuristic', 'sci-fi'] },
+  { color: '#33ffff', tags: ['cyan', 'aqua', 'bright', 'neon', 'electric', 'water', 'ocean', 'pool', 'ice', 'cool', 'fresh', 'clean', 'modern', 'light', 'pale', 'soft', 'gentle', 'mint', 'turquoise', 'tropical'] },
+  { color: '#66ffff', tags: ['cyan', 'aqua', 'light', 'pale', 'water', 'ocean', 'pool', 'ice', 'cool', 'fresh', 'clean', 'soft', 'gentle', 'pastel', 'mint', 'turquoise', 'tropical', 'beach', 'lagoon', 'paradise'] },
+  { color: '#99ffff', tags: ['cyan', 'aqua', 'pale', 'light', 'pastel', 'water', 'ice', 'cool', 'fresh', 'clean', 'soft', 'gentle', 'baby', 'delicate', 'feminine', 'mint', 'turquoise', 'arctic', 'frozen', 'crystal'] },
+  { color: '#ccffff', tags: ['cyan', 'aqua', 'pale', 'light', 'pastel', 'ice', 'snow', 'cool', 'fresh', 'clean', 'soft', 'gentle', 'baby', 'delicate', 'feminine', 'pure', 'minimal', 'subtle', 'arctic', 'frozen'] },
+  { color: '#008b8b', tags: ['teal', 'dark', 'cyan', 'ocean', 'sea', 'water', 'tropical', 'caribbean', 'turquoise', 'cool', 'calm', 'deep', 'rich', 'jewel', 'peacock', 'elegant', 'sophisticated', 'nature', 'exotic', 'lagoon'] },
+  { color: '#20b2aa', tags: ['teal', 'cyan', 'sea', 'ocean', 'water', 'tropical', 'turquoise', 'aqua', 'cool', 'calm', 'serene', 'peaceful', 'fresh', 'nature', 'beach', 'lagoon', 'paradise', 'exotic', 'caribbean', 'spring'] },
+  { color: '#40e0d0', tags: ['turquoise', 'teal', 'cyan', 'ocean', 'sea', 'water', 'tropical', 'caribbean', 'aqua', 'bright', 'vibrant', 'cool', 'fresh', 'beach', 'lagoon', 'paradise', 'exotic', 'jewel', 'gemstone', 'summer'] },
+  { color: '#48d1cc', tags: ['turquoise', 'teal', 'cyan', 'ocean', 'sea', 'water', 'tropical', 'aqua', 'medium', 'cool', 'fresh', 'calm', 'serene', 'beach', 'lagoon', 'paradise', 'exotic', 'caribbean', 'spring', 'summer'] },
+  { color: '#00ced1', tags: ['turquoise', 'cyan', 'teal', 'ocean', 'sea', 'water', 'tropical', 'aqua', 'bright', 'vibrant', 'cool', 'fresh', 'beach', 'lagoon', 'paradise', 'exotic', 'caribbean', 'electric', 'neon', 'bold'] },
+  { color: '#5f9ea0', tags: ['teal', 'gray', 'blue', 'sea', 'ocean', 'water', 'muted', 'dusty', 'soft', 'calm', 'serene', 'peaceful', 'cool', 'nature', 'stone', 'slate', 'sophisticated', 'elegant', 'vintage', 'antique'] },
 
-  // Blues - navy, midnight, steel, slate
-  '#000033', '#00004d', '#000066', '#000080', '#000099', '#0000b3', '#0000cc', '#0000e6',
-  '#0000ff', '#3333ff', '#6666ff', '#9999ff', '#ccccff',
-  '#191970', '#00008b', '#0000cd', '#4169e1', '#1e90ff', '#4682b4',
-  '#5f9ea0', '#6495ed', '#87ceeb', '#add8e6', '#b0c4de',
+  // Blues
+  { color: '#000033', tags: ['blue', 'dark', 'navy', 'midnight', 'night', 'deep', 'rich', 'ocean', 'sea', 'space', 'cosmic', 'galaxy', 'universe', 'mysterious', 'shadow', 'ink', 'royal', 'regal', 'elegant', 'sophisticated'] },
+  { color: '#000066', tags: ['blue', 'dark', 'navy', 'midnight', 'night', 'deep', 'rich', 'ocean', 'sea', 'space', 'cosmic', 'royal', 'regal', 'elegant', 'sophisticated', 'formal', 'classic', 'traditional', 'ink', 'indigo'] },
+  { color: '#000080', tags: ['blue', 'navy', 'dark', 'deep', 'rich', 'ocean', 'sea', 'royal', 'regal', 'elegant', 'sophisticated', 'formal', 'classic', 'traditional', 'military', 'uniform', 'sailor', 'nautical', 'maritime', 'preppy'] },
+  { color: '#000099', tags: ['blue', 'navy', 'dark', 'deep', 'rich', 'ocean', 'sea', 'royal', 'regal', 'elegant', 'sophisticated', 'formal', 'classic', 'sapphire', 'jewel', 'gemstone', 'precious', 'indigo', 'ink', 'cobalt'] },
+  { color: '#0000cc', tags: ['blue', 'bright', 'royal', 'cobalt', 'electric', 'vibrant', 'bold', 'rich', 'deep', 'ocean', 'sea', 'sapphire', 'jewel', 'gemstone', 'precious', 'intense', 'dramatic', 'powerful', 'strong', 'primary'] },
+  { color: '#0000ff', tags: ['blue', 'bright', 'primary', 'electric', 'vibrant', 'bold', 'royal', 'cobalt', 'intense', 'dramatic', 'powerful', 'strong', 'pure', 'clean', 'digital', 'tech', 'modern', 'sapphire', 'jewel', 'neon'] },
+  { color: '#3333ff', tags: ['blue', 'bright', 'electric', 'vibrant', 'bold', 'royal', 'cobalt', 'intense', 'dramatic', 'powerful', 'neon', 'glow', 'digital', 'tech', 'modern', 'futuristic', 'sci-fi', 'sapphire', 'jewel', 'violet'] },
+  { color: '#6666ff', tags: ['blue', 'purple', 'violet', 'periwinkle', 'lavender', 'bright', 'electric', 'vibrant', 'soft', 'gentle', 'dreamy', 'fantasy', 'magical', 'mystical', 'cosmic', 'space', 'galaxy', 'twilight', 'dusk', 'evening'] },
+  { color: '#9999ff', tags: ['blue', 'purple', 'violet', 'periwinkle', 'lavender', 'light', 'pale', 'soft', 'gentle', 'pastel', 'dreamy', 'fantasy', 'magical', 'mystical', 'romantic', 'feminine', 'delicate', 'sweet', 'twilight', 'sky'] },
+  { color: '#ccccff', tags: ['blue', 'purple', 'violet', 'periwinkle', 'lavender', 'pale', 'light', 'pastel', 'soft', 'gentle', 'dreamy', 'fantasy', 'romantic', 'feminine', 'delicate', 'sweet', 'baby', 'subtle', 'minimal', 'clean'] },
+  { color: '#191970', tags: ['blue', 'dark', 'navy', 'midnight', 'night', 'deep', 'rich', 'ocean', 'sea', 'space', 'cosmic', 'galaxy', 'mysterious', 'elegant', 'sophisticated', 'formal', 'classic', 'royal', 'regal', 'indigo'] },
+  { color: '#00008b', tags: ['blue', 'dark', 'navy', 'deep', 'rich', 'ocean', 'sea', 'royal', 'regal', 'elegant', 'sophisticated', 'formal', 'classic', 'sapphire', 'jewel', 'gemstone', 'precious', 'cobalt', 'indigo', 'ink'] },
+  { color: '#4169e1', tags: ['blue', 'royal', 'bright', 'vibrant', 'rich', 'elegant', 'sophisticated', 'regal', 'noble', 'majestic', 'sapphire', 'jewel', 'gemstone', 'precious', 'formal', 'classic', 'traditional', 'bold', 'strong', 'powerful'] },
+  { color: '#1e90ff', tags: ['blue', 'bright', 'sky', 'dodger', 'electric', 'vibrant', 'bold', 'ocean', 'sea', 'water', 'summer', 'fresh', 'clean', 'modern', 'tech', 'digital', 'sports', 'athletic', 'energetic', 'dynamic'] },
+  { color: '#4682b4', tags: ['blue', 'steel', 'gray', 'muted', 'dusty', 'soft', 'calm', 'serene', 'peaceful', 'cool', 'professional', 'corporate', 'business', 'formal', 'classic', 'sophisticated', 'elegant', 'neutral', 'industrial', 'metal'] },
+  { color: '#6495ed', tags: ['blue', 'cornflower', 'medium', 'soft', 'gentle', 'calm', 'serene', 'peaceful', 'sky', 'spring', 'summer', 'fresh', 'clean', 'romantic', 'pretty', 'feminine', 'delicate', 'flower', 'petal', 'garden'] },
+  { color: '#87ceeb', tags: ['blue', 'sky', 'light', 'pale', 'soft', 'gentle', 'calm', 'serene', 'peaceful', 'fresh', 'clean', 'summer', 'spring', 'baby', 'pastel', 'sweet', 'delicate', 'feminine', 'dreamy', 'cloud'] },
+  { color: '#add8e6', tags: ['blue', 'light', 'pale', 'soft', 'gentle', 'calm', 'baby', 'pastel', 'powder', 'sky', 'cloud', 'ice', 'snow', 'winter', 'fresh', 'clean', 'pure', 'delicate', 'feminine', 'sweet'] },
+  { color: '#b0c4de', tags: ['blue', 'steel', 'light', 'pale', 'gray', 'muted', 'soft', 'gentle', 'calm', 'cool', 'professional', 'corporate', 'business', 'formal', 'classic', 'sophisticated', 'elegant', 'neutral', 'subtle', 'understated'] },
 
-  // Purples & Violets - plum, eggplant, wine
-  '#1a001a', '#330033', '#4d004d', '#660066', '#800080', '#990099', '#b300b3', '#cc00cc',
-  '#ff00ff', '#ff33ff', '#ff66ff', '#ff99ff', '#ffccff',
-  '#4b0082', '#6a0dad', '#8b008b', '#9400d3', '#9932cc', '#ba55d3',
-  '#800020', '#722f37', '#5d3954', '#673147', '#702963',
+  // Purples & Violets
+  { color: '#1a001a', tags: ['purple', 'dark', 'black', 'night', 'shadow', 'deep', 'rich', 'mysterious', 'gothic', 'vampire', 'witch', 'magic', 'mystic', 'cosmic', 'space', 'galaxy', 'void', 'eggplant', 'plum', 'grape'] },
+  { color: '#330033', tags: ['purple', 'dark', 'deep', 'rich', 'mysterious', 'gothic', 'vampire', 'witch', 'magic', 'mystic', 'cosmic', 'space', 'galaxy', 'eggplant', 'plum', 'grape', 'wine', 'royal', 'regal', 'elegant'] },
+  { color: '#4d004d', tags: ['purple', 'dark', 'deep', 'rich', 'mysterious', 'gothic', 'magic', 'mystic', 'cosmic', 'eggplant', 'plum', 'grape', 'wine', 'royal', 'regal', 'elegant', 'sophisticated', 'luxury', 'velvet', 'jewel'] },
+  { color: '#660066', tags: ['purple', 'dark', 'deep', 'rich', 'mysterious', 'magic', 'mystic', 'cosmic', 'eggplant', 'plum', 'grape', 'wine', 'royal', 'regal', 'elegant', 'sophisticated', 'luxury', 'velvet', 'jewel', 'amethyst'] },
+  { color: '#800080', tags: ['purple', 'magenta', 'royal', 'regal', 'elegant', 'sophisticated', 'luxury', 'rich', 'deep', 'grape', 'plum', 'wine', 'berry', 'jewel', 'amethyst', 'velvet', 'noble', 'majestic', 'imperial', 'exotic'] },
+  { color: '#990099', tags: ['purple', 'magenta', 'bright', 'vibrant', 'bold', 'electric', 'royal', 'regal', 'elegant', 'luxury', 'grape', 'plum', 'berry', 'jewel', 'amethyst', 'exotic', 'tropical', 'dramatic', 'intense', 'powerful'] },
+  { color: '#b300b3', tags: ['purple', 'magenta', 'bright', 'vibrant', 'bold', 'electric', 'neon', 'grape', 'berry', 'orchid', 'flower', 'petal', 'exotic', 'tropical', 'dramatic', 'intense', 'powerful', 'energetic', 'fun', 'party'] },
+  { color: '#cc00cc', tags: ['purple', 'magenta', 'bright', 'vibrant', 'bold', 'electric', 'neon', 'hot', 'grape', 'berry', 'orchid', 'flower', 'exotic', 'tropical', 'dramatic', 'intense', 'powerful', 'energetic', 'fun', 'party'] },
+  { color: '#ff00ff', tags: ['magenta', 'pink', 'purple', 'bright', 'neon', 'electric', 'vibrant', 'bold', 'hot', 'fuchsia', 'orchid', 'flower', 'exotic', 'tropical', 'dramatic', 'intense', 'powerful', 'energetic', 'fun', 'party'] },
+  { color: '#ff33ff', tags: ['magenta', 'pink', 'purple', 'bright', 'neon', 'electric', 'vibrant', 'bold', 'hot', 'fuchsia', 'orchid', 'flower', 'exotic', 'tropical', 'dramatic', 'intense', 'light', 'pale', 'soft', 'gentle'] },
+  { color: '#ff66ff', tags: ['magenta', 'pink', 'purple', 'light', 'bright', 'vibrant', 'soft', 'gentle', 'fuchsia', 'orchid', 'flower', 'petal', 'romantic', 'feminine', 'pretty', 'sweet', 'candy', 'bubblegum', 'fun', 'playful'] },
+  { color: '#ff99ff', tags: ['pink', 'purple', 'magenta', 'light', 'pale', 'soft', 'gentle', 'pastel', 'orchid', 'flower', 'petal', 'romantic', 'feminine', 'pretty', 'sweet', 'candy', 'bubblegum', 'baby', 'delicate', 'dreamy'] },
+  { color: '#ffccff', tags: ['pink', 'purple', 'pale', 'light', 'pastel', 'soft', 'gentle', 'romantic', 'feminine', 'pretty', 'sweet', 'candy', 'bubblegum', 'baby', 'delicate', 'dreamy', 'subtle', 'minimal', 'clean', 'pure'] },
+  { color: '#4b0082', tags: ['purple', 'indigo', 'dark', 'deep', 'rich', 'mysterious', 'magic', 'mystic', 'cosmic', 'space', 'galaxy', 'night', 'twilight', 'jewel', 'amethyst', 'royal', 'regal', 'elegant', 'sophisticated', 'luxury'] },
+  { color: '#6a0dad', tags: ['purple', 'violet', 'dark', 'deep', 'rich', 'mysterious', 'magic', 'mystic', 'cosmic', 'grape', 'plum', 'berry', 'jewel', 'amethyst', 'royal', 'regal', 'elegant', 'sophisticated', 'luxury', 'velvet'] },
+  { color: '#8b008b', tags: ['purple', 'magenta', 'dark', 'deep', 'rich', 'grape', 'plum', 'berry', 'orchid', 'flower', 'jewel', 'amethyst', 'royal', 'regal', 'elegant', 'sophisticated', 'luxury', 'exotic', 'tropical', 'bold'] },
+  { color: '#9400d3', tags: ['purple', 'violet', 'bright', 'vibrant', 'bold', 'electric', 'grape', 'plum', 'berry', 'orchid', 'flower', 'jewel', 'amethyst', 'royal', 'regal', 'exotic', 'tropical', 'dramatic', 'intense', 'powerful'] },
+  { color: '#9932cc', tags: ['purple', 'orchid', 'violet', 'bright', 'vibrant', 'bold', 'grape', 'plum', 'berry', 'flower', 'petal', 'jewel', 'amethyst', 'exotic', 'tropical', 'romantic', 'feminine', 'pretty', 'elegant', 'sophisticated'] },
+  { color: '#ba55d3', tags: ['purple', 'orchid', 'violet', 'medium', 'soft', 'gentle', 'grape', 'plum', 'berry', 'flower', 'petal', 'romantic', 'feminine', 'pretty', 'sweet', 'elegant', 'sophisticated', 'spring', 'garden', 'bloom'] },
+  { color: '#800020', tags: ['purple', 'red', 'burgundy', 'wine', 'maroon', 'dark', 'deep', 'rich', 'grape', 'berry', 'cherry', 'plum', 'velvet', 'elegant', 'sophisticated', 'luxury', 'formal', 'classic', 'vintage', 'antique'] },
+  { color: '#722f37', tags: ['purple', 'red', 'wine', 'burgundy', 'maroon', 'dark', 'deep', 'rich', 'grape', 'berry', 'cherry', 'plum', 'velvet', 'elegant', 'sophisticated', 'luxury', 'formal', 'vintage', 'antique', 'romantic'] },
+  { color: '#5d3954', tags: ['purple', 'brown', 'mauve', 'dusty', 'muted', 'soft', 'vintage', 'antique', 'romantic', 'feminine', 'elegant', 'sophisticated', 'subtle', 'understated', 'grape', 'plum', 'berry', 'wine', 'velvet', 'faded'] },
+  { color: '#673147', tags: ['purple', 'red', 'wine', 'burgundy', 'mauve', 'dusty', 'muted', 'vintage', 'antique', 'romantic', 'feminine', 'elegant', 'sophisticated', 'subtle', 'grape', 'plum', 'berry', 'velvet', 'rose', 'faded'] },
 
   // Pinks & Rose
-  '#330019', '#4d0026', '#660033', '#800040', '#99004d', '#b3005a', '#cc0066',
-  '#ff0080', '#ff3399', '#ff66b3', '#ff99cc', '#ffcce6',
-  '#c71585', '#db7093', '#ff69b4', '#ffb6c1', '#ffc0cb',
-  '#e75480', '#de5d83', '#f08080', '#fa8072', '#e9967a',
+  { color: '#330019', tags: ['pink', 'dark', 'deep', 'rich', 'wine', 'burgundy', 'maroon', 'berry', 'cherry', 'plum', 'magenta', 'fuchsia', 'romantic', 'passionate', 'dramatic', 'intense', 'mysterious', 'gothic', 'velvet', 'rose'] },
+  { color: '#660033', tags: ['pink', 'dark', 'deep', 'rich', 'wine', 'burgundy', 'berry', 'cherry', 'plum', 'magenta', 'fuchsia', 'romantic', 'passionate', 'dramatic', 'intense', 'elegant', 'sophisticated', 'luxury', 'velvet', 'rose'] },
+  { color: '#99004d', tags: ['pink', 'magenta', 'deep', 'rich', 'berry', 'cherry', 'raspberry', 'plum', 'fuchsia', 'hot', 'romantic', 'passionate', 'dramatic', 'intense', 'bold', 'vibrant', 'exotic', 'tropical', 'flower', 'orchid'] },
+  { color: '#cc0066', tags: ['pink', 'magenta', 'hot', 'bright', 'vibrant', 'bold', 'fuchsia', 'berry', 'raspberry', 'cherry', 'romantic', 'passionate', 'dramatic', 'intense', 'electric', 'neon', 'exotic', 'tropical', 'flower', 'orchid'] },
+  { color: '#ff0080', tags: ['pink', 'magenta', 'hot', 'bright', 'neon', 'electric', 'vibrant', 'bold', 'fuchsia', 'berry', 'raspberry', 'romantic', 'passionate', 'dramatic', 'intense', 'fun', 'party', 'exotic', 'tropical', 'flower'] },
+  { color: '#ff3399', tags: ['pink', 'hot', 'bright', 'vibrant', 'bold', 'magenta', 'fuchsia', 'berry', 'raspberry', 'bubblegum', 'candy', 'fun', 'party', 'playful', 'energetic', 'youthful', 'girly', 'feminine', 'romantic', 'flower'] },
+  { color: '#ff66b3', tags: ['pink', 'bright', 'vibrant', 'soft', 'gentle', 'magenta', 'fuchsia', 'berry', 'raspberry', 'bubblegum', 'candy', 'sweet', 'fun', 'playful', 'youthful', 'girly', 'feminine', 'romantic', 'flower', 'petal'] },
+  { color: '#ff99cc', tags: ['pink', 'light', 'soft', 'gentle', 'pastel', 'rose', 'blush', 'petal', 'flower', 'romantic', 'feminine', 'pretty', 'sweet', 'candy', 'bubblegum', 'baby', 'delicate', 'dreamy', 'subtle', 'lovely'] },
+  { color: '#ffcce6', tags: ['pink', 'pale', 'light', 'pastel', 'soft', 'gentle', 'rose', 'blush', 'petal', 'flower', 'romantic', 'feminine', 'pretty', 'sweet', 'baby', 'delicate', 'dreamy', 'subtle', 'minimal', 'clean'] },
+  { color: '#c71585', tags: ['pink', 'magenta', 'violet', 'deep', 'rich', 'berry', 'raspberry', 'plum', 'orchid', 'flower', 'romantic', 'passionate', 'dramatic', 'bold', 'vibrant', 'exotic', 'tropical', 'elegant', 'sophisticated', 'jewel'] },
+  { color: '#db7093', tags: ['pink', 'rose', 'dusty', 'muted', 'soft', 'gentle', 'romantic', 'feminine', 'pretty', 'vintage', 'antique', 'faded', 'elegant', 'sophisticated', 'subtle', 'understated', 'flower', 'petal', 'bloom', 'garden'] },
+  { color: '#ff69b4', tags: ['pink', 'hot', 'bright', 'vibrant', 'bold', 'bubblegum', 'candy', 'sweet', 'fun', 'playful', 'youthful', 'girly', 'feminine', 'romantic', 'flower', 'petal', 'spring', 'summer', 'cheerful', 'happy'] },
+  { color: '#ffb6c1', tags: ['pink', 'light', 'soft', 'gentle', 'pastel', 'rose', 'blush', 'petal', 'flower', 'romantic', 'feminine', 'pretty', 'sweet', 'baby', 'delicate', 'dreamy', 'subtle', 'lovely', 'spring', 'cherry'] },
+  { color: '#ffc0cb', tags: ['pink', 'light', 'soft', 'gentle', 'pastel', 'rose', 'blush', 'petal', 'flower', 'romantic', 'feminine', 'pretty', 'sweet', 'baby', 'delicate', 'classic', 'traditional', 'lovely', 'valentine', 'love'] },
+  { color: '#e75480', tags: ['pink', 'rose', 'medium', 'soft', 'gentle', 'romantic', 'feminine', 'pretty', 'flower', 'petal', 'bloom', 'garden', 'spring', 'summer', 'sweet', 'lovely', 'elegant', 'sophisticated', 'vintage', 'antique'] },
+  { color: '#f08080', tags: ['pink', 'coral', 'salmon', 'peach', 'soft', 'warm', 'gentle', 'muted', 'dusty', 'romantic', 'feminine', 'vintage', 'antique', 'faded', 'subtle', 'understated', 'natural', 'organic', 'earth', 'skin'] },
+  { color: '#fa8072', tags: ['pink', 'coral', 'salmon', 'peach', 'orange', 'soft', 'warm', 'gentle', 'tropical', 'beach', 'summer', 'sunset', 'romantic', 'feminine', 'pretty', 'fresh', 'natural', 'organic', 'fish', 'seafood'] },
+  { color: '#e9967a', tags: ['pink', 'coral', 'salmon', 'peach', 'orange', 'soft', 'warm', 'gentle', 'muted', 'dusty', 'tropical', 'beach', 'summer', 'romantic', 'feminine', 'vintage', 'antique', 'natural', 'organic', 'earth'] },
 
   // Skin Tones
-  '#8d5524', '#a0522d', '#b5651d', '#c68642', '#d2a679', '#e0ac69',
-  '#f1c27d', '#ffcd94', '#ffdbac', '#ffe4c4', '#ffecd9', '#fff5eb',
-  '#4a2c2a', '#6b4423', '#8b5a2b',
+  { color: '#8d5524', tags: ['brown', 'skin', 'tan', 'warm', 'earth', 'natural', 'organic', 'human', 'flesh', 'body', 'face', 'portrait', 'ethnic', 'diverse', 'inclusive', 'cinnamon', 'spice', 'caramel', 'toffee', 'leather'] },
+  { color: '#a0522d', tags: ['brown', 'skin', 'tan', 'sienna', 'warm', 'earth', 'natural', 'organic', 'human', 'flesh', 'body', 'face', 'portrait', 'ethnic', 'diverse', 'inclusive', 'cinnamon', 'spice', 'clay', 'terracotta'] },
+  { color: '#b5651d', tags: ['brown', 'skin', 'tan', 'warm', 'earth', 'natural', 'organic', 'human', 'flesh', 'body', 'face', 'portrait', 'ethnic', 'diverse', 'inclusive', 'caramel', 'toffee', 'honey', 'amber', 'golden'] },
+  { color: '#c68642', tags: ['brown', 'skin', 'tan', 'warm', 'earth', 'natural', 'organic', 'human', 'flesh', 'body', 'face', 'portrait', 'ethnic', 'diverse', 'inclusive', 'caramel', 'toffee', 'honey', 'golden', 'bronze'] },
+  { color: '#d2a679', tags: ['brown', 'skin', 'tan', 'beige', 'warm', 'earth', 'natural', 'organic', 'human', 'flesh', 'body', 'face', 'portrait', 'ethnic', 'diverse', 'inclusive', 'sand', 'nude', 'neutral', 'soft'] },
+  { color: '#e0ac69', tags: ['brown', 'skin', 'tan', 'beige', 'warm', 'earth', 'natural', 'organic', 'human', 'flesh', 'body', 'face', 'portrait', 'ethnic', 'diverse', 'inclusive', 'sand', 'nude', 'neutral', 'golden'] },
+  { color: '#f1c27d', tags: ['skin', 'tan', 'beige', 'cream', 'warm', 'earth', 'natural', 'organic', 'human', 'flesh', 'body', 'face', 'portrait', 'ethnic', 'diverse', 'inclusive', 'sand', 'nude', 'neutral', 'light'] },
+  { color: '#ffcd94', tags: ['skin', 'tan', 'beige', 'cream', 'peach', 'warm', 'earth', 'natural', 'organic', 'human', 'flesh', 'body', 'face', 'portrait', 'ethnic', 'diverse', 'inclusive', 'nude', 'neutral', 'light'] },
+  { color: '#ffdbac', tags: ['skin', 'beige', 'cream', 'peach', 'light', 'pale', 'warm', 'natural', 'organic', 'human', 'flesh', 'body', 'face', 'portrait', 'ethnic', 'diverse', 'inclusive', 'nude', 'neutral', 'soft'] },
+  { color: '#ffe4c4', tags: ['skin', 'beige', 'cream', 'peach', 'light', 'pale', 'warm', 'natural', 'organic', 'human', 'flesh', 'body', 'face', 'portrait', 'bisque', 'nude', 'neutral', 'soft', 'gentle', 'delicate'] },
+  { color: '#ffecd9', tags: ['skin', 'cream', 'peach', 'ivory', 'light', 'pale', 'warm', 'natural', 'organic', 'human', 'flesh', 'body', 'face', 'portrait', 'nude', 'neutral', 'soft', 'gentle', 'delicate', 'pure'] },
+  { color: '#fff5eb', tags: ['skin', 'cream', 'ivory', 'white', 'light', 'pale', 'warm', 'natural', 'organic', 'human', 'flesh', 'body', 'face', 'portrait', 'nude', 'neutral', 'soft', 'gentle', 'delicate', 'pure'] },
+  { color: '#4a2c2a', tags: ['brown', 'dark', 'skin', 'chocolate', 'coffee', 'espresso', 'warm', 'earth', 'natural', 'organic', 'human', 'flesh', 'body', 'face', 'portrait', 'ethnic', 'diverse', 'inclusive', 'rich', 'deep'] },
+  { color: '#6b4423', tags: ['brown', 'skin', 'chocolate', 'coffee', 'warm', 'earth', 'natural', 'organic', 'human', 'flesh', 'body', 'face', 'portrait', 'ethnic', 'diverse', 'inclusive', 'rich', 'deep', 'wood', 'bark'] },
 
   // Metallics & Stone
-  '#2f4f4f', '#36454f', '#4a4a4a', '#696969', '#708090', '#778899', '#808080',
-  '#a9a9a9', '#c0c0c0', '#d3d3d3',
-  '#ffd700', '#daa520', '#b8860b', '#d4af37', '#cfb53b',
-  '#b87333', '#cd7f32', '#b08d57', '#c9ae5d',
+  { color: '#2f4f4f', tags: ['gray', 'dark', 'slate', 'stone', 'rock', 'metal', 'steel', 'iron', 'charcoal', 'graphite', 'industrial', 'urban', 'modern', 'cool', 'cold', 'professional', 'corporate', 'formal', 'serious', 'strong'] },
+  { color: '#36454f', tags: ['gray', 'dark', 'charcoal', 'slate', 'stone', 'rock', 'metal', 'steel', 'iron', 'graphite', 'industrial', 'urban', 'modern', 'cool', 'cold', 'professional', 'corporate', 'formal', 'serious', 'strong'] },
+  { color: '#4a4a4a', tags: ['gray', 'dark', 'charcoal', 'stone', 'rock', 'metal', 'steel', 'iron', 'graphite', 'industrial', 'urban', 'modern', 'neutral', 'professional', 'corporate', 'formal', 'serious', 'strong', 'solid', 'stable'] },
+  { color: '#696969', tags: ['gray', 'medium', 'stone', 'rock', 'metal', 'steel', 'iron', 'concrete', 'industrial', 'urban', 'modern', 'neutral', 'professional', 'corporate', 'dim', 'muted', 'understated', 'subtle', 'solid', 'stable'] },
+  { color: '#708090', tags: ['gray', 'blue', 'slate', 'stone', 'rock', 'metal', 'steel', 'cool', 'cold', 'professional', 'corporate', 'business', 'formal', 'classic', 'sophisticated', 'elegant', 'neutral', 'understated', 'subtle', 'modern'] },
+  { color: '#778899', tags: ['gray', 'blue', 'slate', 'stone', 'light', 'pale', 'soft', 'cool', 'cold', 'professional', 'corporate', 'business', 'formal', 'classic', 'sophisticated', 'elegant', 'neutral', 'understated', 'subtle', 'modern'] },
+  { color: '#808080', tags: ['gray', 'medium', 'neutral', 'stone', 'rock', 'metal', 'steel', 'concrete', 'industrial', 'urban', 'modern', 'professional', 'corporate', 'balanced', 'stable', 'solid', 'classic', 'timeless', 'universal', 'versatile'] },
+  { color: '#a9a9a9', tags: ['gray', 'light', 'silver', 'metal', 'steel', 'stone', 'neutral', 'soft', 'gentle', 'muted', 'understated', 'subtle', 'professional', 'corporate', 'modern', 'clean', 'minimal', 'simple', 'elegant', 'sophisticated'] },
+  { color: '#c0c0c0', tags: ['silver', 'gray', 'light', 'metal', 'metallic', 'shiny', 'chrome', 'platinum', 'steel', 'modern', 'tech', 'futuristic', 'sleek', 'clean', 'minimal', 'elegant', 'sophisticated', 'precious', 'valuable', 'luxury'] },
+  { color: '#d3d3d3', tags: ['gray', 'light', 'silver', 'pale', 'soft', 'gentle', 'neutral', 'cloud', 'fog', 'mist', 'clean', 'minimal', 'simple', 'subtle', 'understated', 'modern', 'fresh', 'pure', 'delicate', 'airy'] },
+  { color: '#ffd700', tags: ['gold', 'yellow', 'metal', 'metallic', 'shiny', 'bright', 'rich', 'luxury', 'royal', 'regal', 'crown', 'treasure', 'coin', 'sun', 'warm', 'precious', 'valuable', 'wealth', 'success', 'winner'] },
+  { color: '#daa520', tags: ['gold', 'yellow', 'metal', 'metallic', 'amber', 'honey', 'caramel', 'autumn', 'fall', 'harvest', 'warm', 'rich', 'antique', 'vintage', 'classic', 'traditional', 'earth', 'natural', 'organic', 'mustard'] },
+  { color: '#b8860b', tags: ['gold', 'yellow', 'dark', 'metal', 'metallic', 'amber', 'honey', 'caramel', 'autumn', 'fall', 'harvest', 'warm', 'rich', 'deep', 'antique', 'vintage', 'classic', 'earth', 'natural', 'mustard'] },
+  { color: '#d4af37', tags: ['gold', 'yellow', 'metal', 'metallic', 'shiny', 'bright', 'rich', 'luxury', 'royal', 'regal', 'antique', 'vintage', 'classic', 'traditional', 'warm', 'precious', 'valuable', 'wealth', 'success', 'elegant'] },
+  { color: '#cfb53b', tags: ['gold', 'yellow', 'metal', 'metallic', 'old', 'antique', 'vintage', 'classic', 'traditional', 'warm', 'rich', 'muted', 'dusty', 'faded', 'aged', 'patina', 'brass', 'bronze', 'earth', 'natural'] },
+  { color: '#b87333', tags: ['copper', 'orange', 'brown', 'metal', 'metallic', 'shiny', 'warm', 'rich', 'earth', 'natural', 'organic', 'rustic', 'industrial', 'vintage', 'antique', 'penny', 'coin', 'autumn', 'fall', 'harvest'] },
+  { color: '#cd7f32', tags: ['bronze', 'copper', 'orange', 'brown', 'metal', 'metallic', 'shiny', 'warm', 'rich', 'earth', 'natural', 'organic', 'rustic', 'industrial', 'vintage', 'antique', 'medal', 'trophy', 'autumn', 'fall'] },
+  { color: '#b08d57', tags: ['bronze', 'gold', 'tan', 'brown', 'metal', 'metallic', 'warm', 'muted', 'dusty', 'antique', 'vintage', 'classic', 'traditional', 'earth', 'natural', 'organic', 'rustic', 'aged', 'patina', 'brass'] },
+  { color: '#c9ae5d', tags: ['gold', 'bronze', 'tan', 'metal', 'metallic', 'warm', 'muted', 'dusty', 'antique', 'vintage', 'classic', 'traditional', 'earth', 'natural', 'organic', 'rustic', 'aged', 'patina', 'brass', 'harvest'] },
 ];
 
 export function SpriteEditor({ onClose }: SpriteEditorProps) {
@@ -124,17 +304,18 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     if (selectedGroupFilter) {
       const group = colorGroups.find(g => g.id === selectedGroupFilter);
       if (group) {
-        colors = group.colors.filter(c => DEFAULT_PALETTE.includes(c) || true);
+        colors = colors.filter(entry => group.colors.includes(entry.color));
       }
     }
 
-    // Filter by search query (search in color names)
+    // Filter by search query (search in tags and color names)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      colors = colors.filter(color => {
-        const name = colorNames[color]?.toLowerCase() || '';
-        const hex = color.toLowerCase();
-        return name.includes(query) || hex.includes(query);
+      colors = colors.filter(entry => {
+        const name = colorNames[entry.color]?.toLowerCase() || '';
+        const hex = entry.color.toLowerCase();
+        const tagsMatch = entry.tags.some(tag => tag.includes(query));
+        return name.includes(query) || hex.includes(query) || tagsMatch;
       });
     }
 
@@ -1329,23 +1510,23 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                       gap: '3px',
                     }}
                   >
-                    {filteredColors.map((color, index) => (
+                    {filteredColors.map((entry, index) => (
                       <div
                         key={index}
-                        onClick={() => setSelectedColor(color)}
+                        onClick={() => setSelectedColor(entry.color)}
                         style={{
                           width: '28px',
                           height: '28px',
-                          backgroundColor: color,
-                          border: selectedColor === color ? '2px solid #0D0D0D' : '1px solid #ccc',
+                          backgroundColor: entry.color,
+                          border: selectedColor === entry.color ? '2px solid #0D0D0D' : '1px solid #ccc',
                           borderRadius: '2px',
                           cursor: 'pointer',
-                          boxShadow: selectedColor === color ? '0 0 6px rgba(13, 13, 13, 0.5)' : 'none',
+                          boxShadow: selectedColor === entry.color ? '0 0 6px rgba(13, 13, 13, 0.5)' : 'none',
                           position: 'relative',
                         }}
-                        title={colorNames[color] ? `${colorNames[color]} (${color})` : color}
+                        title={colorNames[entry.color] ? `${colorNames[entry.color]} (${entry.color})` : entry.tags.slice(0, 5).join(', ')}
                       >
-                        {colorNames[color] && (
+                        {colorNames[entry.color] && (
                           <div style={{
                             position: 'absolute',
                             bottom: '-2px',
