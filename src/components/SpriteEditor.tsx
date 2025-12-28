@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
+import { useGameStateStore } from '@/stores/gameStateStore';
 import { generatePlantPreview, generateAnimalPreview, generateResourcePreview } from '@/utils/generatePreviewImage';
 
 interface SpriteEditorProps {
@@ -20,9 +21,9 @@ interface DrawnShape {
   fillColor: string;
 }
 
-const GRID_SIZE = 10;
-const PIXEL_SIZE = 30; // Display size of each pixel
-const CANVAS_SIZE = GRID_SIZE * PIXEL_SIZE; // 300px
+const GRID_SIZE = 16;
+const CANVAS_SIZE = 300; // Keep canvas size consistent
+const PIXEL_SIZE = CANVAS_SIZE / GRID_SIZE; // 18.75px per pixel
 
 const DEFAULT_PALETTE = [
   '#000000', '#ffffff', '#f5f5f5', '#d1d5db', '#6b7280', '#1f2937',
@@ -40,6 +41,7 @@ const DEFAULT_PALETTE = [
 
 export function SpriteEditor({ onClose }: SpriteEditorProps) {
   const { plants, animals, resources } = useDefinitionsStore();
+  const { spriteEditorContext } = useGameStateStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const [pixels, setPixels] = useState<string[][]>(
@@ -51,6 +53,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
   const [isMouseDown, setIsMouseDown] = useState(false);
   const [selectedObjectType, setSelectedObjectType] = useState<'plant' | 'animal' | 'resource'>('plant');
   const [selectedObjectId, setSelectedObjectId] = useState<string>('');
+  const [showLoadModal, setShowLoadModal] = useState(false);
 
   // Free-form mode states
   const [shapes, setShapes] = useState<DrawnShape[]>([]);
@@ -62,6 +65,14 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
 
   // Preview state for free-form mode
   const [previewShape, setPreviewShape] = useState<DrawnShape | null>(null);
+
+  // Initialize from context on mount
+  useEffect(() => {
+    if (spriteEditorContext.objectType && spriteEditorContext.objectId) {
+      setSelectedObjectType(spriteEditorContext.objectType);
+      setSelectedObjectId(spriteEditorContext.objectId);
+    }
+  }, []);
 
   // Prevent default behavior
   const stopProp = (e: React.MouseEvent) => e.stopPropagation();
@@ -287,36 +298,29 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
   // Generate sprite as data URL (combines both pixels AND shapes)
   const generateSpriteDataURL = (): string => {
     const canvas = document.createElement('canvas');
-    canvas.width = GRID_SIZE;
-    canvas.height = GRID_SIZE;
+    canvas.width = CANVAS_SIZE;
+    canvas.height = CANVAS_SIZE;
     const ctx = canvas.getContext('2d');
     if (!ctx) return '';
 
-    // First, draw pixels
+    // First, draw pixels (scaled up to CANVAS_SIZE)
     for (let row = 0; row < GRID_SIZE; row++) {
       for (let col = 0; col < GRID_SIZE; col++) {
         const color = pixels[row][col];
         if (color !== 'transparent') {
           ctx.fillStyle = color;
-          ctx.fillRect(col, row, 1, 1);
+          ctx.fillRect(col * PIXEL_SIZE, row * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
         }
       }
     }
 
-    // Then, draw shapes on top (if any)
+    // Then, draw shapes on top (if any) - already at CANVAS_SIZE scale
     if (shapes.length > 0) {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      // Scale factor to convert from display size to final size
-      const scaleFactor = GRID_SIZE / CANVAS_SIZE;
-
-      ctx.scale(scaleFactor, scaleFactor);
-
-      // Draw all shapes
+      // Draw all shapes (no scaling needed - they're already in canvas coordinates)
       shapes.forEach(shape => drawSmoothShapeOnCanvas(ctx, shape));
-
-      ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
     }
 
     return canvas.toDataURL();
@@ -421,6 +425,122 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     }
 
     alert('Version restored successfully!');
+  };
+
+  // Get all sprite versions from all objects
+  const getAllSpriteVersions = useMemo(() => {
+    const allVersions: Array<{
+      objectType: 'plant' | 'animal' | 'resource';
+      objectId: string;
+      objectName: string;
+      version: number;
+      imageUrl: string;
+      createdAt: number;
+    }> = [];
+
+    // Collect from plants
+    plants.forEach(plant => {
+      if (plant.spriteVersions) {
+        plant.spriteVersions.forEach(v => {
+          allVersions.push({
+            objectType: 'plant',
+            objectId: plant.id,
+            objectName: plant.name,
+            version: v.version,
+            imageUrl: v.imageUrl,
+            createdAt: v.createdAt,
+          });
+        });
+      }
+    });
+
+    // Collect from animals
+    animals.forEach(animal => {
+      if (animal.spriteVersions) {
+        animal.spriteVersions.forEach(v => {
+          allVersions.push({
+            objectType: 'animal',
+            objectId: animal.id,
+            objectName: animal.name,
+            version: v.version,
+            imageUrl: v.imageUrl,
+            createdAt: v.createdAt,
+          });
+        });
+      }
+    });
+
+    // Collect from resources
+    resources.forEach(resource => {
+      if (resource.spriteVersions) {
+        resource.spriteVersions.forEach(v => {
+          allVersions.push({
+            objectType: 'resource',
+            objectId: resource.id,
+            objectName: resource.name,
+            version: v.version,
+            imageUrl: v.imageUrl,
+            createdAt: v.createdAt,
+          });
+        });
+      }
+    });
+
+    // Sort by created date descending (newest first)
+    return allVersions.sort((a, b) => b.createdAt - a.createdAt);
+  }, [plants, animals, resources]);
+
+  // Load a sprite onto the canvas (creates a copy)
+  const handleLoadSprite = (imageUrl: string) => {
+    const img = new Image();
+    img.onload = () => {
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = CANVAS_SIZE;
+      tempCanvas.height = CANVAS_SIZE;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (!tempCtx) return;
+
+      // Draw image onto temp canvas
+      tempCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+      tempCtx.drawImage(img, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+      if (mode === 'pixel') {
+        // Convert to pixel grid
+        const newPixels = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill('transparent'));
+
+        for (let row = 0; row < GRID_SIZE; row++) {
+          for (let col = 0; col < GRID_SIZE; col++) {
+            const x = col * PIXEL_SIZE;
+            const y = row * PIXEL_SIZE;
+            const imageData = tempCtx.getImageData(x, y, 1, 1);
+            const [r, g, b, a] = imageData.data;
+
+            if (a > 0) {
+              const hex = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+              newPixels[row][col] = hex;
+            }
+          }
+        }
+
+        setPixels(newPixels);
+      } else {
+        // For freeform mode, draw the image directly on the canvas
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+        ctx.drawImage(img, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+        // Clear shapes as we're loading a new image
+        setShapes([]);
+      }
+
+      setShowLoadModal(false);
+      alert('Sprite loaded successfully! You can now edit it.');
+    };
+    img.src = imageUrl;
   };
 
   return (
@@ -637,6 +757,24 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
           </div>
 
           <button
+            onClick={() => setShowLoadModal(true)}
+            style={{
+              width: '100%',
+              padding: '12px',
+              background: '#3b82f6',
+              border: 'none',
+              borderRadius: '4px',
+              color: 'white',
+              cursor: 'pointer',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              marginBottom: '10px',
+            }}
+          >
+            Load Sprite
+          </button>
+
+          <button
             onClick={handleSaveAndLink}
             disabled={!selectedObjectId}
             style={{
@@ -724,7 +862,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                       left: 0,
                       display: 'grid',
                       gridTemplateColumns: `repeat(${GRID_SIZE}, ${PIXEL_SIZE}px)`,
-                      gap: '1px',
+                      gap: '0px',
                       background: '#444',
                       width: CANVAS_SIZE,
                       height: CANVAS_SIZE,
@@ -1088,6 +1226,110 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
           )}
         </div>
       </div>
+
+      {/* Load Sprite Modal */}
+      {showLoadModal && (
+        <div
+          onClick={() => setShowLoadModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0, 0, 0, 0.8)',
+            zIndex: 3000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <div
+            onClick={stopProp}
+            style={{
+              background: '#1a1a2e',
+              borderRadius: '8px',
+              padding: '20px',
+              maxWidth: '800px',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              border: '2px solid #3b82f6',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0, fontSize: '20px' }}>Load Existing Sprite</h2>
+              <button
+                onClick={() => setShowLoadModal(false)}
+                style={{
+                  padding: '8px 16px',
+                  background: '#990F3D',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                }}
+              >
+                Close
+              </button>
+            </div>
+
+            {getAllSpriteVersions.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+                No sprite versions found. Create and save some sprites first!
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '10px' }}>
+                {getAllSpriteVersions.map((sprite, idx) => {
+                  const date = new Date(sprite.createdAt);
+                  const formattedDate = date.toLocaleDateString();
+
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => handleLoadSprite(sprite.imageUrl)}
+                      style={{
+                        background: '#2a2a3e',
+                        borderRadius: '6px',
+                        padding: '8px',
+                        cursor: 'pointer',
+                        border: '2px solid transparent',
+                        transition: 'border-color 0.2s',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.borderColor = '#3b82f6'}
+                      onMouseLeave={(e) => e.currentTarget.style.borderColor = 'transparent'}
+                    >
+                      <div
+                        style={{
+                          width: '100%',
+                          height: '60px',
+                          backgroundImage: `url(${sprite.imageUrl})`,
+                          backgroundSize: 'contain',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'center',
+                          imageRendering: 'pixelated',
+                          borderRadius: '4px',
+                          backgroundColor: '#1a1a2e',
+                          marginBottom: '6px',
+                        }}
+                      />
+                      <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '3px', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {sprite.objectName}
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#999', marginBottom: '2px' }}>
+                        {sprite.objectType.charAt(0).toUpperCase() + sprite.objectType.slice(1)} v{sprite.version}
+                      </div>
+                      <div style={{ fontSize: '9px', color: '#666' }}>
+                        {formattedDate}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

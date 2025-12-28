@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
+import { useGameStateStore } from '@/stores/gameStateStore';
 import { Card, FieldRow, CompactInput, CompactSelect } from './FormComponents';
 import { FaTrashAlt } from 'react-icons/fa';
 import { generateResourcePreview } from '@/utils/generatePreviewImage';
@@ -13,6 +14,7 @@ interface ResourceFormProps {
 
 export function ResourceForm({ item, isDraft, onSave, onCancel }: ResourceFormProps) {
   const { updateResource, updateDraftResource, deleteResource, resources } = useDefinitionsStore();
+  const { openSpriteEditor } = useGameStateStore();
 
   const handleChange = (field: string, value: any) => {
     if (isDraft) {
@@ -56,9 +58,9 @@ export function ResourceForm({ item, isDraft, onSave, onCancel }: ResourceFormPr
           </div>
         )}
         <FieldRow>
-          {/* Image preview and upload */}
+          {/* Image preview - opens Sprite Editor */}
           <div
-            onClick={() => document.getElementById(`resource-image-upload-${item.id}`)?.click()}
+            onClick={() => openSpriteEditor('resource', item.id)}
             style={{
               width: '60px',
               height: '60px',
@@ -74,25 +76,9 @@ export function ResourceForm({ item, isDraft, onSave, onCancel }: ResourceFormPr
               backgroundPosition: 'center',
               flexShrink: 0,
             }}
-            title={item.imageUrl ? "Click to change image" : "Click to upload custom image (default preview shown)"}
+            title="Click to open Sprite Editor"
           >
           </div>
-          <input
-            id={`resource-image-upload-${item.id}`}
-            type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                const reader = new FileReader();
-                reader.onload = () => {
-                  handleChange('imageUrl', reader.result as string);
-                };
-                reader.readAsDataURL(file);
-              }
-            }}
-          />
           <input
             type="text"
             value={item.name}

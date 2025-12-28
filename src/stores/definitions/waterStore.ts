@@ -38,11 +38,25 @@ export interface WaterSlice {
   deleteWater: (id: string) => void;
 }
 
+// Initialize counter from existing waters to prevent ID collisions
 let waterIdCounter = 0;
-const genWaterId = () => `water-${++waterIdCounter}`;
+const genWaterId = (existingWaters: WaterDefinition[] = []) => {
+  // Find the highest numeric ID from existing waters
+  const maxId = existingWaters.reduce((max, water) => {
+    const match = water.id.match(/^water-(\d+)$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      return num > max ? num : max;
+    }
+    return max;
+  }, waterIdCounter);
 
-export const defaultWater = (): WaterDefinition => ({
-  id: genWaterId(),
+  waterIdCounter = maxId + 1;
+  return `water-${waterIdCounter}`;
+};
+
+export const defaultWater = (existingWaters: WaterDefinition[] = []): WaterDefinition => ({
+  id: genWaterId(existingWaters),
   name: 'New Water Body',
   waterType: 'pond',
   fishTypes: [],
@@ -102,7 +116,8 @@ export const createWaterSlice: StateCreator<
   draftWater: null,
 
   addWater: () => {
-    set({ draftWater: defaultWater(), selectedId: null });
+    const waters = get().waters;
+    set({ draftWater: defaultWater(waters), selectedId: null });
   },
 
   saveWater: () => {
