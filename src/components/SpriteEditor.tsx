@@ -16,44 +16,97 @@ const BASE_CANVAS_SIZE = GRID_SIZE * PIXEL_SIZE + NUM_BORDERS * TILE_BORDER; // 
 const VIEWPORT_SIZE = 580; // Fixed viewport size
 
 const DEFAULT_PALETTE = [
-  // Blacks & Whites
-  '#000000', '#1a1a1a', '#333333', '#4d4d4d', '#666666', '#808080',
-  '#999999', '#b3b3b3', '#cccccc', '#e6e6e6', '#f2f2f2', '#ffffff',
-  // Rich Reds
-  '#2d0a0a', '#5c1414', '#8b1e1e', '#b22222', '#dc143c', '#ff0000',
-  '#ff3333', '#ff6666', '#ff9999', '#ffcccc', '#ffe6e6', '#fff0f0',
-  // Rich Oranges
-  '#3d1f00', '#7a3d00', '#b85c00', '#f57c00', '#ff9800', '#ffb74d',
-  '#ffcc80', '#ffe0b2', '#fff3e0', '#ffecd9', '#fff5eb', '#fffaf5',
-  // Rich Yellows
-  '#3d3d00', '#7a7a00', '#b8b800', '#f5f500', '#ffff00', '#ffff4d',
-  '#ffff80', '#ffffb3', '#ffffe6', '#ffffd9', '#ffffeb', '#fffff5',
-  // Rich Greens
-  '#0a2d0a', '#145c14', '#1e8b1e', '#22b222', '#2ecc40', '#4caf50',
-  '#66bb6a', '#81c784', '#a5d6a7', '#c8e6c9', '#e8f5e9', '#f1f8f1',
-  // Teals & Cyans
-  '#0a2d2d', '#145c5c', '#1e8b8b', '#22b2b2', '#00bcd4', '#26c6da',
-  '#4dd0e1', '#80deea', '#b2ebf2', '#e0f7fa', '#e6ffff', '#f0ffff',
-  // Rich Blues
-  '#0a0a2d', '#14145c', '#1e1e8b', '#2222b2', '#1976d2', '#2196f3',
-  '#42a5f5', '#64b5f6', '#90caf9', '#bbdefb', '#e3f2fd', '#f0f7ff',
-  // Rich Purples
-  '#1a0a2d', '#33145c', '#4d1e8b', '#6622b2', '#7b1fa2', '#9c27b0',
-  '#ab47bc', '#ba68c8', '#ce93d8', '#e1bee7', '#f3e5f5', '#faf0ff',
-  // Rich Pinks
-  '#2d0a1a', '#5c1433', '#8b1e4d', '#b22266', '#c2185b', '#e91e63',
-  '#ec407a', '#f06292', '#f48fb1', '#f8bbd9', '#fce4ec', '#fff0f5',
-  // Browns & Tans
-  '#1a0f00', '#3d2200', '#5c3300', '#7a4400', '#8d6e63', '#a1887f',
-  '#bcaaa4', '#d7ccc8', '#efebe9', '#f5f0eb', '#faf5f0', '#fffaf5',
-  // Skin Tones
-  '#8d5524', '#c68642', '#e0ac69', '#f1c27d', '#ffdbac', '#ffe4c4',
-  // Nature Greens
-  '#1b4d1b', '#228b22', '#2e8b57', '#3cb371', '#90ee90', '#98fb98',
-  // Sky Blues
-  '#4682b4', '#5f9ea0', '#87ceeb', '#add8e6', '#b0e0e6', '#e0ffff',
-  // Earth Tones
-  '#8b4513', '#a0522d', '#cd853f', '#deb887', '#f4a460', '#ffdab9',
+  // Grayscale (12)
+  '#000000', '#111111', '#222222', '#333333', '#444444', '#555555',
+  '#666666', '#777777', '#888888', '#999999', '#aaaaaa', '#bbbbbb',
+  '#cccccc', '#dddddd', '#eeeeee', '#ffffff', '#f5f5f5', '#fafafa',
+  '#e0e0e0', '#bdbdbd', '#9e9e9e', '#757575', '#616161', '#424242',
+
+  // Reds (24)
+  '#1a0000', '#330000', '#4d0000', '#660000', '#800000', '#990000',
+  '#b30000', '#cc0000', '#e60000', '#ff0000', '#ff1a1a', '#ff3333',
+  '#ff4d4d', '#ff6666', '#ff8080', '#ff9999', '#ffb3b3', '#ffcccc',
+  '#ffe6e6', '#fff0f0', '#d32f2f', '#c62828', '#b71c1c', '#ffebee',
+
+  // Oranges (24)
+  '#1a0a00', '#331400', '#4d1f00', '#662900', '#803300', '#993d00',
+  '#b34700', '#cc5200', '#e65c00', '#ff6600', '#ff751a', '#ff8533',
+  '#ff944d', '#ffa366', '#ffb380', '#ffc299', '#ffd1b3', '#ffe0cc',
+  '#ffefe6', '#fff5f0', '#e65100', '#ef6c00', '#f57c00', '#fff3e0',
+
+  // Yellows (24)
+  '#1a1a00', '#333300', '#4d4d00', '#666600', '#808000', '#999900',
+  '#b3b300', '#cccc00', '#e6e600', '#ffff00', '#ffff1a', '#ffff33',
+  '#ffff4d', '#ffff66', '#ffff80', '#ffff99', '#ffffb3', '#ffffcc',
+  '#ffffe6', '#fffff0', '#fdd835', '#fbc02d', '#f9a825', '#fffde7',
+
+  // Lime & Yellow-Greens (24)
+  '#0a1a00', '#143300', '#1f4d00', '#296600', '#338000', '#3d9900',
+  '#47b300', '#52cc00', '#5ce600', '#66ff00', '#75ff1a', '#85ff33',
+  '#94ff4d', '#a3ff66', '#b3ff80', '#c2ff99', '#d1ffb3', '#e0ffcc',
+  '#efffeb', '#f5fff0', '#aeea00', '#c6ff00', '#cddc39', '#f0f4c3',
+
+  // Greens (24)
+  '#001a00', '#003300', '#004d00', '#006600', '#008000', '#009900',
+  '#00b300', '#00cc00', '#00e600', '#00ff00', '#1aff1a', '#33ff33',
+  '#4dff4d', '#66ff66', '#80ff80', '#99ff99', '#b3ffb3', '#ccffcc',
+  '#e6ffe6', '#f0fff0', '#2e7d32', '#388e3c', '#43a047', '#e8f5e9',
+
+  // Teals (24)
+  '#001a1a', '#003333', '#004d4d', '#006666', '#008080', '#009999',
+  '#00b3b3', '#00cccc', '#00e6e6', '#00ffff', '#1affff', '#33ffff',
+  '#4dffff', '#66ffff', '#80ffff', '#99ffff', '#b3ffff', '#ccffff',
+  '#e6ffff', '#f0ffff', '#00838f', '#00acc1', '#26c6da', '#e0f7fa',
+
+  // Blues (24)
+  '#00001a', '#000033', '#00004d', '#000066', '#000080', '#000099',
+  '#0000b3', '#0000cc', '#0000e6', '#0000ff', '#1a1aff', '#3333ff',
+  '#4d4dff', '#6666ff', '#8080ff', '#9999ff', '#b3b3ff', '#ccccff',
+  '#e6e6ff', '#f0f0ff', '#1565c0', '#1976d2', '#2196f3', '#e3f2fd',
+
+  // Indigos (24)
+  '#0a001a', '#140033', '#1f004d', '#290066', '#330080', '#3d0099',
+  '#4700b3', '#5200cc', '#5c00e6', '#6600ff', '#751aff', '#8533ff',
+  '#944dff', '#a366ff', '#b380ff', '#c299ff', '#d1b3ff', '#e0ccff',
+  '#efe6ff', '#f5f0ff', '#303f9f', '#3949ab', '#3f51b5', '#e8eaf6',
+
+  // Purples (24)
+  '#1a001a', '#330033', '#4d004d', '#660066', '#800080', '#990099',
+  '#b300b3', '#cc00cc', '#e600e6', '#ff00ff', '#ff1aff', '#ff33ff',
+  '#ff4dff', '#ff66ff', '#ff80ff', '#ff99ff', '#ffb3ff', '#ffccff',
+  '#ffe6ff', '#fff0ff', '#7b1fa2', '#8e24aa', '#9c27b0', '#f3e5f5',
+
+  // Pinks (24)
+  '#1a000a', '#330014', '#4d001f', '#660029', '#800033', '#99003d',
+  '#b30047', '#cc0052', '#e6005c', '#ff0066', '#ff1a75', '#ff3385',
+  '#ff4d94', '#ff66a3', '#ff80b3', '#ff99c2', '#ffb3d1', '#ffcce0',
+  '#ffe6ef', '#fff0f5', '#c2185b', '#d81b60', '#e91e63', '#fce4ec',
+
+  // Browns (24)
+  '#1a0f00', '#2d1a00', '#402600', '#533300', '#664000', '#7a4d00',
+  '#8d5a00', '#a06600', '#b37300', '#c68000', '#d98c00', '#ec9900',
+  '#8d6e63', '#795548', '#6d4c41', '#5d4037', '#4e342e', '#3e2723',
+  '#a1887f', '#bcaaa4', '#d7ccc8', '#efebe9', '#4a2c2a', '#3b1f1c',
+
+  // Skin Tones (12)
+  '#8d5524', '#a0522d', '#b5651d', '#c68642', '#d2a679', '#e0ac69',
+  '#f1c27d', '#ffcd94', '#ffdbac', '#ffe4c4', '#ffecd9', '#fff5eb',
+
+  // Nature & Earth (24)
+  '#1b4d1b', '#228b22', '#2e8b57', '#3cb371', '#556b2f', '#6b8e23',
+  '#808000', '#9acd32', '#8b4513', '#a0522d', '#cd853f', '#daa520',
+  '#b8860b', '#d2691e', '#f4a460', '#deb887', '#d2b48c', '#c4a484',
+  '#bc8f8f', '#f5deb3', '#ffdead', '#ffe4b5', '#ffdab9', '#ffe4c4',
+
+  // Pastels (24)
+  '#ffb3ba', '#ffdfba', '#ffffba', '#baffc9', '#bae1ff', '#e8d5e8',
+  '#ffd1dc', '#ffefd5', '#fffacd', '#e0ffff', '#e6e6fa', '#fff0f5',
+  '#f0fff0', '#f5fffa', '#f0f8ff', '#f8f8ff', '#fffaf0', '#fdf5e6',
+  '#faf0e6', '#fff5ee', '#faebd7', '#ffebcd', '#f5f5dc', '#fffff0',
+
+  // Metallics & Special (12)
+  '#ffd700', '#ffdf00', '#c0c0c0', '#d4af37', '#b87333', '#cd7f32',
+  '#e5c100', '#cfb53b', '#c9bbe0', '#b0c4de', '#708090', '#2f4f4f',
 ];
 
 export function SpriteEditor({ onClose }: SpriteEditorProps) {
@@ -737,30 +790,43 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                 </div>
               </div>
 
+              {/* Scrollable color palette */}
               <div
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(12, 40px)',
-                  gap: '8px',
+                  height: '200px',
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  padding: '8px',
                   marginBottom: '20px',
+                  background: '#fff',
                 }}
               >
-                {DEFAULT_PALETTE.map((color, index) => (
-                  <div
-                    key={index}
-                    onClick={() => setSelectedColor(color)}
-                    style={{
-                      width: '40px',
-                      height: '40px',
-                      backgroundColor: color,
-                      border: selectedColor === color ? '3px solid #0D0D0D' : '2px solid #ccc',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      boxShadow: selectedColor === color ? '0 0 10px rgba(13, 13, 13, 0.5)' : 'none',
-                    }}
-                    title={color}
-                  />
-                ))}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(12, 32px)',
+                    gap: '4px',
+                  }}
+                >
+                  {DEFAULT_PALETTE.map((color, index) => (
+                    <div
+                      key={index}
+                      onClick={() => setSelectedColor(color)}
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        backgroundColor: color,
+                        border: selectedColor === color ? '3px solid #0D0D0D' : '1px solid #ccc',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        boxShadow: selectedColor === color ? '0 0 8px rgba(13, 13, 13, 0.5)' : 'none',
+                      }}
+                      title={color}
+                    />
+                  ))}
+                </div>
               </div>
 
               {/* Custom color picker */}
