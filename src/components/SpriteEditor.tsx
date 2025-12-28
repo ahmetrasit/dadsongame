@@ -16,97 +16,77 @@ const BASE_CANVAS_SIZE = GRID_SIZE * PIXEL_SIZE + NUM_BORDERS * TILE_BORDER; // 
 const VIEWPORT_SIZE = 580; // Fixed viewport size
 
 const DEFAULT_PALETTE = [
-  // Grayscale (12)
+  // Grayscale
   '#000000', '#111111', '#222222', '#333333', '#444444', '#555555',
   '#666666', '#777777', '#888888', '#999999', '#aaaaaa', '#bbbbbb',
-  '#cccccc', '#dddddd', '#eeeeee', '#ffffff', '#f5f5f5', '#fafafa',
-  '#e0e0e0', '#bdbdbd', '#9e9e9e', '#757575', '#616161', '#424242',
+  '#cccccc', '#ffffff',
 
-  // Reds (24)
+  // Reds
   '#1a0000', '#330000', '#4d0000', '#660000', '#800000', '#990000',
   '#b30000', '#cc0000', '#e60000', '#ff0000', '#ff1a1a', '#ff3333',
-  '#ff4d4d', '#ff6666', '#ff8080', '#ff9999', '#ffb3b3', '#ffcccc',
-  '#ffe6e6', '#fff0f0', '#d32f2f', '#c62828', '#b71c1c', '#ffebee',
+  '#ff4d4d', '#d32f2f', '#c62828', '#b71c1c',
 
-  // Oranges (24)
+  // Oranges
   '#1a0a00', '#331400', '#4d1f00', '#662900', '#803300', '#993d00',
   '#b34700', '#cc5200', '#e65c00', '#ff6600', '#ff751a', '#ff8533',
-  '#ff944d', '#ffa366', '#ffb380', '#ffc299', '#ffd1b3', '#ffe0cc',
-  '#ffefe6', '#fff5f0', '#e65100', '#ef6c00', '#f57c00', '#fff3e0',
+  '#e65100', '#ef6c00', '#f57c00',
 
-  // Yellows (24)
+  // Yellows
   '#1a1a00', '#333300', '#4d4d00', '#666600', '#808000', '#999900',
-  '#b3b300', '#cccc00', '#e6e600', '#ffff00', '#ffff1a', '#ffff33',
-  '#ffff4d', '#ffff66', '#ffff80', '#ffff99', '#ffffb3', '#ffffcc',
-  '#ffffe6', '#fffff0', '#fdd835', '#fbc02d', '#f9a825', '#fffde7',
+  '#b3b300', '#cccc00', '#e6e600', '#ffff00', '#fdd835', '#fbc02d', '#f9a825',
 
-  // Lime & Yellow-Greens (24)
+  // Lime & Yellow-Greens
   '#0a1a00', '#143300', '#1f4d00', '#296600', '#338000', '#3d9900',
   '#47b300', '#52cc00', '#5ce600', '#66ff00', '#75ff1a', '#85ff33',
-  '#94ff4d', '#a3ff66', '#b3ff80', '#c2ff99', '#d1ffb3', '#e0ffcc',
-  '#efffeb', '#f5fff0', '#aeea00', '#c6ff00', '#cddc39', '#f0f4c3',
+  '#aeea00', '#c6ff00', '#cddc39',
 
-  // Greens (24)
+  // Greens
   '#001a00', '#003300', '#004d00', '#006600', '#008000', '#009900',
   '#00b300', '#00cc00', '#00e600', '#00ff00', '#1aff1a', '#33ff33',
-  '#4dff4d', '#66ff66', '#80ff80', '#99ff99', '#b3ffb3', '#ccffcc',
-  '#e6ffe6', '#f0fff0', '#2e7d32', '#388e3c', '#43a047', '#e8f5e9',
+  '#2e7d32', '#388e3c', '#43a047',
 
-  // Teals (24)
+  // Teals
   '#001a1a', '#003333', '#004d4d', '#006666', '#008080', '#009999',
-  '#00b3b3', '#00cccc', '#00e6e6', '#00ffff', '#1affff', '#33ffff',
-  '#4dffff', '#66ffff', '#80ffff', '#99ffff', '#b3ffff', '#ccffff',
-  '#e6ffff', '#f0ffff', '#00838f', '#00acc1', '#26c6da', '#e0f7fa',
+  '#00b3b3', '#00cccc', '#00e6e6', '#00ffff', '#00838f', '#00acc1', '#26c6da',
 
-  // Blues (24)
+  // Blues
   '#00001a', '#000033', '#00004d', '#000066', '#000080', '#000099',
   '#0000b3', '#0000cc', '#0000e6', '#0000ff', '#1a1aff', '#3333ff',
-  '#4d4dff', '#6666ff', '#8080ff', '#9999ff', '#b3b3ff', '#ccccff',
-  '#e6e6ff', '#f0f0ff', '#1565c0', '#1976d2', '#2196f3', '#e3f2fd',
+  '#4d4dff', '#1565c0', '#1976d2', '#2196f3',
 
-  // Indigos (24)
+  // Indigos
   '#0a001a', '#140033', '#1f004d', '#290066', '#330080', '#3d0099',
   '#4700b3', '#5200cc', '#5c00e6', '#6600ff', '#751aff', '#8533ff',
-  '#944dff', '#a366ff', '#b380ff', '#c299ff', '#d1b3ff', '#e0ccff',
-  '#efe6ff', '#f5f0ff', '#303f9f', '#3949ab', '#3f51b5', '#e8eaf6',
+  '#303f9f', '#3949ab', '#3f51b5',
 
-  // Purples (24)
+  // Purples
   '#1a001a', '#330033', '#4d004d', '#660066', '#800080', '#990099',
   '#b300b3', '#cc00cc', '#e600e6', '#ff00ff', '#ff1aff', '#ff33ff',
-  '#ff4dff', '#ff66ff', '#ff80ff', '#ff99ff', '#ffb3ff', '#ffccff',
-  '#ffe6ff', '#fff0ff', '#7b1fa2', '#8e24aa', '#9c27b0', '#f3e5f5',
+  '#7b1fa2', '#8e24aa', '#9c27b0',
 
-  // Pinks (24)
+  // Pinks
   '#1a000a', '#330014', '#4d001f', '#660029', '#800033', '#99003d',
   '#b30047', '#cc0052', '#e6005c', '#ff0066', '#ff1a75', '#ff3385',
-  '#ff4d94', '#ff66a3', '#ff80b3', '#ff99c2', '#ffb3d1', '#ffcce0',
-  '#ffe6ef', '#fff0f5', '#c2185b', '#d81b60', '#e91e63', '#fce4ec',
+  '#c2185b', '#d81b60', '#e91e63',
 
-  // Browns (24)
+  // Browns
   '#1a0f00', '#2d1a00', '#402600', '#533300', '#664000', '#7a4d00',
   '#8d5a00', '#a06600', '#b37300', '#c68000', '#d98c00', '#ec9900',
   '#8d6e63', '#795548', '#6d4c41', '#5d4037', '#4e342e', '#3e2723',
-  '#a1887f', '#bcaaa4', '#d7ccc8', '#efebe9', '#4a2c2a', '#3b1f1c',
+  '#4a2c2a', '#3b1f1c',
 
-  // Skin Tones (12)
+  // Skin Tones
   '#8d5524', '#a0522d', '#b5651d', '#c68642', '#d2a679', '#e0ac69',
-  '#f1c27d', '#ffcd94', '#ffdbac', '#ffe4c4', '#ffecd9', '#fff5eb',
+  '#f1c27d', '#ffcd94',
 
-  // Nature & Earth (24)
+  // Nature & Earth
   '#1b4d1b', '#228b22', '#2e8b57', '#3cb371', '#556b2f', '#6b8e23',
   '#808000', '#9acd32', '#8b4513', '#a0522d', '#cd853f', '#daa520',
-  '#b8860b', '#d2691e', '#f4a460', '#deb887', '#d2b48c', '#c4a484',
-  '#bc8f8f', '#f5deb3', '#ffdead', '#ffe4b5', '#ffdab9', '#ffe4c4',
+  '#b8860b', '#d2691e', '#f4a460',
 
-  // Pastels (24)
-  '#ffb3ba', '#ffdfba', '#ffffba', '#baffc9', '#bae1ff', '#e8d5e8',
-  '#ffd1dc', '#ffefd5', '#fffacd', '#e0ffff', '#e6e6fa', '#fff0f5',
-  '#f0fff0', '#f5fffa', '#f0f8ff', '#f8f8ff', '#fffaf0', '#fdf5e6',
-  '#faf0e6', '#fff5ee', '#faebd7', '#ffebcd', '#f5f5dc', '#fffff0',
-
-  // Metallics & Special (12)
+  // Metallics & Special
   '#ffd700', '#ffdf00', '#c0c0c0', '#d4af37', '#b87333', '#cd7f32',
-  '#e5c100', '#cfb53b', '#c9bbe0', '#b0c4de', '#708090', '#2f4f4f',
+  '#e5c100', '#cfb53b', '#708090', '#2f4f4f',
 ];
 
 export function SpriteEditor({ onClose }: SpriteEditorProps) {
@@ -813,6 +793,145 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
           >
             Save & Link Sprite
           </button>
+
+          {/* Tools Section */}
+          <div style={{ marginTop: '25px', borderTop: '1px solid #E8DDD1', paddingTop: '20px' }}>
+            <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#0D0D0D' }}>Tools</h2>
+
+            {/* Tool Selection */}
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setCurrentTool('paint')}
+                style={{
+                  padding: '8px 14px',
+                  background: currentTool === 'paint' ? '#0D0D0D' : '#E8DDD1',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  color: currentTool === 'paint' ? '#FFF1E5' : '#333',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                }}
+              >
+                Paint
+              </button>
+              <button
+                onClick={() => setCurrentTool('square')}
+                style={{
+                  padding: '8px 14px',
+                  background: currentTool === 'square' ? '#0D0D0D' : '#E8DDD1',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  color: currentTool === 'square' ? '#FFF1E5' : '#333',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                }}
+              >
+                Rect
+              </button>
+              <button
+                onClick={() => setCurrentTool('circle')}
+                style={{
+                  padding: '8px 14px',
+                  background: currentTool === 'circle' ? '#0D0D0D' : '#E8DDD1',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  color: currentTool === 'circle' ? '#FFF1E5' : '#333',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                }}
+              >
+                Ellipse
+              </button>
+            </div>
+
+            <p style={{ fontSize: '11px', color: '#666', marginBottom: '12px' }}>
+              {currentTool === 'paint'
+                ? 'Left-click paint, right-click erase'
+                : 'Drag to draw, right-click erases'}
+            </p>
+
+            {/* Brush Size */}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', color: '#0D0D0D', fontSize: '13px' }}>
+                Brush: {brushSize}px
+              </label>
+              <input
+                type="range"
+                min="1"
+                max="8"
+                value={brushSize}
+                onChange={(e) => setBrushSize(parseInt(e.target.value))}
+                style={{
+                  width: '100%',
+                  cursor: 'pointer',
+                }}
+              />
+            </div>
+
+            {/* Zoom */}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', color: '#0D0D0D', fontSize: '13px' }}>
+                Zoom: {Math.round(zoom * 100)}%
+              </label>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  onClick={() => setZoom(1)}
+                  style={{
+                    flex: 1,
+                    padding: '6px',
+                    background: zoom === 1 ? '#ccc' : '#0D0D0D',
+                    border: 'none',
+                    borderRadius: '4px',
+                    color: zoom === 1 ? '#666' : '#FFF1E5',
+                    cursor: zoom === 1 ? 'default' : 'pointer',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                  }}
+                  disabled={zoom === 1}
+                >
+                  Reset
+                </button>
+                <button
+                  onClick={centerCanvas}
+                  style={{
+                    flex: 1,
+                    padding: '6px',
+                    background: '#0D0D0D',
+                    border: 'none',
+                    borderRadius: '4px',
+                    color: '#FFF1E5',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Center
+                </button>
+              </div>
+              <p style={{ fontSize: '10px', color: '#888', marginTop: '4px' }}>Scroll on canvas to zoom</p>
+            </div>
+
+            {/* Clear All */}
+            <button
+              onClick={handleClear}
+              style={{
+                width: '100%',
+                padding: '10px',
+                background: '#ef4444',
+                border: 'none',
+                borderRadius: '4px',
+                color: 'white',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '13px',
+              }}
+            >
+              Clear All
+            </button>
+          </div>
         </div>
 
         {/* Main Content Area */}
@@ -949,23 +1068,6 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                 </div>
               </div>
 
-              {/* Clear Button (Below Canvas) */}
-              <div style={{ marginTop: '15px' }}>
-                <button
-                  onClick={handleClear}
-                  style={{
-                    padding: '8px 16px',
-                    background: '#ef4444',
-                    border: 'none',
-                    borderRadius: '4px',
-                    color: 'white',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  Clear All
-                </button>
-              </div>
             </div>
 
             {/* Color Groups & Naming Panel (Right of Canvas) */}
@@ -1020,48 +1122,68 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                 ) : (
                   colorGroups.map(group => (
                     <div key={group.id} style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '6px',
-                      marginBottom: '4px',
+                      padding: '8px',
+                      marginBottom: '6px',
                       background: '#fff',
                       borderRadius: '4px',
                       border: '1px solid #ddd',
                     }}>
-                      <span style={{ flex: 1, fontSize: '12px', fontWeight: 500 }}>{group.name}</span>
-                      <span style={{ fontSize: '10px', color: '#666' }}>{group.colors.length}</span>
-                      <button
-                        onClick={() => {
-                          if (selectedColor) addColorToGroup(group.id, selectedColor);
-                        }}
-                        style={{
-                          padding: '3px 8px',
-                          background: '#4CAF50',
-                          border: 'none',
-                          borderRadius: '3px',
-                          color: 'white',
-                          cursor: 'pointer',
-                          fontSize: '10px',
-                        }}
-                        title="Add selected color"
-                      >
-                        +
-                      </button>
-                      <button
-                        onClick={() => deleteGroup(group.id)}
-                        style={{
-                          padding: '3px 8px',
-                          background: '#f44336',
-                          border: 'none',
-                          borderRadius: '3px',
-                          color: 'white',
-                          cursor: 'pointer',
-                          fontSize: '10px',
-                        }}
-                      >
-                        ×
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                        <span style={{ flex: 1, fontSize: '12px', fontWeight: 600 }}>{group.name}</span>
+                        <button
+                          onClick={() => {
+                            if (selectedColor) addColorToGroup(group.id, selectedColor);
+                          }}
+                          style={{
+                            padding: '3px 8px',
+                            background: '#4CAF50',
+                            border: 'none',
+                            borderRadius: '3px',
+                            color: 'white',
+                            cursor: 'pointer',
+                            fontSize: '10px',
+                          }}
+                          title="Add selected color"
+                        >
+                          +
+                        </button>
+                        <button
+                          onClick={() => deleteGroup(group.id)}
+                          style={{
+                            padding: '3px 8px',
+                            background: '#f44336',
+                            border: 'none',
+                            borderRadius: '3px',
+                            color: 'white',
+                            cursor: 'pointer',
+                            fontSize: '10px',
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                      {/* Show colors in the group */}
+                      {group.colors.length > 0 ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                          {group.colors.map((color, idx) => (
+                            <div
+                              key={idx}
+                              onClick={() => setSelectedColor(color)}
+                              style={{
+                                width: '18px',
+                                height: '18px',
+                                backgroundColor: color,
+                                border: selectedColor === color ? '2px solid #0D0D0D' : '1px solid #999',
+                                borderRadius: '2px',
+                                cursor: 'pointer',
+                              }}
+                              title={colorNames[color] || color}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <p style={{ fontSize: '10px', color: '#999', margin: 0 }}>No colors yet</p>
+                      )}
                     </div>
                   ))
                 )}
@@ -1103,33 +1225,43 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
               {Object.keys(colorNames).filter(c => colorNames[c]).length > 0 && (
                 <div style={{ borderTop: '1px solid #ddd', paddingTop: '12px', marginTop: '12px' }}>
                   <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#0D0D0D' }}>Named Colors</h4>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     {Object.entries(colorNames).filter(([_, name]) => name).map(([color, name]) => (
                       <div
                         key={color}
                         onClick={() => setSelectedColor(color)}
                         style={{
                           display: 'flex',
+                          flexDirection: 'column',
                           alignItems: 'center',
-                          gap: '4px',
-                          padding: '3px 6px',
+                          padding: '4px',
                           background: selectedColor === color ? '#0D0D0D' : '#fff',
                           border: '1px solid #ccc',
-                          borderRadius: '3px',
+                          borderRadius: '4px',
                           cursor: 'pointer',
-                          fontSize: '10px',
-                          color: selectedColor === color ? '#FFF1E5' : '#333',
+                          minWidth: '40px',
                         }}
                         title={color}
                       >
                         <div style={{
-                          width: '12px',
-                          height: '12px',
+                          width: '24px',
+                          height: '24px',
                           backgroundColor: color,
-                          borderRadius: '2px',
+                          borderRadius: '3px',
                           border: '1px solid #999',
+                          marginBottom: '3px',
                         }} />
-                        {name}
+                        <span style={{
+                          fontSize: '9px',
+                          color: selectedColor === color ? '#FFF1E5' : '#333',
+                          textAlign: 'center',
+                          maxWidth: '50px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {name}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -1138,121 +1270,9 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
             </div>
           </div>
 
-          {/* Tools & Color Palette */}
+          {/* Color Palette */}
           <div>
-              <h3 style={{ fontSize: '16px', marginBottom: '10px', color: '#0D0D0D' }}>Tools</h3>
-
-              {/* Tool Selection */}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '15px' }}>
-                <button
-                  onClick={() => setCurrentTool('paint')}
-                  style={{
-                    padding: '8px 16px',
-                    background: currentTool === 'paint' ? '#0D0D0D' : '#E8DDD1',
-                    border: '1px solid #ccc',
-                    borderRadius: '4px',
-                    color: currentTool === 'paint' ? '#FFF1E5' : '#333',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  Paint
-                </button>
-                <button
-                  onClick={() => setCurrentTool('square')}
-                  style={{
-                    padding: '8px 16px',
-                    background: currentTool === 'square' ? '#0D0D0D' : '#E8DDD1',
-                    border: '1px solid #ccc',
-                    borderRadius: '4px',
-                    color: currentTool === 'square' ? '#FFF1E5' : '#333',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  Rectangle
-                </button>
-                <button
-                  onClick={() => setCurrentTool('circle')}
-                  style={{
-                    padding: '8px 16px',
-                    background: currentTool === 'circle' ? '#0D0D0D' : '#E8DDD1',
-                    border: '1px solid #ccc',
-                    borderRadius: '4px',
-                    color: currentTool === 'circle' ? '#FFF1E5' : '#333',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  Ellipse
-                </button>
-              </div>
-
-              <p style={{ fontSize: '12px', color: '#666', marginBottom: '15px' }}>
-                {currentTool === 'paint'
-                  ? 'Left-click to paint, right-click to erase'
-                  : 'Click and drag to draw shape, right-click to erase shape'}
-              </p>
-
-              {/* Brush Size & Zoom */}
-              <div style={{ display: 'flex', gap: '30px', marginBottom: '15px', alignItems: 'flex-end' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', color: '#0D0D0D' }}>Brush Size: {brushSize}px</label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="8"
-                    value={brushSize}
-                    onChange={(e) => setBrushSize(parseInt(e.target.value))}
-                    style={{
-                      width: '150px',
-                      cursor: 'pointer',
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', color: '#0D0D0D' }}>
-                    Zoom: {Math.round(zoom * 100)}%
-                    <span style={{ fontSize: '11px', color: '#666', marginLeft: '8px' }}>(scroll on canvas)</span>
-                  </label>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button
-                      onClick={() => setZoom(1)}
-                      style={{
-                        padding: '6px 12px',
-                        background: zoom === 1 ? '#ccc' : '#0D0D0D',
-                        border: 'none',
-                        borderRadius: '4px',
-                        color: zoom === 1 ? '#666' : '#FFF1E5',
-                        cursor: zoom === 1 ? 'default' : 'pointer',
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                      }}
-                      disabled={zoom === 1}
-                    >
-                      Reset
-                    </button>
-                    <button
-                      onClick={centerCanvas}
-                      style={{
-                        padding: '6px 12px',
-                        background: '#0D0D0D',
-                        border: 'none',
-                        borderRadius: '4px',
-                        color: '#FFF1E5',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                      }}
-                    >
-                      Center
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <h3 style={{ fontSize: '16px', marginBottom: '10px', color: '#0D0D0D' }}>Colors</h3>
 
               {/* Color Search & Filter */}
               <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
