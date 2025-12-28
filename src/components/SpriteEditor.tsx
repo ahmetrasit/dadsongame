@@ -9,9 +9,11 @@ interface SpriteEditorProps {
 const TILE_SIZE = 16; // 16x16 pixels per tile
 const TILES_PER_ROW = 3; // 3x3 grid of tiles
 const GRID_SIZE = TILE_SIZE * TILES_PER_ROW; // 48x48 total pixels
-const BASE_PIXEL_SIZE = 12; // Base display size of each pixel
+const PIXEL_SIZE = 12; // Display size of each pixel
 const TILE_BORDER = 2; // Black border between tiles
 const NUM_BORDERS = TILES_PER_ROW - 1; // 2 borders for 3 tiles
+const BASE_CANVAS_SIZE = GRID_SIZE * PIXEL_SIZE + NUM_BORDERS * TILE_BORDER; // 580px
+const VIEWPORT_SIZE = 580; // Fixed viewport size
 
 const DEFAULT_PALETTE = [
   // Blacks & Whites
@@ -68,9 +70,8 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
   const [selectedObjectType, setSelectedObjectType] = useState<'plant' | 'animal' | 'resource'>('plant');
   const [selectedObjectId, setSelectedObjectId] = useState<string>('');
 
-  // Calculate sizes based on zoom
-  const pixelSize = BASE_PIXEL_SIZE * zoom;
-  const canvasSize = GRID_SIZE * pixelSize + NUM_BORDERS * TILE_BORDER;
+  // Calculate scaled canvas size for scrollable area
+  const scaledCanvasSize = BASE_CANVAS_SIZE * zoom;
 
   // Prevent default behavior
   const stopProp = (e: React.MouseEvent) => e.stopPropagation();
@@ -503,112 +504,125 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
           <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
             {/* Canvas Area (Left) */}
             <div>
+              {/* Fixed viewport with scrollable zoomed canvas */}
               <div
                 style={{
-                  display: 'inline-block',
+                  width: VIEWPORT_SIZE,
+                  height: VIEWPORT_SIZE,
+                  overflow: 'auto',
                   border: '2px solid #ccc',
                   background: '#E8DDD1',
-                  padding: '10px',
                   borderRadius: '8px',
                 }}
               >
-                {/* Canvas with tile borders */}
+                {/* Scrollable area that grows with zoom */}
                 <div
                   style={{
-                    position: 'relative',
-                    width: canvasSize,
-                    height: canvasSize,
-                    background: '#000', // Black background for tile borders
-                    border: '1px solid #000',
+                    width: scaledCanvasSize,
+                    height: scaledCanvasSize,
+                    padding: '10px',
                   }}
                 >
-                  {/* Render 3x3 tiles */}
-                  {Array.from({ length: TILES_PER_ROW }).map((_, tileRow) =>
-                    Array.from({ length: TILES_PER_ROW }).map((_, tileCol) => {
-                      const tileX = tileCol * (TILE_SIZE * pixelSize + TILE_BORDER);
-                      const tileY = tileRow * (TILE_SIZE * pixelSize + TILE_BORDER);
-                      return (
-                        <div
-                          key={`tile-${tileRow}-${tileCol}`}
-                          style={{
-                            position: 'absolute',
-                            left: tileX,
-                            top: tileY,
-                            width: TILE_SIZE * pixelSize,
-                            height: TILE_SIZE * pixelSize,
-                            display: 'grid',
-                            gridTemplateColumns: `repeat(${TILE_SIZE}, ${pixelSize}px)`,
-                            gridTemplateRows: `repeat(${TILE_SIZE}, ${pixelSize}px)`,
-                          }}
-                        >
-                          {/* Pixels within this tile */}
-                          {Array.from({ length: TILE_SIZE }).map((_, localRow) =>
-                            Array.from({ length: TILE_SIZE }).map((_, localCol) => {
-                              const globalRow = tileRow * TILE_SIZE + localRow;
-                              const globalCol = tileCol * TILE_SIZE + localCol;
-                              const color = pixels[globalRow][globalCol];
-                              // Checkerboard pattern for transparent pixels
-                              const isCheckerWhite = (globalRow + globalCol) % 2 === 0;
-                              const transparentColor = isCheckerWhite ? '#ffffff' : '#cccccc';
+                  {/* Canvas with tile borders - scaled */}
+                  <div
+                    style={{
+                      position: 'relative',
+                      width: BASE_CANVAS_SIZE,
+                      height: BASE_CANVAS_SIZE,
+                      background: '#000',
+                      border: '1px solid #000',
+                      transform: `scale(${zoom})`,
+                      transformOrigin: 'top left',
+                    }}
+                  >
+                    {/* Render 3x3 tiles */}
+                    {Array.from({ length: TILES_PER_ROW }).map((_, tileRow) =>
+                      Array.from({ length: TILES_PER_ROW }).map((_, tileCol) => {
+                        const tileX = tileCol * (TILE_SIZE * PIXEL_SIZE + TILE_BORDER);
+                        const tileY = tileRow * (TILE_SIZE * PIXEL_SIZE + TILE_BORDER);
+                        return (
+                          <div
+                            key={`tile-${tileRow}-${tileCol}`}
+                            style={{
+                              position: 'absolute',
+                              left: tileX,
+                              top: tileY,
+                              width: TILE_SIZE * PIXEL_SIZE,
+                              height: TILE_SIZE * PIXEL_SIZE,
+                              display: 'grid',
+                              gridTemplateColumns: `repeat(${TILE_SIZE}, ${PIXEL_SIZE}px)`,
+                              gridTemplateRows: `repeat(${TILE_SIZE}, ${PIXEL_SIZE}px)`,
+                            }}
+                          >
+                            {/* Pixels within this tile */}
+                            {Array.from({ length: TILE_SIZE }).map((_, localRow) =>
+                              Array.from({ length: TILE_SIZE }).map((_, localCol) => {
+                                const globalRow = tileRow * TILE_SIZE + localRow;
+                                const globalCol = tileCol * TILE_SIZE + localCol;
+                                const color = pixels[globalRow][globalCol];
+                                // Checkerboard pattern for transparent pixels
+                                const isCheckerWhite = (globalRow + globalCol) % 2 === 0;
+                                const transparentColor = isCheckerWhite ? '#ffffff' : '#cccccc';
 
-                              return (
-                                <div
-                                  key={`${localRow}-${localCol}`}
-                                  style={{
-                                    width: pixelSize,
-                                    height: pixelSize,
-                                    backgroundColor: color === 'transparent' ? transparentColor : color,
-                                  }}
-                                />
-                              );
-                            })
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
+                                return (
+                                  <div
+                                    key={`${localRow}-${localCol}`}
+                                    style={{
+                                      width: PIXEL_SIZE,
+                                      height: PIXEL_SIZE,
+                                      backgroundColor: color === 'transparent' ? transparentColor : color,
+                                    }}
+                                  />
+                                );
+                              })
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
 
-                  {/* Interaction grid overlay */}
-                  {Array.from({ length: TILES_PER_ROW }).map((_, tileRow) =>
-                    Array.from({ length: TILES_PER_ROW }).map((_, tileCol) => {
-                      const tileX = tileCol * (TILE_SIZE * pixelSize + TILE_BORDER);
-                      const tileY = tileRow * (TILE_SIZE * pixelSize + TILE_BORDER);
-                      return (
-                        <div
-                          key={`interact-tile-${tileRow}-${tileCol}`}
-                          style={{
-                            position: 'absolute',
-                            left: tileX,
-                            top: tileY,
-                            width: TILE_SIZE * pixelSize,
-                            height: TILE_SIZE * pixelSize,
-                            display: 'grid',
-                            gridTemplateColumns: `repeat(${TILE_SIZE}, ${pixelSize}px)`,
-                            gridTemplateRows: `repeat(${TILE_SIZE}, ${pixelSize}px)`,
-                          }}
-                        >
-                          {Array.from({ length: TILE_SIZE }).map((_, localRow) =>
-                            Array.from({ length: TILE_SIZE }).map((_, localCol) => {
-                              const globalRow = tileRow * TILE_SIZE + localRow;
-                              const globalCol = tileCol * TILE_SIZE + localCol;
-                              return (
-                                <div
-                                  key={`i-${localRow}-${localCol}`}
-                                  onMouseDown={(e) => handleMouseDown(globalRow, globalCol, e)}
-                                  onMouseEnter={() => handleMouseEnter(globalRow, globalCol)}
-                                  style={{
-                                    width: pixelSize,
-                                    height: pixelSize,
-                                    pointerEvents: 'all',
-                                  }}
-                                />
-                              );
-                            })
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
+                    {/* Interaction grid overlay */}
+                    {Array.from({ length: TILES_PER_ROW }).map((_, tileRow) =>
+                      Array.from({ length: TILES_PER_ROW }).map((_, tileCol) => {
+                        const tileX = tileCol * (TILE_SIZE * PIXEL_SIZE + TILE_BORDER);
+                        const tileY = tileRow * (TILE_SIZE * PIXEL_SIZE + TILE_BORDER);
+                        return (
+                          <div
+                            key={`interact-tile-${tileRow}-${tileCol}`}
+                            style={{
+                              position: 'absolute',
+                              left: tileX,
+                              top: tileY,
+                              width: TILE_SIZE * PIXEL_SIZE,
+                              height: TILE_SIZE * PIXEL_SIZE,
+                              display: 'grid',
+                              gridTemplateColumns: `repeat(${TILE_SIZE}, ${PIXEL_SIZE}px)`,
+                              gridTemplateRows: `repeat(${TILE_SIZE}, ${PIXEL_SIZE}px)`,
+                            }}
+                          >
+                            {Array.from({ length: TILE_SIZE }).map((_, localRow) =>
+                              Array.from({ length: TILE_SIZE }).map((_, localCol) => {
+                                const globalRow = tileRow * TILE_SIZE + localRow;
+                                const globalCol = tileCol * TILE_SIZE + localCol;
+                                return (
+                                  <div
+                                    key={`i-${localRow}-${localCol}`}
+                                    onMouseDown={(e) => handleMouseDown(globalRow, globalCol, e)}
+                                    onMouseEnter={() => handleMouseEnter(globalRow, globalCol)}
+                                    style={{
+                                      width: PIXEL_SIZE,
+                                      height: PIXEL_SIZE,
+                                      pointerEvents: 'all',
+                                    }}
+                                  />
+                                );
+                              })
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
               </div>
 
