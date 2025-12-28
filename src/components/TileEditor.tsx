@@ -184,6 +184,10 @@ export function TileEditor({ onClose }: TileEditorProps) {
   const [selectedTiles, setSelectedTiles] = useState<Set<number>>(new Set());
   const [tileSelectMode, setTileSelectMode] = useState(false);
 
+  // K-key region selection for saving to gallery
+  const [regionSelectMode, setRegionSelectMode] = useState(false);
+  const [regionPoint1, setRegionPoint1] = useState<{ x: number; y: number } | null>(null);
+
   // Zoom and pan
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -223,6 +227,30 @@ export function TileEditor({ onClose }: TileEditorProps) {
       console.error('Failed to save data:', e);
     }
   }, [layers, gallery, galleryGroups, referenceSprites, isLoaded]);
+
+  // K key to toggle region select mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'k' || e.key === 'K') {
+        if (!regionSelectMode) {
+          setRegionSelectMode(true);
+          setRegionPoint1(null);
+          setTileSelectMode(false); // Turn off tile select mode
+        } else {
+          // Cancel region select mode
+          setRegionSelectMode(false);
+          setRegionPoint1(null);
+        }
+      }
+      // Escape to cancel
+      if (e.key === 'Escape' && regionSelectMode) {
+        setRegionSelectMode(false);
+        setRegionPoint1(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [regionSelectMode]);
 
   // Create new layer
   const addLayer = () => {
@@ -295,6 +323,20 @@ export function TileEditor({ onClose }: TileEditorProps) {
       if (tileX >= 0 && tileX < GRID_TILES && tileY >= 0 && tileY < GRID_TILES) {
         const tileIndex = tileY * GRID_TILES + tileX;
         toggleTileSelection(tileIndex);
+      }
+      return;
+    }
+
+    // Handle K-key region selection mode
+    if (regionSelectMode && e.button === 0) {
+      if (x >= 0 && x < CANVAS_PIXELS && y >= 0 && y < CANVAS_PIXELS) {
+        if (!regionPoint1) {
+          // First click - set first point
+          setRegionPoint1({ x, y });
+        } else {
+          // Second click - save region to gallery
+          saveRegionToGallery(regionPoint1.x, regionPoint1.y, x, y);
+        }
       }
       return;
     }
@@ -454,7 +496,22 @@ export function TileEditor({ onClose }: TileEditorProps) {
       }
     }
 
-  }, [layers, activeLayerId, ghostMode, tileSelectMode, selectedTiles]);
+    // Draw region selection (K key mode)
+    if (regionSelectMode && regionPoint1) {
+      const p1x = regionPoint1.x * DISPLAY_SCALE;
+      const p1y = regionPoint1.y * DISPLAY_SCALE;
+
+      // Draw first point marker
+      ctx.fillStyle = '#FF5722';
+      ctx.beginPath();
+      ctx.arc(p1x + DISPLAY_SCALE / 2, p1y + DISPLAY_SCALE / 2, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+  }, [layers, activeLayerId, ghostMode, tileSelectMode, selectedTiles, regionSelectMode, regionPoint1]);
 
   // Generate thumbnail for full canvas
   const generateThumbnail = (targetLayers?: Layer[]): string => {
@@ -595,6 +652,63 @@ export function TileEditor({ onClose }: TileEditorProps) {
 
     setGallery([...gallery, sprite]);
     setSpriteName('');
+  };
+
+  // Save selected region to gallery (K key selection)
+  const saveRegionToGallery = (x1: number, y1: number, x2: number, y2: number) => {
+    // Get bounding box
+    const minX = Math.min(x1, x2);
+    const maxX = Math.max(x1, x2);
+    const minY = Math.min(y1, y2);
+    const maxY = Math.max(y1, y2);
+    const width = maxX - minX + 1;
+    const height = maxY - minY + 1;
+
+    // Create thumbnail for the region
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const ctx = tempCanvas.getContext('2d');
+    if (!ctx) return;
+
+    // Extract pixels from all visible layers
+    for (const layer of layers) {
+      if (!layer.visible) continue;
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          const color = layer.pixels[y]?.[x];
+          if (color && color !== 'transparent') {
+            ctx.fillStyle = color;
+            ctx.fillRect(x - minX, y - minY, 1, 1);
+          }
+        }
+      }
+    }
+
+    // Create layer data for the region
+    const regionLayers: Layer[] = layers.map(layer => {
+      const newPixels: string[][] = Array(height).fill(null).map(() => Array(width).fill('transparent'));
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          newPixels[y][x] = layer.pixels[minY + y]?.[minX + x] || 'transparent';
+        }
+      }
+      return { ...layer, id: `layer-${Date.now()}-${layer.id}`, pixels: newPixels };
+    });
+
+    const sprite: GallerySprite = {
+      id: `sprite-${Date.now()}`,
+      name: `Region ${width}x${height}`,
+      group: selectedGalleryGroup,
+      layers: regionLayers,
+      thumbnail: tempCanvas.toDataURL(),
+    };
+
+    setGallery([...gallery, sprite]);
+
+    // Reset region selection
+    setRegionSelectMode(false);
+    setRegionPoint1(null);
   };
 
   // Load from gallery
@@ -938,16 +1052,22 @@ export function TileEditor({ onClose }: TileEditorProps) {
               onWheel={handleWheel}
               onContextMenu={handleContextMenu}
               style={{
-                cursor: tileSelectMode ? 'pointer' : (isPanning ? 'grabbing' : 'crosshair'),
+                cursor: regionSelectMode ? 'crosshair' : (tileSelectMode ? 'pointer' : (isPanning ? 'grabbing' : 'crosshair')),
                 transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
                 transformOrigin: 'center center',
               }}
             />
           </div>
 
-          {/* Zoom hint */}
+          {/* Mode indicator and hint */}
           <div style={{ position: 'absolute', bottom: '20px', left: '20px', color: '#666', fontSize: '12px' }}>
-            Scroll to zoom • Middle-click drag to pan • Right-click to erase
+            {regionSelectMode ? (
+              <span style={{ color: '#FF5722' }}>
+                {regionPoint1 ? 'Click second point to save region • ESC to cancel' : 'Click first point • ESC to cancel'}
+              </span>
+            ) : (
+              'Scroll to zoom • Middle-click drag to pan • Right-click to erase • K to select region'
+            )}
           </div>
         </div>
 
