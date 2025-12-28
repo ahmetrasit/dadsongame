@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
 import { generatePlantPreview, generateAnimalPreview, generateResourcePreview } from '@/utils/generatePreviewImage';
 
@@ -6,23 +6,11 @@ interface SpriteEditorProps {
   onClose: () => void;
 }
 
-type Mode = 'pixel' | 'freeform';
 type Tool = 'paint' | 'erase';
-type Shape = 'circle' | 'square' | 'roundedSquare' | 'triangle' | 'line';
 
-interface DrawnShape {
-  type: Shape;
-  centerX: number;
-  centerY: number;
-  size: number;
-  borderThickness: number;
-  borderColor: string;
-  fillColor: string;
-}
-
-const GRID_SIZE = 10;
-const PIXEL_SIZE = 30; // Display size of each pixel
-const CANVAS_SIZE = GRID_SIZE * PIXEL_SIZE; // 300px
+const GRID_SIZE = 14;
+const PIXEL_SIZE = 24; // Display size of each pixel
+const CANVAS_SIZE = GRID_SIZE * PIXEL_SIZE; // 336px
 
 const DEFAULT_PALETTE = [
   '#000000', '#ffffff', '#f5f5f5', '#d1d5db', '#6b7280', '#1f2937',
@@ -40,212 +28,37 @@ const DEFAULT_PALETTE = [
 
 export function SpriteEditor({ onClose }: SpriteEditorProps) {
   const { plants, animals, resources } = useDefinitionsStore();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const [pixels, setPixels] = useState<string[][]>(
     Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill('transparent'))
   );
-  const [mode, setMode] = useState<Mode>('pixel');
   const [selectedColor, setSelectedColor] = useState('#000000');
   const [tool, setTool] = useState<Tool>('paint');
   const [isMouseDown, setIsMouseDown] = useState(false);
   const [selectedObjectType, setSelectedObjectType] = useState<'plant' | 'animal' | 'resource'>('plant');
   const [selectedObjectId, setSelectedObjectId] = useState<string>('');
 
-  // Free-form mode states
-  const [shapes, setShapes] = useState<DrawnShape[]>([]);
-  const [selectedShape, setSelectedShape] = useState<Shape>('circle');
-  const [shapeSize, setShapeSize] = useState(3);
-  const [borderThickness, setBorderThickness] = useState(1);
-  const [borderColor, setBorderColor] = useState('#000000');
-  const [fillColor, setFillColor] = useState('transparent');
-
-  // Preview state for free-form mode
-  const [previewShape, setPreviewShape] = useState<DrawnShape | null>(null);
-
   // Prevent default behavior
   const stopProp = (e: React.MouseEvent) => e.stopPropagation();
 
-  // Draw smooth shape on canvas (free-form mode)
-  const drawSmoothShapeOnCanvas = (ctx: CanvasRenderingContext2D, shape: DrawnShape) => {
-    const { type, centerX, centerY, size, borderThickness, borderColor, fillColor } = shape;
-    const radius = size * PIXEL_SIZE / 2;
-
-    ctx.save();
-
-    if (type === 'circle') {
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-      if (fillColor !== 'transparent') {
-        ctx.fillStyle = fillColor;
-        ctx.fill();
-      }
-      if (borderThickness > 0) {
-        ctx.strokeStyle = borderColor;
-        ctx.lineWidth = borderThickness * 2;
-        ctx.stroke();
-      }
-    } else if (type === 'square') {
-      const halfSize = radius;
-      if (fillColor !== 'transparent') {
-        ctx.fillStyle = fillColor;
-        ctx.fillRect(centerX - halfSize, centerY - halfSize, halfSize * 2, halfSize * 2);
-      }
-      if (borderThickness > 0) {
-        ctx.strokeStyle = borderColor;
-        ctx.lineWidth = borderThickness * 2;
-        ctx.strokeRect(centerX - halfSize, centerY - halfSize, halfSize * 2, halfSize * 2);
-      }
-    } else if (type === 'roundedSquare') {
-      const halfSize = radius;
-      const cornerRadius = halfSize / 4;
-      const x = centerX - halfSize;
-      const y = centerY - halfSize;
-      const width = halfSize * 2;
-      const height = halfSize * 2;
-
-      ctx.beginPath();
-      ctx.moveTo(x + cornerRadius, y);
-      ctx.lineTo(x + width - cornerRadius, y);
-      ctx.arcTo(x + width, y, x + width, y + cornerRadius, cornerRadius);
-      ctx.lineTo(x + width, y + height - cornerRadius);
-      ctx.arcTo(x + width, y + height, x + width - cornerRadius, y + height, cornerRadius);
-      ctx.lineTo(x + cornerRadius, y + height);
-      ctx.arcTo(x, y + height, x, y + height - cornerRadius, cornerRadius);
-      ctx.lineTo(x, y + cornerRadius);
-      ctx.arcTo(x, y, x + cornerRadius, y, cornerRadius);
-      ctx.closePath();
-
-      if (fillColor !== 'transparent') {
-        ctx.fillStyle = fillColor;
-        ctx.fill();
-      }
-      if (borderThickness > 0) {
-        ctx.strokeStyle = borderColor;
-        ctx.lineWidth = borderThickness * 2;
-        ctx.stroke();
-      }
-    } else if (type === 'triangle') {
-      const height = size * PIXEL_SIZE;
-      const halfHeight = height / 2;
-
-      ctx.beginPath();
-      ctx.moveTo(centerX, centerY - halfHeight);
-      ctx.lineTo(centerX - halfHeight, centerY + halfHeight);
-      ctx.lineTo(centerX + halfHeight, centerY + halfHeight);
-      ctx.closePath();
-
-      if (fillColor !== 'transparent') {
-        ctx.fillStyle = fillColor;
-        ctx.fill();
-      }
-      if (borderThickness > 0) {
-        ctx.strokeStyle = borderColor;
-        ctx.lineWidth = borderThickness * 2;
-        ctx.stroke();
-      }
-    } else if (type === 'line') {
-      ctx.beginPath();
-      ctx.moveTo(centerX - radius, centerY);
-      ctx.lineTo(centerX + radius, centerY);
-      ctx.strokeStyle = borderColor;
-      ctx.lineWidth = borderThickness * 2;
-      ctx.stroke();
-    }
-
-    ctx.restore();
-  };
-
-  // Render all shapes on canvas including preview
-  const renderShapesToCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Clear canvas
-    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-
-    // Draw all permanent shapes
-    shapes.forEach(shape => drawSmoothShapeOnCanvas(ctx, shape));
-
-    // Draw preview shape with lower opacity
-    if (previewShape && mode === 'freeform') {
-      ctx.globalAlpha = 0.5;
-      drawSmoothShapeOnCanvas(ctx, previewShape);
-      ctx.globalAlpha = 1.0;
-    }
-  };
-
-  // Update canvas when shapes or preview change
-  useEffect(() => {
-    renderShapesToCanvas();
-  }, [shapes, previewShape, mode]);
-
-  // Handle mouse move for preview (free-form mode)
-  const handleMouseMove = (row: number, col: number) => {
-    if (mode === 'freeform') {
-      const centerX = col * PIXEL_SIZE + PIXEL_SIZE / 2;
-      const centerY = row * PIXEL_SIZE + PIXEL_SIZE / 2;
-
-      const preview: DrawnShape = {
-        type: selectedShape,
-        centerX,
-        centerY,
-        size: shapeSize,
-        borderThickness,
-        borderColor,
-        fillColor,
-      };
-
-      setPreviewShape(preview);
-    }
-  };
-
-  // Handle click to place shape or paint pixel
+  // Handle click to paint pixel
   const handleClick = (row: number, col: number) => {
-    if (mode === 'freeform') {
-      // Free-form mode: place shape on click
-      const centerX = col * PIXEL_SIZE + PIXEL_SIZE / 2;
-      const centerY = row * PIXEL_SIZE + PIXEL_SIZE / 2;
-
-      const newShape: DrawnShape = {
-        type: selectedShape,
-        centerX,
-        centerY,
-        size: shapeSize,
-        borderThickness,
-        borderColor,
-        fillColor,
-      };
-
-      setShapes(prev => [...prev, newShape]);
-    } else {
-      // Pixel mode - paint single pixel on click
-      setPixels(prev => {
-        const newPixels = prev.map(r => [...r]);
-        newPixels[row][col] = tool === 'paint' ? selectedColor : 'transparent';
-        return newPixels;
-      });
-    }
+    setPixels(prev => {
+      const newPixels = prev.map(r => [...r]);
+      newPixels[row][col] = tool === 'paint' ? selectedColor : 'transparent';
+      return newPixels;
+    });
   };
 
-  // Handle mouse down for pixel mode dragging
+  // Handle mouse down for dragging
   const handleMouseDown = (row: number, col: number) => {
-    if (mode === 'pixel') {
-      setIsMouseDown(true);
-      handleClick(row, col);
-    } else {
-      handleClick(row, col);
-    }
+    setIsMouseDown(true);
+    handleClick(row, col);
   };
 
-  // Handle mouse enter for pixel mode dragging
+  // Handle mouse enter for dragging
   const handleMouseEnter = (row: number, col: number) => {
-    handleMouseMove(row, col);
-
-    if (mode === 'pixel' && isMouseDown) {
+    if (isMouseDown) {
       setPixels(prev => {
         const newPixels = prev.map(r => [...r]);
         newPixels[row][col] = tool === 'paint' ? selectedColor : 'transparent';
@@ -256,10 +69,6 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
 
   const handleMouseUp = () => {
     setIsMouseDown(false);
-  };
-
-  const handleMouseLeave = () => {
-    setPreviewShape(null);
   };
 
   useEffect(() => {
@@ -278,13 +87,12 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
 
-  // Clear canvas (clears both pixels and shapes)
+  // Clear canvas
   const handleClear = () => {
     setPixels(Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill('transparent')));
-    setShapes([]);
   };
 
-  // Generate sprite as data URL (combines both pixels AND shapes)
+  // Generate sprite as data URL
   const generateSpriteDataURL = (): string => {
     const canvas = document.createElement('canvas');
     canvas.width = GRID_SIZE;
@@ -292,7 +100,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return '';
 
-    // First, draw pixels
+    // Draw pixels
     for (let row = 0; row < GRID_SIZE; row++) {
       for (let col = 0; col < GRID_SIZE; col++) {
         const color = pixels[row][col];
@@ -301,22 +109,6 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
           ctx.fillRect(col, row, 1, 1);
         }
       }
-    }
-
-    // Then, draw shapes on top (if any)
-    if (shapes.length > 0) {
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-
-      // Scale factor to convert from display size to final size
-      const scaleFactor = GRID_SIZE / CANVAS_SIZE;
-
-      ctx.scale(scaleFactor, scaleFactor);
-
-      // Draw all shapes
-      shapes.forEach(shape => drawSmoothShapeOnCanvas(ctx, shape));
-
-      ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
     }
 
     return canvas.toDataURL();
@@ -446,7 +238,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
       {/* Header */}
       <div style={{ padding: '20px', borderBottom: '1px solid #333', background: '#0f0f1e' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>Sprite Editor (10x10 pixels)</h1>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>Sprite Editor (14x14 pixels)</h1>
           <button
             onClick={onClose}
             style={{
@@ -657,42 +449,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
 
         {/* Main Content Area */}
         <div style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column' }}>
-          {/* Mode Toggle (Top) */}
-          <div style={{ marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '16px', marginBottom: '10px' }}>Mode</h3>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                onClick={() => setMode('pixel')}
-                style={{
-                  padding: '8px 16px',
-                  background: mode === 'pixel' ? '#3b82f6' : '#444',
-                  border: 'none',
-                  borderRadius: '4px',
-                  color: 'white',
-                  cursor: 'pointer',
-                  fontWeight: mode === 'pixel' ? 'bold' : 'normal',
-                }}
-              >
-                Pixel Mode
-              </button>
-              <button
-                onClick={() => setMode('freeform')}
-                style={{
-                  padding: '8px 16px',
-                  background: mode === 'freeform' ? '#3b82f6' : '#444',
-                  border: 'none',
-                  borderRadius: '4px',
-                  color: 'white',
-                  cursor: 'pointer',
-                  fontWeight: mode === 'freeform' ? 'bold' : 'normal',
-                }}
-              >
-                Free-form Mode
-              </button>
-            </div>
-          </div>
-
-          {/* Middle Row: Canvas + Tools */}
+          {/* Canvas + Tools */}
           <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
             {/* Canvas Area (Left) */}
             <div>
@@ -714,7 +471,6 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                     background: '#fff',
                     border: '1px solid #666',
                   }}
-                  onMouseLeave={handleMouseLeave}
                 >
                   {/* Pixel grid background */}
                   <div
@@ -749,20 +505,6 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                       ))
                     )}
                   </div>
-
-                  {/* Canvas overlay for smooth shapes */}
-                  <canvas
-                    ref={canvasRef}
-                    width={CANVAS_SIZE}
-                    height={CANVAS_SIZE}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      cursor: 'crosshair',
-                      pointerEvents: 'none',
-                    }}
-                  />
 
                   {/* Interaction grid overlay */}
                   <div
@@ -814,181 +556,10 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                 </button>
               </div>
             </div>
-
-            {/* Shape Tools (Right side - only in free-form mode) */}
-            {mode === 'freeform' && (
-              <div style={{ minWidth: '250px' }}>
-                <h3 style={{ fontSize: '16px', marginBottom: '15px' }}>Shape Tools</h3>
-
-                {/* Shape Selection */}
-                <div style={{ marginBottom: '15px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>Shape:</label>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    <button
-                      onClick={() => setSelectedShape('circle')}
-                      style={{
-                        padding: '8px 12px',
-                        background: selectedShape === 'circle' ? '#3b82f6' : '#444',
-                        border: 'none',
-                        borderRadius: '4px',
-                        color: 'white',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                      }}
-                    >
-                      Circle
-                    </button>
-                    <button
-                      onClick={() => setSelectedShape('square')}
-                      style={{
-                        padding: '8px 12px',
-                        background: selectedShape === 'square' ? '#3b82f6' : '#444',
-                        border: 'none',
-                        borderRadius: '4px',
-                        color: 'white',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                      }}
-                    >
-                      Square
-                    </button>
-                    <button
-                      onClick={() => setSelectedShape('roundedSquare')}
-                      style={{
-                        padding: '8px 12px',
-                        background: selectedShape === 'roundedSquare' ? '#3b82f6' : '#444',
-                        border: 'none',
-                        borderRadius: '4px',
-                        color: 'white',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                      }}
-                    >
-                      Rounded
-                    </button>
-                    <button
-                      onClick={() => setSelectedShape('triangle')}
-                      style={{
-                        padding: '8px 12px',
-                        background: selectedShape === 'triangle' ? '#3b82f6' : '#444',
-                        border: 'none',
-                        borderRadius: '4px',
-                        color: 'white',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                      }}
-                    >
-                      Triangle
-                    </button>
-                    <button
-                      onClick={() => setSelectedShape('line')}
-                      style={{
-                        padding: '8px 12px',
-                        background: selectedShape === 'line' ? '#3b82f6' : '#444',
-                        border: 'none',
-                        borderRadius: '4px',
-                        color: 'white',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                      }}
-                    >
-                      Line
-                    </button>
-                  </div>
-                </div>
-
-                {/* Size Control */}
-                <div style={{ marginBottom: '15px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>
-                    Size: {shapeSize}
-                  </label>
-                  <input
-                    type="range"
-                    min="2"
-                    max="10"
-                    value={shapeSize}
-                    onChange={(e) => setShapeSize(Number(e.target.value))}
-                    style={{ width: '100%' }}
-                  />
-                </div>
-
-                {/* Border Thickness Control */}
-                <div style={{ marginBottom: '15px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>
-                    Border Thickness: {borderThickness}
-                  </label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="3"
-                    value={borderThickness}
-                    onChange={(e) => setBorderThickness(Number(e.target.value))}
-                    style={{ width: '100%' }}
-                  />
-                </div>
-
-                {/* Border Color */}
-                <div style={{ marginBottom: '15px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>Border Color:</label>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <input
-                      type="color"
-                      value={borderColor}
-                      onChange={(e) => setBorderColor(e.target.value)}
-                      style={{
-                        width: '60px',
-                        height: '40px',
-                        border: '2px solid #555',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                      }}
-                    />
-                    <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>{borderColor}</span>
-                  </div>
-                </div>
-
-                {/* Fill Color */}
-                <div style={{ marginBottom: '15px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>Fill Color:</label>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
-                    <input
-                      type="color"
-                      value={fillColor === 'transparent' ? '#ffffff' : fillColor}
-                      onChange={(e) => setFillColor(e.target.value)}
-                      disabled={fillColor === 'transparent'}
-                      style={{
-                        width: '60px',
-                        height: '40px',
-                        border: '2px solid #555',
-                        borderRadius: '4px',
-                        cursor: fillColor === 'transparent' ? 'not-allowed' : 'pointer',
-                        opacity: fillColor === 'transparent' ? 0.5 : 1,
-                      }}
-                    />
-                    <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>{fillColor}</span>
-                  </div>
-                  <button
-                    onClick={() => setFillColor(fillColor === 'transparent' ? '#ffffff' : 'transparent')}
-                    style={{
-                      padding: '6px 12px',
-                      background: fillColor === 'transparent' ? '#3b82f6' : '#444',
-                      border: 'none',
-                      borderRadius: '4px',
-                      color: 'white',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                    }}
-                  >
-                    {fillColor === 'transparent' ? 'Transparent' : 'Make Transparent'}
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Color Palette - Only in pixel mode */}
-          {mode === 'pixel' && (
-            <div>
+          {/* Color Palette */}
+          <div>
               <h3 style={{ fontSize: '16px', marginBottom: '10px' }}>Color Palette</h3>
 
               {/* Tools */}
@@ -1084,8 +655,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
