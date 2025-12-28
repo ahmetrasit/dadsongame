@@ -55,19 +55,42 @@ const COLOR_PALETTE: { [group: string]: string[] } = {
     '#4169E1', '#0000FF', '#0000CD', '#00008B', '#000080',
     '#191970', '#4682B4', '#5F9EA0', '#ADD8E6', '#B0E0E6',
   ],
-  'Purples': [
-    '#F5E6FF', '#EBCCFF', '#E0B3FF', '#D699FF', '#CC80FF',
-    '#C266FF', '#B84DFF', '#AD33FF', '#A31AFF', '#9900FF',
-    '#8A00E6', '#7A00CC', '#6B00B3', '#5C0099', '#4D0080',
-    '#3D0066', '#2E004D', '#1F0033', '#8B008B', '#9400D3',
-    '#9932CC', '#BA55D3', '#DA70D6', '#EE82EE', '#DDA0DD',
-  ],
-  'Indigo & Deep Purple': [
+  'Rich Colors': [
+    // Deep Purples & Violets
     '#4B0082', '#3F0071', '#340060', '#29004F', '#1E003E',
-    '#13002D', '#0A001C', '#05000E', '#2E0854', '#3D0A6B',
-    '#4C0D82', '#5A1099', '#6913B0', '#7816C7', '#1A0033',
-    '#0D001A', '#240047', '#30005C', '#3C0070', '#480085',
-    '#540099', '#6000AD', '#2C003E', '#1E0029', '#0F0014',
+    '#5B2C6F', '#6C3483', '#7D3C98', '#8E44AD', '#9B59B6',
+    // Royal & Navy Blues
+    '#1A0033', '#0D001A', '#0A1628', '#0F1F3D', '#152952',
+    '#1B3A6D', '#214B87', '#2E5CA2', '#1F4788', '#1A3A6E',
+    // Deep Teals & Cyans
+    '#003333', '#004444', '#005555', '#006666', '#007777',
+    '#008080', '#009999', '#00AAAA', '#0D6B6B', '#0A5252',
+    // Rich Magentas & Wines
+    '#800040', '#990052', '#B30066', '#CC0077', '#990033',
+    '#800020', '#660019', '#4D0013', '#8B0A50', '#C71585',
+    // Deep Forest & Emeralds
+    '#004D00', '#003D00', '#002E00', '#001F00', '#0D3D0D',
+    '#1A4D1A', '#145214', '#0F470F', '#0A3C0A', '#053105',
+    // Burnt & Rich Oranges
+    '#8B2500', '#A52A00', '#BF3000', '#CC3300', '#993D00',
+    '#804000', '#664400', '#B34700', '#E65C00', '#FF6600',
+  ],
+  'Pale Colors': [
+    // Pale Pinks
+    '#FFF0F5', '#FFE4E9', '#FFD9E3', '#FFCED8', '#FFC3CD',
+    '#FFB8C2', '#FFADB7', '#FFA2AC', '#FF97A1', '#FFE4EC',
+    // Pale Blues
+    '#F0F8FF', '#E6F3FF', '#DCF0FF', '#D2EDFF', '#C8EAFF',
+    '#BEE7FF', '#B4E4FF', '#AAE1FF', '#A0DEFF', '#E6F7FF',
+    // Pale Greens
+    '#F0FFF0', '#E6FFE6', '#DCFFDC', '#D2FFD2', '#C8FFC8',
+    '#BEFFBE', '#B4FFB4', '#AAFFAA', '#A0FFA0', '#E6FFE0',
+    // Pale Yellows
+    '#FFFFF0', '#FFFFE6', '#FFFFDC', '#FFFFD2', '#FFFFC8',
+    '#FFFFBE', '#FFFFB4', '#FFFFAA', '#FFFFA0', '#FFF9E6',
+    // Pale Lavenders
+    '#F8F0FF', '#F0E6FF', '#E8DCFF', '#E0D2FF', '#D8C8FF',
+    '#D0BEFF', '#C8B4FF', '#C0AAFF', '#B8A0FF', '#EEE0FF',
   ],
   'Skin Tones': [
     '#FFECD9', '#FFE4C4', '#FFDAB9', '#FFD0A8', '#FFC69A',
@@ -252,8 +275,10 @@ export function TileEditor({ onClose }: TileEditorProps) {
   };
 
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Middle mouse or space+click for panning
-    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    e.preventDefault();
+
+    // Middle mouse button for panning
+    if (e.button === 1) {
       setIsPanning(true);
       setLastPanPos({ x: e.clientX, y: e.clientY });
       return;
@@ -274,10 +299,34 @@ export function TileEditor({ onClose }: TileEditorProps) {
       return;
     }
 
+    // Right-click to erase
+    if (e.button === 2) {
+      setIsMouseDown(true);
+      if (x >= 0 && x < CANVAS_PIXELS && y >= 0 && y < CANVAS_PIXELS) {
+        // Directly erase pixel
+        setLayers(layers.map(layer => {
+          if (layer.id !== activeLayerId) return layer;
+          const newPixels = layer.pixels.map(row => [...row]);
+          newPixels[y][x] = 'transparent';
+          return { ...layer, pixels: newPixels };
+        }));
+      }
+      return;
+    }
+
+    // Left-click to paint
     setIsMouseDown(true);
     if (x >= 0 && x < CANVAS_PIXELS && y >= 0 && y < CANVAS_PIXELS) {
       drawPixel(x, y);
     }
+  };
+
+  // Track which mouse button is held for move events
+  const [isRightMouseDown, setIsRightMouseDown] = useState(false);
+
+  const handleCanvasMouseDownWithButton = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (e.button === 2) setIsRightMouseDown(true);
+    handleCanvasMouseDown(e);
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -294,13 +343,28 @@ export function TileEditor({ onClose }: TileEditorProps) {
     if (!coords) return;
     const { x, y } = coords;
     if (x >= 0 && x < CANVAS_PIXELS && y >= 0 && y < CANVAS_PIXELS) {
-      drawPixel(x, y);
+      // If right mouse is held, erase; otherwise paint
+      if (isRightMouseDown) {
+        setLayers(layers.map(layer => {
+          if (layer.id !== activeLayerId) return layer;
+          const newPixels = layer.pixels.map(row => [...row]);
+          newPixels[y][x] = 'transparent';
+          return { ...layer, pixels: newPixels };
+        }));
+      } else {
+        drawPixel(x, y);
+      }
     }
   };
 
   const handleCanvasMouseUp = () => {
     setIsMouseDown(false);
     setIsPanning(false);
+    setIsRightMouseDown(false);
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent right-click menu
   };
 
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
@@ -867,11 +931,12 @@ export function TileEditor({ onClose }: TileEditorProps) {
               ref={canvasRef}
               width={DISPLAY_SIZE}
               height={DISPLAY_SIZE}
-              onMouseDown={handleCanvasMouseDown}
+              onMouseDown={handleCanvasMouseDownWithButton}
               onMouseMove={handleCanvasMouseMove}
               onMouseUp={handleCanvasMouseUp}
               onMouseLeave={handleCanvasMouseUp}
               onWheel={handleWheel}
+              onContextMenu={handleContextMenu}
               style={{
                 cursor: tileSelectMode ? 'pointer' : (isPanning ? 'grabbing' : 'crosshair'),
                 transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
@@ -882,7 +947,7 @@ export function TileEditor({ onClose }: TileEditorProps) {
 
           {/* Zoom hint */}
           <div style={{ position: 'absolute', bottom: '20px', left: '20px', color: '#666', fontSize: '12px' }}>
-            Scroll to zoom • Alt+drag to pan
+            Scroll to zoom • Middle-click drag to pan • Right-click to erase
           </div>
         </div>
 
