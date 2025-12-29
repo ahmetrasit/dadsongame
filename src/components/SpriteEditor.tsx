@@ -792,10 +792,8 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
         // Just add points, use Next button to close
         setPolygonState(prev => ({ ...prev, boundaryPoints: [...prev.boundaryPoints, point] }));
       } else if (polygonState.step === 'highlights') {
-        // Add highlight points (inside the boundary)
-        if (isPointInPolygon(col, row, polygonState.boundaryPoints)) {
-          setPolygonState(prev => ({ ...prev, currentHighlightPoints: [...prev.currentHighlightPoints, point] }));
-        }
+        // Add highlight points anywhere
+        setPolygonState(prev => ({ ...prev, currentHighlightPoints: [...prev.currentHighlightPoints, point] }));
       } else if (polygonState.step === 'coloring') {
         // Right-click to assign selected color to base or highlight
         if (e.button === 2) {
@@ -2100,7 +2098,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                       <>Click pixels to add points. Press Next when done.</>
                     )}
                     {polygonState.step === 'highlights' && (
-                      <>Click inside shape to add highlight points. Click "New Highlight" to start another.</>
+                      <>Click to add highlight points. Click "Close Highlight" to finish, then add more.</>
                     )}
                     {polygonState.step === 'coloring' && (
                       <>Select a color from palette, then right-click on shape or highlight to assign.</>
@@ -2126,17 +2124,19 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                     )}
                     {polygonState.step === 'highlights' && (
                       <>
-                        <button
-                          onClick={addHighlight}
-                          disabled={polygonState.currentHighlightPoints.length < 3}
-                          style={{
-                            padding: '6px 10px',
-                            background: polygonState.currentHighlightPoints.length >= 3 ? '#22c55e' : '#ccc',
-                            border: 'none', borderRadius: '4px', color: 'white', cursor: polygonState.currentHighlightPoints.length >= 3 ? 'pointer' : 'not-allowed', fontSize: '11px',
-                          }}
-                        >
-                          New Highlight
-                        </button>
+                        {polygonState.currentHighlightPoints.length > 0 && (
+                          <button
+                            onClick={addHighlight}
+                            disabled={polygonState.currentHighlightPoints.length < 3}
+                            style={{
+                              padding: '6px 10px',
+                              background: polygonState.currentHighlightPoints.length >= 3 ? '#22c55e' : '#ccc',
+                              border: 'none', borderRadius: '4px', color: 'white', cursor: polygonState.currentHighlightPoints.length >= 3 ? 'pointer' : 'not-allowed', fontSize: '11px',
+                            }}
+                          >
+                            Close Highlight
+                          </button>
+                        )}
                         <button
                           onClick={goToColoring}
                           style={{ padding: '6px 10px', background: '#3b82f6', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '11px' }}
