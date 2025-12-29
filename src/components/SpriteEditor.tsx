@@ -775,11 +775,6 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     });
   };
 
-  // Helper: check if clicking on the exact point
-  const isOnPoint = (x: number, y: number, point: PolygonPoint) => {
-    return x === point.x && y === point.y;
-  };
-
   // Handle mouse down
   const handleMouseDown = (row: number, col: number, e: React.MouseEvent) => {
     if (currentTool === 'paint') {
@@ -794,12 +789,8 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
       const point: PolygonPoint = { x: col, y: row };
 
       if (polygonState.step === 'drawing') {
-        // Check if clicking on first point to close shape
-        if (polygonState.boundaryPoints.length >= 3 && isOnPoint(col, row, polygonState.boundaryPoints[0])) {
-          setPolygonState(prev => ({ ...prev, isClosed: true, step: 'highlights' }));
-        } else {
-          setPolygonState(prev => ({ ...prev, boundaryPoints: [...prev.boundaryPoints, point] }));
-        }
+        // Just add points, use Next button to close
+        setPolygonState(prev => ({ ...prev, boundaryPoints: [...prev.boundaryPoints, point] }));
       } else if (polygonState.step === 'highlights') {
         // Add highlight points (inside the boundary)
         if (isPointInPolygon(col, row, polygonState.boundaryPoints)) {
@@ -831,23 +822,15 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
       const point: PolygonPoint = { x: col, y: row };
 
       if (textureState.step === 'drawing') {
-        // Check if clicking on first point to close shape
-        if (textureState.areaPoints.length >= 3 && isOnPoint(col, row, textureState.areaPoints[0])) {
-          setTextureState(prev => ({ ...prev, isClosed: true, step: 'apply' }));
-        } else {
-          setTextureState(prev => ({ ...prev, areaPoints: [...prev.areaPoints, point] }));
-        }
+        // Just add points, use Next button to close
+        setTextureState(prev => ({ ...prev, areaPoints: [...prev.areaPoints, point] }));
       }
     } else if (currentTool === 'depth') {
       const point: PolygonPoint = { x: col, y: row };
 
       if (depthState.step === 'drawing') {
-        // Check if clicking on first point to close shape
-        if (depthState.areaPoints.length >= 3 && isOnPoint(col, row, depthState.areaPoints[0])) {
-          setDepthState(prev => ({ ...prev, isClosed: true, step: 'light' }));
-        } else {
-          setDepthState(prev => ({ ...prev, areaPoints: [...prev.areaPoints, point] }));
-        }
+        // Just add points, use Next button to close
+        setDepthState(prev => ({ ...prev, areaPoints: [...prev.areaPoints, point] }));
       } else if (depthState.step === 'light') {
         // Set light direction
         setDepthState(prev => ({ ...prev, lightDirection: point }));
@@ -2114,7 +2097,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                   </div>
                   <div style={{ fontSize: '12px', color: '#555', marginBottom: '10px', lineHeight: '1.4' }}>
                     {polygonState.step === 'drawing' && (
-                      <>Click on pixel corners to draw shape. Click near first point to close.</>
+                      <>Click pixels to add points. Press Next when done.</>
                     )}
                     {polygonState.step === 'highlights' && (
                       <>Click inside shape to add highlight points. Click "New Highlight" to start another.</>
@@ -2127,6 +2110,20 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                     Points: {polygonState.boundaryPoints.length} | Highlights: {polygonState.highlights.length}
                   </div>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {polygonState.step === 'drawing' && (
+                      <button
+                        onClick={() => setPolygonState(prev => ({ ...prev, isClosed: true, step: 'highlights' }))}
+                        disabled={polygonState.boundaryPoints.length < 3}
+                        style={{
+                          padding: '6px 10px',
+                          background: polygonState.boundaryPoints.length >= 3 ? '#3b82f6' : '#ccc',
+                          border: 'none', borderRadius: '4px', color: 'white',
+                          cursor: polygonState.boundaryPoints.length >= 3 ? 'pointer' : 'not-allowed', fontSize: '11px',
+                        }}
+                      >
+                        Next
+                      </button>
+                    )}
                     {polygonState.step === 'highlights' && (
                       <>
                         <button
@@ -2144,7 +2141,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                           onClick={goToColoring}
                           style={{ padding: '6px 10px', background: '#3b82f6', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '11px' }}
                         >
-                          Next: Colors
+                          Next
                         </button>
                       </>
                     )}
@@ -2175,11 +2172,14 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                   </div>
                   <div style={{ fontSize: '12px', color: '#555', marginBottom: '10px', lineHeight: '1.4' }}>
                     {textureState.step === 'drawing' && (
-                      <>Click on pixel corners to draw area. Click near first point to close.</>
+                      <>Click pixels to add points. Press Next when done.</>
                     )}
                     {textureState.step === 'apply' && (
                       <>Choose texture type and intensity, then click Apply.</>
                     )}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>
+                    Points: {textureState.areaPoints.length}
                   </div>
                   {textureState.step === 'apply' && (
                     <>
@@ -2209,6 +2209,20 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                     </>
                   )}
                   <div style={{ display: 'flex', gap: '6px' }}>
+                    {textureState.step === 'drawing' && (
+                      <button
+                        onClick={() => setTextureState(prev => ({ ...prev, isClosed: true, step: 'apply' }))}
+                        disabled={textureState.areaPoints.length < 3}
+                        style={{
+                          padding: '6px 10px',
+                          background: textureState.areaPoints.length >= 3 ? '#3b82f6' : '#ccc',
+                          border: 'none', borderRadius: '4px', color: 'white',
+                          cursor: textureState.areaPoints.length >= 3 ? 'pointer' : 'not-allowed', fontSize: '11px',
+                        }}
+                      >
+                        Next
+                      </button>
+                    )}
                     {textureState.step === 'apply' && (
                       <button
                         onClick={applyTextureToArea}
@@ -2236,7 +2250,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                   </div>
                   <div style={{ fontSize: '12px', color: '#555', marginBottom: '10px', lineHeight: '1.4' }}>
                     {depthState.step === 'drawing' && (
-                      <>Click on pixel corners to draw area. Click near first point to close.</>
+                      <>Click pixels to add points. Press Next when done.</>
                     )}
                     {depthState.step === 'light' && (
                       <>Click anywhere to set light direction. Pixels facing light will be brighter.</>
@@ -2246,6 +2260,20 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                     Points: {depthState.areaPoints.length} | Light: {depthState.lightDirection ? 'Set' : 'Not set'}
                   </div>
                   <div style={{ display: 'flex', gap: '6px' }}>
+                    {depthState.step === 'drawing' && (
+                      <button
+                        onClick={() => setDepthState(prev => ({ ...prev, isClosed: true, step: 'light' }))}
+                        disabled={depthState.areaPoints.length < 3}
+                        style={{
+                          padding: '6px 10px',
+                          background: depthState.areaPoints.length >= 3 ? '#3b82f6' : '#ccc',
+                          border: 'none', borderRadius: '4px', color: 'white',
+                          cursor: depthState.areaPoints.length >= 3 ? 'pointer' : 'not-allowed', fontSize: '11px',
+                        }}
+                      >
+                        Next
+                      </button>
+                    )}
                     {depthState.step === 'light' && depthState.lightDirection && (
                       <button
                         onClick={generateDepthShadows}
