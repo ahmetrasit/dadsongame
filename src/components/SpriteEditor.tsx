@@ -775,9 +775,9 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     });
   };
 
-  // Helper: check if clicking near a point (within 2 pixels)
-  const isNearPoint = (x: number, y: number, point: PolygonPoint) => {
-    return Math.abs(x - point.x) <= 2 && Math.abs(y - point.y) <= 2;
+  // Helper: check if clicking on the exact point
+  const isOnPoint = (x: number, y: number, point: PolygonPoint) => {
+    return x === point.x && y === point.y;
   };
 
   // Handle mouse down
@@ -794,8 +794,8 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
       const point: PolygonPoint = { x: col, y: row };
 
       if (polygonState.step === 'drawing') {
-        // Check if clicking near first point to close shape
-        if (polygonState.boundaryPoints.length >= 3 && isNearPoint(col, row, polygonState.boundaryPoints[0])) {
+        // Check if clicking on first point to close shape
+        if (polygonState.boundaryPoints.length >= 3 && isOnPoint(col, row, polygonState.boundaryPoints[0])) {
           setPolygonState(prev => ({ ...prev, isClosed: true, step: 'highlights' }));
         } else {
           setPolygonState(prev => ({ ...prev, boundaryPoints: [...prev.boundaryPoints, point] }));
@@ -831,8 +831,8 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
       const point: PolygonPoint = { x: col, y: row };
 
       if (textureState.step === 'drawing') {
-        // Check if clicking near first point to close shape
-        if (textureState.areaPoints.length >= 3 && isNearPoint(col, row, textureState.areaPoints[0])) {
+        // Check if clicking on first point to close shape
+        if (textureState.areaPoints.length >= 3 && isOnPoint(col, row, textureState.areaPoints[0])) {
           setTextureState(prev => ({ ...prev, isClosed: true, step: 'apply' }));
         } else {
           setTextureState(prev => ({ ...prev, areaPoints: [...prev.areaPoints, point] }));
@@ -842,8 +842,8 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
       const point: PolygonPoint = { x: col, y: row };
 
       if (depthState.step === 'drawing') {
-        // Check if clicking near first point to close shape
-        if (depthState.areaPoints.length >= 3 && isNearPoint(col, row, depthState.areaPoints[0])) {
+        // Check if clicking on first point to close shape
+        if (depthState.areaPoints.length >= 3 && isOnPoint(col, row, depthState.areaPoints[0])) {
           setDepthState(prev => ({ ...prev, isClosed: true, step: 'light' }));
         } else {
           setDepthState(prev => ({ ...prev, areaPoints: [...prev.areaPoints, point] }));
