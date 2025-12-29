@@ -23,8 +23,13 @@ interface ColorEntry {
 
 // Tool types for sprite creation pipeline
 type TexturePattern = 'noise' | 'dither' | 'grain' | 'crosshatch';
-type PolygonStep = 'boundary' | 'highlights' | 'colors' | 'done';
-type DepthStep = 'lines' | 'lightArea' | 'lightDirection' | 'done';
+
+// Simplified polygon steps: draw boundary -> add highlights -> assign colors
+type PolygonStep = 'drawing' | 'highlights' | 'coloring';
+// Simplified depth steps: draw area -> set light
+type DepthStep = 'drawing' | 'light';
+// Simplified texture steps: draw area -> apply
+type TextureStep = 'drawing' | 'apply';
 
 interface PolygonPoint {
   x: number;
@@ -38,22 +43,24 @@ interface PolygonHighlight {
 
 interface PolygonState {
   step: PolygonStep;
+  isClosed: boolean;
   boundaryPoints: PolygonPoint[];
   highlights: PolygonHighlight[];
   currentHighlightPoints: PolygonPoint[];
   baseColor: string;
 }
 
-interface DepthLine {
-  points: PolygonPoint[];
-}
-
 interface DepthState {
   step: DepthStep;
-  depthLines: DepthLine[];
-  currentLinePoints: PolygonPoint[];
-  lightAreaPoints: PolygonPoint[];
+  isClosed: boolean;
+  areaPoints: PolygonPoint[];
   lightDirection: PolygonPoint | null;
+}
+
+interface TextureState {
+  step: TextureStep;
+  isClosed: boolean;
+  areaPoints: PolygonPoint[];
 }
 
 interface AlignmentSelection {
@@ -588,25 +595,30 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<string | null>(null);
 
-  // Polygon tool state
+  // Polygon tool state - simplified
   const [polygonState, setPolygonState] = useState<PolygonState>({
-    step: 'boundary',
+    step: 'drawing',
+    isClosed: false,
     boundaryPoints: [],
     highlights: [],
     currentHighlightPoints: [],
     baseColor: '#4a90d9',
   });
 
-  // Texture tool state
+  // Texture tool state - simplified
   const [texturePattern, setTexturePattern] = useState<TexturePattern>('noise');
   const [textureIntensity, setTextureIntensity] = useState(0.3);
+  const [textureState, setTextureState] = useState<TextureState>({
+    step: 'drawing',
+    isClosed: false,
+    areaPoints: [],
+  });
 
-  // Depth tool state
+  // Depth tool state - simplified
   const [depthState, setDepthState] = useState<DepthState>({
-    step: 'lines',
-    depthLines: [],
-    currentLinePoints: [],
-    lightAreaPoints: [],
+    step: 'drawing',
+    isClosed: false,
+    areaPoints: [],
     lightDirection: null,
   });
 
@@ -763,6 +775,11 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     });
   };
 
+  // Helper: check if clicking near a point (within 2 pixels)
+  const isNearPoint = (x: number, y: number, point: PolygonPoint) => {
+    return Math.abs(x - point.x) <= 2 && Math.abs(y - point.y) <= 2;
+  };
+
   // Handle mouse down
   const handleMouseDown = (row: number, col: number, e: React.MouseEvent) => {
     if (currentTool === 'paint') {
@@ -774,24 +791,66 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
         paintPixels(row, col, false);
       }
     } else if (currentTool === 'polygon') {
-      // Polygon tool - add points
       const point: PolygonPoint = { x: col, y: row };
-      if (polygonState.step === 'boundary') {
-        setPolygonState(prev => ({ ...prev, boundaryPoints: [...prev.boundaryPoints, point] }));
+
+      if (polygonState.step === 'drawing') {
+        // Check if clicking near first point to close shape
+        if (polygonState.boundaryPoints.length >= 3 && isNearPoint(col, row, polygonState.boundaryPoints[0])) {
+          setPolygonState(prev => ({ ...prev, isClosed: true, step: 'highlights' }));
+        } else {
+          setPolygonState(prev => ({ ...prev, boundaryPoints: [...prev.boundaryPoints, point] }));
+        }
       } else if (polygonState.step === 'highlights') {
-        setPolygonState(prev => ({ ...prev, currentHighlightPoints: [...prev.currentHighlightPoints, point] }));
+        // Add highlight points (inside the boundary)
+        if (isPointInPolygon(col, row, polygonState.boundaryPoints)) {
+          setPolygonState(prev => ({ ...prev, currentHighlightPoints: [...prev.currentHighlightPoints, point] }));
+        }
+      } else if (polygonState.step === 'coloring') {
+        // Right-click to assign selected color to base or highlight
+        if (e.button === 2) {
+          e.preventDefault();
+          // Check if clicking inside a highlight first
+          const highlightIndex = polygonState.highlights.findIndex(h =>
+            h.points.length >= 3 && isPointInPolygon(col, row, h.points)
+          );
+          if (highlightIndex >= 0) {
+            // Assign color to this highlight
+            setPolygonState(prev => ({
+              ...prev,
+              highlights: prev.highlights.map((h, i) =>
+                i === highlightIndex ? { ...h, color: selectedColor } : h
+              )
+            }));
+          } else if (isPointInPolygon(col, row, polygonState.boundaryPoints)) {
+            // Assign color to base
+            setPolygonState(prev => ({ ...prev, baseColor: selectedColor }));
+          }
+        }
       }
     } else if (currentTool === 'texture') {
-      setIsMouseDown(true);
-      applyTextureToPixel(row, col);
+      const point: PolygonPoint = { x: col, y: row };
+
+      if (textureState.step === 'drawing') {
+        // Check if clicking near first point to close shape
+        if (textureState.areaPoints.length >= 3 && isNearPoint(col, row, textureState.areaPoints[0])) {
+          setTextureState(prev => ({ ...prev, isClosed: true, step: 'apply' }));
+        } else {
+          setTextureState(prev => ({ ...prev, areaPoints: [...prev.areaPoints, point] }));
+        }
+      }
     } else if (currentTool === 'depth') {
       const point: PolygonPoint = { x: col, y: row };
-      if (depthState.step === 'lines') {
-        setDepthState(prev => ({ ...prev, currentLinePoints: [...prev.currentLinePoints, point] }));
-      } else if (depthState.step === 'lightArea') {
-        setDepthState(prev => ({ ...prev, lightAreaPoints: [...prev.lightAreaPoints, point] }));
-      } else if (depthState.step === 'lightDirection') {
-        setDepthState(prev => ({ ...prev, lightDirection: point, step: 'done' }));
+
+      if (depthState.step === 'drawing') {
+        // Check if clicking near first point to close shape
+        if (depthState.areaPoints.length >= 3 && isNearPoint(col, row, depthState.areaPoints[0])) {
+          setDepthState(prev => ({ ...prev, isClosed: true, step: 'light' }));
+        } else {
+          setDepthState(prev => ({ ...prev, areaPoints: [...prev.areaPoints, point] }));
+        }
+      } else if (depthState.step === 'light') {
+        // Set light direction
+        setDepthState(prev => ({ ...prev, lightDirection: point }));
       }
     } else if (currentTool === 'alignment') {
       if (!isSelectingAlignment) {
@@ -839,60 +898,13 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     return () => window.removeEventListener('mouseup', handleMouseUp);
   }, [handleMouseUp]);
 
-  // Keyboard handler for all tools
+  // Keyboard handler - simplified (only ESC and arrow keys for alignment)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // ESC to close editor
       if (e.key === 'Escape') {
         onClose();
         return;
-      }
-
-      // Polygon tool hotkeys
-      if (currentTool === 'polygon') {
-        if (e.key === '1') {
-          if (polygonState.step === 'boundary' && polygonState.boundaryPoints.length >= 3) {
-            setPolygonState(prev => ({ ...prev, step: 'highlights' }));
-          } else if (polygonState.step === 'highlights') {
-            if (polygonState.currentHighlightPoints.length >= 3) {
-              setPolygonState(prev => ({
-                ...prev,
-                highlights: [...prev.highlights, { points: prev.currentHighlightPoints, color: '#ffffff' }],
-                currentHighlightPoints: [],
-                step: 'colors',
-              }));
-            } else {
-              setPolygonState(prev => ({ ...prev, step: 'colors' }));
-            }
-          } else if (polygonState.step === 'colors') {
-            setPolygonState(prev => ({ ...prev, step: 'done' }));
-          }
-        } else if (e.key === '3' && polygonState.step === 'highlights') {
-          if (polygonState.currentHighlightPoints.length >= 3) {
-            setPolygonState(prev => ({
-              ...prev,
-              highlights: [...prev.highlights, { points: prev.currentHighlightPoints, color: '#ffffff' }],
-              currentHighlightPoints: [],
-            }));
-          }
-        }
-      }
-
-      // Depth tool hotkeys
-      if (currentTool === 'depth') {
-        if (e.key === 'k' || e.key === 'K') {
-          if (depthState.currentLinePoints.length >= 2) {
-            setDepthState(prev => ({
-              ...prev,
-              depthLines: [...prev.depthLines, { points: prev.currentLinePoints }],
-              currentLinePoints: [],
-            }));
-          }
-        } else if (e.key === 'l' || e.key === 'L') {
-          setDepthState(prev => ({ ...prev, step: 'lightArea' }));
-        } else if (e.key === 'p' || e.key === 'P') {
-          setDepthState(prev => ({ ...prev, step: 'lightDirection' }));
-        }
       }
 
       // Alignment tool hotkeys (arrow keys)
@@ -912,7 +924,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, currentTool, polygonState, depthState, alignmentSelection]);
+  }, [onClose, currentTool, alignmentSelection]);
 
   // Shift selected pixels for alignment tool
   const shiftSelectedPixels = (dx: number, dy: number) => {
@@ -986,6 +998,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     if (polygonState.boundaryPoints.length < 3) return;
     const newPixels = pixels.map(row => [...row]);
 
+    // Fill base shape
     for (let y = 0; y < GRID_SIZE; y++) {
       for (let x = 0; x < GRID_SIZE; x++) {
         if (isPointInPolygon(x, y, polygonState.boundaryPoints)) {
@@ -994,10 +1007,11 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
       }
     }
 
+    // Fill highlights on top
     polygonState.highlights.forEach(highlight => {
       for (let y = 0; y < GRID_SIZE; y++) {
         for (let x = 0; x < GRID_SIZE; x++) {
-          if (isPointInPolygon(x, y, highlight.points)) {
+          if (highlight.points.length >= 3 && isPointInPolygon(x, y, highlight.points)) {
             newPixels[y][x] = highlight.color;
           }
         }
@@ -1006,12 +1020,39 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
 
     setPixels(newPixels);
     setPolygonState({
-      step: 'boundary',
+      step: 'drawing',
+      isClosed: false,
       boundaryPoints: [],
       highlights: [],
       currentHighlightPoints: [],
       baseColor: polygonState.baseColor,
     });
+  };
+
+  // Add current highlight to list
+  const addHighlight = () => {
+    if (polygonState.currentHighlightPoints.length >= 3) {
+      setPolygonState(prev => ({
+        ...prev,
+        highlights: [...prev.highlights, { points: prev.currentHighlightPoints, color: '#ffffff' }],
+        currentHighlightPoints: [],
+      }));
+    }
+  };
+
+  // Go to coloring step
+  const goToColoring = () => {
+    // Save any current highlight points first
+    if (polygonState.currentHighlightPoints.length >= 3) {
+      setPolygonState(prev => ({
+        ...prev,
+        highlights: [...prev.highlights, { points: prev.currentHighlightPoints, color: '#ffffff' }],
+        currentHighlightPoints: [],
+        step: 'coloring',
+      }));
+    } else {
+      setPolygonState(prev => ({ ...prev, step: 'coloring' }));
+    }
   };
 
   // Apply texture to a pixel
@@ -1066,14 +1107,17 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     });
   };
 
-  // Generate depth shadows
+  // Generate depth shadows - simplified: lighten inside area, darken outside based on light direction
   const generateDepthShadows = () => {
-    if (depthState.depthLines.length === 0 || !depthState.lightDirection) return;
+    if (depthState.areaPoints.length < 3 || !depthState.lightDirection) return;
     const newPixels = pixels.map(row => [...row]);
 
+    const centerX = depthState.areaPoints.reduce((sum, p) => sum + p.x, 0) / depthState.areaPoints.length;
+    const centerY = depthState.areaPoints.reduce((sum, p) => sum + p.y, 0) / depthState.areaPoints.length;
+
     const lightAngle = Math.atan2(
-      depthState.lightDirection.y - GRID_SIZE / 2,
-      depthState.lightDirection.x - GRID_SIZE / 2
+      depthState.lightDirection.y - centerY,
+      depthState.lightDirection.x - centerX
     );
 
     for (let y = 0; y < GRID_SIZE; y++) {
@@ -1081,58 +1125,97 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
         const currentColor = newPixels[y][x];
         if (currentColor === 'transparent') continue;
 
-        const inLightArea = depthState.lightAreaPoints.length >= 3
-          ? isPointInPolygon(x, y, depthState.lightAreaPoints)
-          : true;
+        const inArea = isPointInPolygon(x, y, depthState.areaPoints);
+        if (!inArea) continue;
 
-        let shadowLevel = 0;
-        depthState.depthLines.forEach(line => {
-          if (line.points.length >= 2) {
-            for (let i = 0; i < line.points.length - 1; i++) {
-              const p1 = line.points[i];
-              const p2 = line.points[i + 1];
-              const lineDx = p2.x - p1.x;
-              const lineDy = p2.y - p1.y;
-              const pointDx = x - p1.x;
-              const pointDy = y - p1.y;
-              const cross = lineDx * pointDy - lineDy * pointDx;
-              const lightDx = Math.cos(lightAngle);
-              const lightDy = Math.sin(lightAngle);
-              const lightCross = lineDx * lightDy - lineDy * lightDx;
+        // Calculate angle from center to this pixel
+        const pixelAngle = Math.atan2(y - centerY, x - centerX);
+        const angleDiff = Math.abs(pixelAngle - lightAngle);
+        const normalizedDiff = Math.min(angleDiff, Math.PI * 2 - angleDiff) / Math.PI;
 
-              if ((cross > 0) !== (lightCross > 0)) {
-                const dist = Math.abs(cross) / Math.sqrt(lineDx * lineDx + lineDy * lineDy);
-                if (dist < 3) {
-                  shadowLevel = Math.max(shadowLevel, 1 - dist / 3);
-                }
-              }
-            }
-          }
-        });
+        const r = parseInt(currentColor.slice(1, 3), 16);
+        const g = parseInt(currentColor.slice(3, 5), 16);
+        const b = parseInt(currentColor.slice(5, 7), 16);
 
-        if (shadowLevel > 0 && !inLightArea) {
-          const r = parseInt(currentColor.slice(1, 3), 16);
-          const g = parseInt(currentColor.slice(3, 5), 16);
-          const b = parseInt(currentColor.slice(5, 7), 16);
-          const darken = Math.floor(shadowLevel * 60);
-          newPixels[y][x] = `#${Math.max(0, r - darken).toString(16).padStart(2, '0')}${Math.max(0, g - darken).toString(16).padStart(2, '0')}${Math.max(0, b - darken).toString(16).padStart(2, '0')}`;
-        } else if (inLightArea && depthState.lightAreaPoints.length >= 3) {
-          const r = parseInt(currentColor.slice(1, 3), 16);
-          const g = parseInt(currentColor.slice(3, 5), 16);
-          const b = parseInt(currentColor.slice(5, 7), 16);
-          const lighten = 15;
-          newPixels[y][x] = `#${Math.min(255, r + lighten).toString(16).padStart(2, '0')}${Math.min(255, g + lighten).toString(16).padStart(2, '0')}${Math.min(255, b + lighten).toString(16).padStart(2, '0')}`;
-        }
+        // Pixels facing the light get lightened, others get darkened
+        const adjustment = Math.floor((0.5 - normalizedDiff) * 60);
+        const newR = Math.max(0, Math.min(255, r + adjustment));
+        const newG = Math.max(0, Math.min(255, g + adjustment));
+        const newB = Math.max(0, Math.min(255, b + adjustment));
+
+        newPixels[y][x] = `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
       }
     }
 
     setPixels(newPixels);
     setDepthState({
-      step: 'lines',
-      depthLines: [],
-      currentLinePoints: [],
-      lightAreaPoints: [],
+      step: 'drawing',
+      isClosed: false,
+      areaPoints: [],
       lightDirection: null,
+    });
+  };
+
+  // Apply texture to selected area
+  const applyTextureToArea = () => {
+    if (textureState.areaPoints.length < 3) return;
+    const newPixels = pixels.map(row => [...row]);
+
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        if (!isPointInPolygon(x, y, textureState.areaPoints)) continue;
+
+        const currentColor = newPixels[y][x];
+        if (currentColor === 'transparent') continue;
+
+        const r = parseInt(currentColor.slice(1, 3), 16);
+        const g = parseInt(currentColor.slice(3, 5), 16);
+        const b = parseInt(currentColor.slice(5, 7), 16);
+
+        let newR = r, newG = g, newB = b;
+        const variation = Math.floor(textureIntensity * 50);
+
+        switch (texturePattern) {
+          case 'noise':
+            newR = Math.max(0, Math.min(255, r + Math.floor(Math.random() * variation * 2) - variation));
+            newG = Math.max(0, Math.min(255, g + Math.floor(Math.random() * variation * 2) - variation));
+            newB = Math.max(0, Math.min(255, b + Math.floor(Math.random() * variation * 2) - variation));
+            break;
+          case 'dither':
+            if ((y + x) % 2 === 0) {
+              newR = Math.max(0, r - variation);
+              newG = Math.max(0, g - variation);
+              newB = Math.max(0, b - variation);
+            } else {
+              newR = Math.min(255, r + variation);
+              newG = Math.min(255, g + variation);
+              newB = Math.min(255, b + variation);
+            }
+            break;
+          case 'grain':
+            const grain = (Math.random() - 0.5) * variation * 2;
+            newR = Math.max(0, Math.min(255, r + grain));
+            newG = Math.max(0, Math.min(255, g + grain));
+            newB = Math.max(0, Math.min(255, b + grain));
+            break;
+          case 'crosshatch':
+            if ((y + x) % 3 === 0 || (y - x + GRID_SIZE) % 3 === 0) {
+              newR = Math.max(0, r - variation);
+              newG = Math.max(0, g - variation);
+              newB = Math.max(0, b - variation);
+            }
+            break;
+        }
+
+        newPixels[y][x] = `#${Math.round(newR).toString(16).padStart(2, '0')}${Math.round(newG).toString(16).padStart(2, '0')}${Math.round(newB).toString(16).padStart(2, '0')}`;
+      }
+    }
+
+    setPixels(newPixels);
+    setTextureState({
+      step: 'drawing',
+      isClosed: false,
+      areaPoints: [],
     });
   };
 
@@ -1689,7 +1772,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                       })
                     )}
 
-                    {/* Polygon Tool Visual Overlay */}
+                    {/* Polygon Tool Visual Overlay - Simplified (no numbers) */}
                     {currentTool === 'polygon' && (
                       <svg
                         style={{
@@ -1702,51 +1785,40 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                           overflow: 'visible',
                         }}
                       >
-                        {/* Boundary polygon lines */}
+                        {/* Boundary polygon */}
                         {polygonState.boundaryPoints.length >= 2 && (
                           <polygon
                             points={polygonState.boundaryPoints.map(p =>
                               `${p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2},${p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}`
                             ).join(' ')}
-                            fill="rgba(34, 197, 94, 0.2)"
-                            stroke="#22c55e"
-                            strokeWidth="3"
-                            strokeDasharray="8,4"
+                            fill={polygonState.isClosed ? `${polygonState.baseColor}33` : 'rgba(34, 197, 94, 0.15)'}
+                            stroke={polygonState.isClosed ? polygonState.baseColor : '#22c55e'}
+                            strokeWidth="2"
+                            strokeDasharray={polygonState.isClosed ? 'none' : '6,3'}
                           />
                         )}
-                        {/* Boundary points */}
+                        {/* Boundary points (no numbers, smaller) */}
                         {polygonState.boundaryPoints.map((p, i) => (
-                          <g key={`bp-${i}`}>
-                            <circle
-                              cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                              cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                              r={8}
-                              fill="#22c55e"
-                              stroke="white"
-                              strokeWidth="2"
-                            />
-                            <text
-                              x={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                              y={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2 + 4}
-                              textAnchor="middle"
-                              fill="white"
-                              fontSize="10"
-                              fontWeight="bold"
-                            >
-                              {i + 1}
-                            </text>
-                          </g>
+                          <circle
+                            key={`bp-${i}`}
+                            cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                            cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                            r={i === 0 ? 7 : 5}
+                            fill={i === 0 ? '#16a34a' : '#22c55e'}
+                            stroke="white"
+                            strokeWidth="2"
+                          />
                         ))}
 
                         {/* Completed highlights */}
                         {polygonState.highlights.map((highlight, hi) => (
                           <g key={`h-${hi}`}>
-                            {highlight.points.length >= 2 && (
+                            {highlight.points.length >= 3 && (
                               <polygon
                                 points={highlight.points.map(p =>
                                   `${p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2},${p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}`
                                 ).join(' ')}
-                                fill={`${highlight.color}66`}
+                                fill={`${highlight.color}55`}
                                 stroke={highlight.color}
                                 strokeWidth="2"
                               />
@@ -1756,7 +1828,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                                 key={`hp-${hi}-${i}`}
                                 cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
                                 cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                                r={5}
+                                r={4}
                                 fill={highlight.color}
                                 stroke="white"
                                 strokeWidth="1"
@@ -1773,10 +1845,10 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                                 points={polygonState.currentHighlightPoints.map(p =>
                                   `${p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2},${p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}`
                                 ).join(' ')}
-                                fill="rgba(251, 191, 36, 0.3)"
+                                fill="rgba(251, 191, 36, 0.25)"
                                 stroke="#fbbf24"
                                 strokeWidth="2"
-                                strokeDasharray="4,4"
+                                strokeDasharray="4,3"
                               />
                             )}
                             {polygonState.currentHighlightPoints.map((p, i) => (
@@ -1784,7 +1856,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                                 key={`chp-${i}`}
                                 cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
                                 cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                                r={6}
+                                r={5}
                                 fill="#fbbf24"
                                 stroke="white"
                                 strokeWidth="2"
@@ -1795,7 +1867,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                       </svg>
                     )}
 
-                    {/* Depth Tool Visual Overlay */}
+                    {/* Depth Tool Visual Overlay - Simplified */}
                     {currentTool === 'depth' && (
                       <svg
                         style={{
@@ -1808,82 +1880,28 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                           overflow: 'visible',
                         }}
                       >
-                        {/* Completed depth lines */}
-                        {depthState.depthLines.map((line, li) => (
-                          <g key={`dl-${li}`}>
-                            {line.points.length >= 2 && (
-                              <polyline
-                                points={line.points.map(p =>
-                                  `${p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2},${p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}`
-                                ).join(' ')}
-                                fill="none"
-                                stroke="#8b5cf6"
-                                strokeWidth="3"
-                              />
-                            )}
-                            {line.points.map((p, i) => (
-                              <circle
-                                key={`dlp-${li}-${i}`}
-                                cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                                cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                                r={5}
-                                fill="#8b5cf6"
-                                stroke="white"
-                                strokeWidth="1"
-                              />
-                            ))}
-                          </g>
-                        ))}
-
-                        {/* Current depth line being drawn */}
-                        {depthState.currentLinePoints.length >= 1 && (
-                          <>
-                            {depthState.currentLinePoints.length >= 2 && (
-                              <polyline
-                                points={depthState.currentLinePoints.map(p =>
-                                  `${p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2},${p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}`
-                                ).join(' ')}
-                                fill="none"
-                                stroke="#a78bfa"
-                                strokeWidth="3"
-                                strokeDasharray="6,4"
-                              />
-                            )}
-                            {depthState.currentLinePoints.map((p, i) => (
-                              <circle
-                                key={`clp-${i}`}
-                                cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                                cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                                r={6}
-                                fill="#a78bfa"
-                                stroke="white"
-                                strokeWidth="2"
-                              />
-                            ))}
-                          </>
-                        )}
-
-                        {/* Light area */}
-                        {depthState.lightAreaPoints.length >= 2 && (
+                        {/* Area polygon */}
+                        {depthState.areaPoints.length >= 2 && (
                           <polygon
-                            points={depthState.lightAreaPoints.map(p =>
+                            points={depthState.areaPoints.map(p =>
                               `${p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2},${p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}`
                             ).join(' ')}
-                            fill="rgba(251, 191, 36, 0.2)"
-                            stroke="#fbbf24"
+                            fill={depthState.isClosed ? 'rgba(139, 92, 246, 0.2)' : 'rgba(139, 92, 246, 0.1)'}
+                            stroke="#8b5cf6"
                             strokeWidth="2"
-                            strokeDasharray="6,3"
+                            strokeDasharray={depthState.isClosed ? 'none' : '6,3'}
                           />
                         )}
-                        {depthState.lightAreaPoints.map((p, i) => (
+                        {/* Area points */}
+                        {depthState.areaPoints.map((p, i) => (
                           <circle
-                            key={`lap-${i}`}
+                            key={`ap-${i}`}
                             cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
                             cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                            r={5}
-                            fill="#fbbf24"
+                            r={i === 0 ? 7 : 5}
+                            fill={i === 0 ? '#7c3aed' : '#8b5cf6'}
                             stroke="white"
-                            strokeWidth="1"
+                            strokeWidth="2"
                           />
                         ))}
 
@@ -1910,6 +1928,46 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                             </text>
                           </>
                         )}
+                      </svg>
+                    )}
+
+                    {/* Texture Tool Visual Overlay */}
+                    {currentTool === 'texture' && (
+                      <svg
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: scaledCanvasSize,
+                          height: scaledCanvasSize,
+                          pointerEvents: 'none',
+                          overflow: 'visible',
+                        }}
+                      >
+                        {/* Area polygon */}
+                        {textureState.areaPoints.length >= 2 && (
+                          <polygon
+                            points={textureState.areaPoints.map(p =>
+                              `${p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2},${p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}`
+                            ).join(' ')}
+                            fill={textureState.isClosed ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.1)'}
+                            stroke="#f59e0b"
+                            strokeWidth="2"
+                            strokeDasharray={textureState.isClosed ? 'none' : '6,3'}
+                          />
+                        )}
+                        {/* Area points */}
+                        {textureState.areaPoints.map((p, i) => (
+                          <circle
+                            key={`tp-${i}`}
+                            cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                            cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                            r={i === 0 ? 7 : 5}
+                            fill={i === 0 ? '#d97706' : '#f59e0b'}
+                            stroke="white"
+                            strokeWidth="2"
+                          />
+                        ))}
                       </svg>
                     )}
 
@@ -2046,43 +2104,61 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                 </div>
               )}
 
-              {/* Polygon Tool Panel */}
+              {/* Polygon Tool Panel - Guided */}
               {currentTool === 'polygon' && (
-                <div style={{ marginBottom: '15px', padding: '10px', background: '#e8f5e9', borderRadius: '4px' }}>
-                  <p style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>
-                    Step: {polygonState.step}. Press 1 to confirm, 3 for new highlight
-                  </p>
-                  <div style={{ fontSize: '12px', marginBottom: '8px' }}>
+                <div style={{ marginBottom: '15px', padding: '12px', background: '#e8f5e9', borderRadius: '6px', border: '1px solid #a5d6a7' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '10px', color: '#2e7d32' }}>
+                    {polygonState.step === 'drawing' && '1. Draw Shape'}
+                    {polygonState.step === 'highlights' && '2. Add Highlights'}
+                    {polygonState.step === 'coloring' && '3. Assign Colors'}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#555', marginBottom: '10px', lineHeight: '1.4' }}>
+                    {polygonState.step === 'drawing' && (
+                      <>Click on pixel corners to draw shape. Click near first point to close.</>
+                    )}
+                    {polygonState.step === 'highlights' && (
+                      <>Click inside shape to add highlight points. Click "New Highlight" to start another.</>
+                    )}
+                    {polygonState.step === 'coloring' && (
+                      <>Select a color from palette, then right-click on shape or highlight to assign.</>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>
                     Points: {polygonState.boundaryPoints.length} | Highlights: {polygonState.highlights.length}
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '12px' }}>Base:</span>
-                    <input
-                      type="color"
-                      value={polygonState.baseColor}
-                      onChange={(e) => setPolygonState(prev => ({ ...prev, baseColor: e.target.value }))}
-                      style={{ width: '40px', height: '25px', cursor: 'pointer' }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {polygonState.step === 'highlights' && (
+                      <>
+                        <button
+                          onClick={addHighlight}
+                          disabled={polygonState.currentHighlightPoints.length < 3}
+                          style={{
+                            padding: '6px 10px',
+                            background: polygonState.currentHighlightPoints.length >= 3 ? '#22c55e' : '#ccc',
+                            border: 'none', borderRadius: '4px', color: 'white', cursor: polygonState.currentHighlightPoints.length >= 3 ? 'pointer' : 'not-allowed', fontSize: '11px',
+                          }}
+                        >
+                          New Highlight
+                        </button>
+                        <button
+                          onClick={goToColoring}
+                          style={{ padding: '6px 10px', background: '#3b82f6', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '11px' }}
+                        >
+                          Next: Colors
+                        </button>
+                      </>
+                    )}
+                    {polygonState.step === 'coloring' && (
+                      <button
+                        onClick={generatePolygonShape}
+                        style={{ padding: '6px 12px', background: '#22c55e', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}
+                      >
+                        Generate Shape
+                      </button>
+                    )}
                     <button
-                      onClick={generatePolygonShape}
-                      disabled={polygonState.boundaryPoints.length < 3}
-                      style={{
-                        padding: '6px 12px',
-                        background: polygonState.boundaryPoints.length >= 3 ? '#22c55e' : '#ccc',
-                        border: 'none',
-                        borderRadius: '4px',
-                        color: 'white',
-                        cursor: polygonState.boundaryPoints.length >= 3 ? 'pointer' : 'not-allowed',
-                        fontSize: '12px',
-                      }}
-                    >
-                      Generate
-                    </button>
-                    <button
-                      onClick={() => setPolygonState({ step: 'boundary', boundaryPoints: [], highlights: [], currentHighlightPoints: [], baseColor: polygonState.baseColor })}
-                      style={{ padding: '6px 12px', background: '#666', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '12px' }}
+                      onClick={() => setPolygonState({ step: 'drawing', isClosed: false, boundaryPoints: [], highlights: [], currentHighlightPoints: [], baseColor: polygonState.baseColor })}
+                      style={{ padding: '6px 10px', background: '#666', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '11px' }}
                     >
                       Reset
                     </button>
@@ -2090,75 +2166,97 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                 </div>
               )}
 
-              {/* Texture Tool Panel */}
+              {/* Texture Tool Panel - Guided */}
               {currentTool === 'texture' && (
-                <div style={{ marginBottom: '15px', padding: '10px', background: '#fff8e1', borderRadius: '4px' }}>
-                  <p style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>
-                    Click and drag to apply texture
-                  </p>
-                  <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                    {(['noise', 'dither', 'grain', 'crosshatch'] as TexturePattern[]).map(p => (
-                      <button
-                        key={p}
-                        onClick={() => setTexturePattern(p)}
-                        style={{
-                          padding: '4px 8px',
-                          background: texturePattern === p ? '#f59e0b' : '#E8DDD1',
-                          border: 'none',
-                          borderRadius: '4px',
-                          color: texturePattern === p ? 'white' : '#333',
-                          cursor: 'pointer',
-                          fontSize: '11px',
-                          textTransform: 'capitalize',
-                        }}
-                      >
-                        {p}
-                      </button>
-                    ))}
+                <div style={{ marginBottom: '15px', padding: '12px', background: '#fff8e1', borderRadius: '6px', border: '1px solid #ffcc80' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '10px', color: '#f57c00' }}>
+                    {textureState.step === 'drawing' && '1. Select Area'}
+                    {textureState.step === 'apply' && '2. Apply Texture'}
                   </div>
-                  <div style={{ fontSize: '12px' }}>
-                    Intensity: {Math.round(textureIntensity * 100)}%
-                    <input
-                      type="range"
-                      min="0.1"
-                      max="1"
-                      step="0.1"
-                      value={textureIntensity}
-                      onChange={(e) => setTextureIntensity(Number(e.target.value))}
-                      style={{ width: '100%', marginTop: '4px' }}
-                    />
+                  <div style={{ fontSize: '12px', color: '#555', marginBottom: '10px', lineHeight: '1.4' }}>
+                    {textureState.step === 'drawing' && (
+                      <>Click on pixel corners to draw area. Click near first point to close.</>
+                    )}
+                    {textureState.step === 'apply' && (
+                      <>Choose texture type and intensity, then click Apply.</>
+                    )}
+                  </div>
+                  {textureState.step === 'apply' && (
+                    <>
+                      <div style={{ display: 'flex', gap: '4px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                        {(['noise', 'dither', 'grain', 'crosshatch'] as TexturePattern[]).map(p => (
+                          <button
+                            key={p}
+                            onClick={() => setTexturePattern(p)}
+                            style={{
+                              padding: '4px 8px', background: texturePattern === p ? '#f59e0b' : '#E8DDD1',
+                              border: 'none', borderRadius: '4px', color: texturePattern === p ? 'white' : '#333',
+                              cursor: 'pointer', fontSize: '10px', textTransform: 'capitalize',
+                            }}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{ fontSize: '11px', marginBottom: '8px' }}>
+                        Intensity: {Math.round(textureIntensity * 100)}%
+                        <input
+                          type="range" min="0.1" max="1" step="0.1" value={textureIntensity}
+                          onChange={(e) => setTextureIntensity(Number(e.target.value))}
+                          style={{ width: '100%', marginTop: '4px' }}
+                        />
+                      </div>
+                    </>
+                  )}
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {textureState.step === 'apply' && (
+                      <button
+                        onClick={applyTextureToArea}
+                        style={{ padding: '6px 12px', background: '#f59e0b', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}
+                      >
+                        Apply Texture
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setTextureState({ step: 'drawing', isClosed: false, areaPoints: [] })}
+                      style={{ padding: '6px 10px', background: '#666', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '11px' }}
+                    >
+                      Reset
+                    </button>
                   </div>
                 </div>
               )}
 
-              {/* Depth Tool Panel */}
+              {/* Depth Tool Panel - Guided */}
               {currentTool === 'depth' && (
-                <div style={{ marginBottom: '15px', padding: '10px', background: '#ede7f6', borderRadius: '4px' }}>
-                  <p style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>
-                    K=confirm line, L=light area, P=light direction
-                  </p>
-                  <div style={{ fontSize: '12px', marginBottom: '8px' }}>
-                    Lines: {depthState.depthLines.length} | Light: {depthState.lightDirection ? 'Set' : 'Not set'}
+                <div style={{ marginBottom: '15px', padding: '12px', background: '#ede7f6', borderRadius: '6px', border: '1px solid #b39ddb' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '10px', color: '#7b1fa2' }}>
+                    {depthState.step === 'drawing' && '1. Select Area'}
+                    {depthState.step === 'light' && '2. Set Light Source'}
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ fontSize: '12px', color: '#555', marginBottom: '10px', lineHeight: '1.4' }}>
+                    {depthState.step === 'drawing' && (
+                      <>Click on pixel corners to draw area. Click near first point to close.</>
+                    )}
+                    {depthState.step === 'light' && (
+                      <>Click anywhere to set light direction. Pixels facing light will be brighter.</>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>
+                    Points: {depthState.areaPoints.length} | Light: {depthState.lightDirection ? 'Set' : 'Not set'}
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {depthState.step === 'light' && depthState.lightDirection && (
+                      <button
+                        onClick={generateDepthShadows}
+                        style={{ padding: '6px 12px', background: '#8b5cf6', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}
+                      >
+                        Apply Shading
+                      </button>
+                    )}
                     <button
-                      onClick={generateDepthShadows}
-                      disabled={depthState.depthLines.length === 0 || !depthState.lightDirection}
-                      style={{
-                        padding: '6px 12px',
-                        background: depthState.depthLines.length > 0 && depthState.lightDirection ? '#8b5cf6' : '#ccc',
-                        border: 'none',
-                        borderRadius: '4px',
-                        color: 'white',
-                        cursor: depthState.depthLines.length > 0 && depthState.lightDirection ? 'pointer' : 'not-allowed',
-                        fontSize: '12px',
-                      }}
-                    >
-                      Generate
-                    </button>
-                    <button
-                      onClick={() => setDepthState({ step: 'lines', depthLines: [], currentLinePoints: [], lightAreaPoints: [], lightDirection: null })}
-                      style={{ padding: '6px 12px', background: '#666', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '12px' }}
+                      onClick={() => setDepthState({ step: 'drawing', isClosed: false, areaPoints: [], lightDirection: null })}
+                      style={{ padding: '6px 10px', background: '#666', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '11px' }}
                     >
                       Reset
                     </button>
