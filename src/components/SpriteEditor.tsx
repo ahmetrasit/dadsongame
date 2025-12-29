@@ -21,6 +21,48 @@ interface ColorEntry {
   tags: string[];
 }
 
+// Tool types for sprite creation pipeline
+type TexturePattern = 'noise' | 'dither' | 'grain' | 'crosshatch';
+type PolygonStep = 'boundary' | 'highlights' | 'colors' | 'done';
+type DepthStep = 'lines' | 'lightArea' | 'lightDirection' | 'done';
+
+interface PolygonPoint {
+  x: number;
+  y: number;
+}
+
+interface PolygonHighlight {
+  points: PolygonPoint[];
+  color: string;
+}
+
+interface PolygonState {
+  step: PolygonStep;
+  boundaryPoints: PolygonPoint[];
+  highlights: PolygonHighlight[];
+  currentHighlightPoints: PolygonPoint[];
+  baseColor: string;
+}
+
+interface DepthLine {
+  points: PolygonPoint[];
+}
+
+interface DepthState {
+  step: DepthStep;
+  depthLines: DepthLine[];
+  currentLinePoints: PolygonPoint[];
+  lightAreaPoints: PolygonPoint[];
+  lightDirection: PolygonPoint | null;
+}
+
+interface AlignmentSelection {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+}
+
 const DEFAULT_PALETTE: ColorEntry[] = [
   // Blacks & Grays (1-25)
   { color: '#000000', name: 'Void Black', tags: ['black', 'dark', 'night', 'shadow', 'void', 'coal', 'ink', 'obsidian', 'midnight', 'abyss'] },
@@ -534,7 +576,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
   const [selectedColor, setSelectedColor] = useState('#000000');
   const [brushSize, setBrushSize] = useState(1);
   const [zoom, setZoom] = useState(1); // Zoom level: 0.5x to 2x
-  const [currentTool, setCurrentTool] = useState<'paint' | 'square' | 'circle'>('paint');
+  const [currentTool, setCurrentTool] = useState<'paint' | 'square' | 'circle' | 'polygon' | 'texture' | 'depth' | 'alignment'>('paint');
   const [shapeStart, setShapeStart] = useState<{ row: number; col: number } | null>(null);
   const [shapeEnd, setShapeEnd] = useState<{ row: number; col: number } | null>(null);
   const [isMouseDown, setIsMouseDown] = useState(false);
@@ -548,6 +590,33 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<string | null>(null);
   const [newGroupName, setNewGroupName] = useState('');
+
+  // Polygon tool state
+  const [polygonState, setPolygonState] = useState<PolygonState>({
+    step: 'boundary',
+    boundaryPoints: [],
+    highlights: [],
+    currentHighlightPoints: [],
+    baseColor: '#4a90d9',
+  });
+
+  // Texture tool state
+  const [texturePattern, setTexturePattern] = useState<TexturePattern>('noise');
+  const [textureIntensity, setTextureIntensity] = useState(0.3);
+
+  // Depth tool state
+  const [depthState, setDepthState] = useState<DepthState>({
+    step: 'lines',
+    depthLines: [],
+    currentLinePoints: [],
+    lightAreaPoints: [],
+    lightDirection: null,
+  });
+
+  // Alignment tool state
+  const [alignmentSelection, setAlignmentSelection] = useState<AlignmentSelection | null>(null);
+  const [isSelectingAlignment, setIsSelectingAlignment] = useState(false);
+  const [alignmentStart, setAlignmentStart] = useState<{ x: number; y: number } | null>(null);
 
   // Ref for viewport to handle scroll-based zoom
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -814,8 +883,38 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
         setIsMouseDown(true);
         paintPixels(row, col, false);
       }
+    } else if (currentTool === 'polygon') {
+      // Polygon tool - add points
+      const point: PolygonPoint = { x: col, y: row };
+      if (polygonState.step === 'boundary') {
+        setPolygonState(prev => ({ ...prev, boundaryPoints: [...prev.boundaryPoints, point] }));
+      } else if (polygonState.step === 'highlights') {
+        setPolygonState(prev => ({ ...prev, currentHighlightPoints: [...prev.currentHighlightPoints, point] }));
+      }
+    } else if (currentTool === 'texture') {
+      setIsMouseDown(true);
+      applyTextureToPixel(row, col);
+    } else if (currentTool === 'depth') {
+      const point: PolygonPoint = { x: col, y: row };
+      if (depthState.step === 'lines') {
+        setDepthState(prev => ({ ...prev, currentLinePoints: [...prev.currentLinePoints, point] }));
+      } else if (depthState.step === 'lightArea') {
+        setDepthState(prev => ({ ...prev, lightAreaPoints: [...prev.lightAreaPoints, point] }));
+      } else if (depthState.step === 'lightDirection') {
+        setDepthState(prev => ({ ...prev, lightDirection: point, step: 'done' }));
+      }
+    } else if (currentTool === 'alignment') {
+      if (!isSelectingAlignment) {
+        setIsSelectingAlignment(true);
+        setAlignmentStart({ x: col, y: row });
+        setAlignmentSelection({ startX: col, startY: row, endX: col, endY: row });
+        setIsMouseDown(true);
+      } else {
+        setIsSelectingAlignment(false);
+        setAlignmentStart(null);
+      }
     } else {
-      // Shape tools
+      // Shape tools (square, circle)
       if (e.button === 0 || e.button === 2) {
         setShapeStart({ row, col });
         setShapeEnd({ row, col });
@@ -836,7 +935,16 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
       } else if (isRightMouseDown) {
         paintPixels(row, col, true);
       }
-    } else {
+    } else if (currentTool === 'texture' && isMouseDown) {
+      applyTextureToPixel(row, col);
+    } else if (currentTool === 'alignment' && isSelectingAlignment && alignmentStart) {
+      setAlignmentSelection({
+        startX: alignmentStart.x,
+        startY: alignmentStart.y,
+        endX: col,
+        endY: row,
+      });
+    } else if (currentTool === 'square' || currentTool === 'circle') {
       // Shape tools - update end point while dragging
       if (isMouseDown || isRightMouseDown) {
         setShapeEnd({ row, col });
@@ -846,30 +954,319 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
 
   const handleMouseUp = useCallback(() => {
     // If using shape tool and we have both points, draw the shape
-    if (currentTool !== 'paint' && shapeStart && shapeEnd) {
+    if ((currentTool === 'square' || currentTool === 'circle') && shapeStart && shapeEnd) {
       drawShape(isRightMouseDown);
+    }
+    if (currentTool === 'alignment' && isSelectingAlignment) {
+      setIsSelectingAlignment(false);
     }
     setIsMouseDown(false);
     setIsRightMouseDown(false);
     setShapeStart(null);
     setShapeEnd(null);
-  }, [currentTool, shapeStart, shapeEnd, isRightMouseDown, selectedColor]);
+  }, [currentTool, shapeStart, shapeEnd, isRightMouseDown, selectedColor, isSelectingAlignment]);
 
   useEffect(() => {
     window.addEventListener('mouseup', handleMouseUp);
     return () => window.removeEventListener('mouseup', handleMouseUp);
   }, [handleMouseUp]);
 
-  // ESC key to close editor
+  // Keyboard handler for all tools
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // ESC to close editor
       if (e.key === 'Escape') {
         onClose();
+        return;
+      }
+
+      // Polygon tool hotkeys
+      if (currentTool === 'polygon') {
+        if (e.key === '1') {
+          if (polygonState.step === 'boundary' && polygonState.boundaryPoints.length >= 3) {
+            setPolygonState(prev => ({ ...prev, step: 'highlights' }));
+          } else if (polygonState.step === 'highlights') {
+            if (polygonState.currentHighlightPoints.length >= 3) {
+              setPolygonState(prev => ({
+                ...prev,
+                highlights: [...prev.highlights, { points: prev.currentHighlightPoints, color: '#ffffff' }],
+                currentHighlightPoints: [],
+                step: 'colors',
+              }));
+            } else {
+              setPolygonState(prev => ({ ...prev, step: 'colors' }));
+            }
+          } else if (polygonState.step === 'colors') {
+            setPolygonState(prev => ({ ...prev, step: 'done' }));
+          }
+        } else if (e.key === '3' && polygonState.step === 'highlights') {
+          if (polygonState.currentHighlightPoints.length >= 3) {
+            setPolygonState(prev => ({
+              ...prev,
+              highlights: [...prev.highlights, { points: prev.currentHighlightPoints, color: '#ffffff' }],
+              currentHighlightPoints: [],
+            }));
+          }
+        }
+      }
+
+      // Depth tool hotkeys
+      if (currentTool === 'depth') {
+        if (e.key === 'k' || e.key === 'K') {
+          if (depthState.currentLinePoints.length >= 2) {
+            setDepthState(prev => ({
+              ...prev,
+              depthLines: [...prev.depthLines, { points: prev.currentLinePoints }],
+              currentLinePoints: [],
+            }));
+          }
+        } else if (e.key === 'l' || e.key === 'L') {
+          setDepthState(prev => ({ ...prev, step: 'lightArea' }));
+        } else if (e.key === 'p' || e.key === 'P') {
+          setDepthState(prev => ({ ...prev, step: 'lightDirection' }));
+        }
+      }
+
+      // Alignment tool hotkeys (arrow keys)
+      if (currentTool === 'alignment' && alignmentSelection) {
+        const shift = { x: 0, y: 0 };
+        if (e.key === 'ArrowUp') shift.y = -1;
+        if (e.key === 'ArrowDown') shift.y = 1;
+        if (e.key === 'ArrowLeft') shift.x = -1;
+        if (e.key === 'ArrowRight') shift.x = 1;
+
+        if (shift.x !== 0 || shift.y !== 0) {
+          e.preventDefault();
+          shiftSelectedPixels(shift.x, shift.y);
+        }
       }
     };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [onClose]);
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose, currentTool, polygonState, depthState, alignmentSelection]);
+
+  // Shift selected pixels for alignment tool
+  const shiftSelectedPixels = (dx: number, dy: number) => {
+    if (!alignmentSelection) return;
+
+    const { startX, startY, endX, endY } = alignmentSelection;
+    const minX = Math.min(startX, endX);
+    const maxX = Math.max(startX, endX);
+    const minY = Math.min(startY, endY);
+    const maxY = Math.max(startY, endY);
+
+    setPixels(prev => {
+      const newPixels = prev.map(row => [...row]);
+      const selectedRegion: string[][] = [];
+      for (let y = minY; y <= maxY; y++) {
+        const row: string[] = [];
+        for (let x = minX; x <= maxX; x++) {
+          row.push(prev[y]?.[x] || 'transparent');
+        }
+        selectedRegion.push(row);
+      }
+
+      // Clear original region
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          if (y >= 0 && y < GRID_SIZE && x >= 0 && x < GRID_SIZE) {
+            newPixels[y][x] = 'transparent';
+          }
+        }
+      }
+
+      // Place at new position
+      const newMinX = minX + dx;
+      const newMinY = minY + dy;
+      for (let y = 0; y < selectedRegion.length; y++) {
+        for (let x = 0; x < selectedRegion[y].length; x++) {
+          const destY = newMinY + y;
+          const destX = newMinX + x;
+          if (destY >= 0 && destY < GRID_SIZE && destX >= 0 && destX < GRID_SIZE) {
+            newPixels[destY][destX] = selectedRegion[y][x];
+          }
+        }
+      }
+      return newPixels;
+    });
+
+    setAlignmentSelection(prev => prev ? {
+      startX: prev.startX + dx,
+      startY: prev.startY + dy,
+      endX: prev.endX + dx,
+      endY: prev.endY + dy,
+    } : null);
+  };
+
+  // Check if a point is inside a polygon
+  const isPointInPolygon = (x: number, y: number, polygon: PolygonPoint[]): boolean => {
+    if (polygon.length < 3) return false;
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i].x, yi = polygon[i].y;
+      const xj = polygon[j].x, yj = polygon[j].y;
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  };
+
+  // Generate polygon shape
+  const generatePolygonShape = () => {
+    if (polygonState.boundaryPoints.length < 3) return;
+    const newPixels = pixels.map(row => [...row]);
+
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        if (isPointInPolygon(x, y, polygonState.boundaryPoints)) {
+          newPixels[y][x] = polygonState.baseColor;
+        }
+      }
+    }
+
+    polygonState.highlights.forEach(highlight => {
+      for (let y = 0; y < GRID_SIZE; y++) {
+        for (let x = 0; x < GRID_SIZE; x++) {
+          if (isPointInPolygon(x, y, highlight.points)) {
+            newPixels[y][x] = highlight.color;
+          }
+        }
+      }
+    });
+
+    setPixels(newPixels);
+    setPolygonState({
+      step: 'boundary',
+      boundaryPoints: [],
+      highlights: [],
+      currentHighlightPoints: [],
+      baseColor: polygonState.baseColor,
+    });
+  };
+
+  // Apply texture to a pixel
+  const applyTextureToPixel = (row: number, col: number) => {
+    const currentColor = pixels[row][col];
+    if (currentColor === 'transparent') return;
+
+    const r = parseInt(currentColor.slice(1, 3), 16);
+    const g = parseInt(currentColor.slice(3, 5), 16);
+    const b = parseInt(currentColor.slice(5, 7), 16);
+
+    let newR = r, newG = g, newB = b;
+    const variation = Math.floor(textureIntensity * 50);
+
+    switch (texturePattern) {
+      case 'noise':
+        newR = Math.max(0, Math.min(255, r + Math.floor(Math.random() * variation * 2) - variation));
+        newG = Math.max(0, Math.min(255, g + Math.floor(Math.random() * variation * 2) - variation));
+        newB = Math.max(0, Math.min(255, b + Math.floor(Math.random() * variation * 2) - variation));
+        break;
+      case 'dither':
+        if ((row + col) % 2 === 0) {
+          newR = Math.max(0, r - variation);
+          newG = Math.max(0, g - variation);
+          newB = Math.max(0, b - variation);
+        } else {
+          newR = Math.min(255, r + variation);
+          newG = Math.min(255, g + variation);
+          newB = Math.min(255, b + variation);
+        }
+        break;
+      case 'grain':
+        const grain = (Math.random() - 0.5) * variation * 2;
+        newR = Math.max(0, Math.min(255, r + grain));
+        newG = Math.max(0, Math.min(255, g + grain));
+        newB = Math.max(0, Math.min(255, b + grain));
+        break;
+      case 'crosshatch':
+        if ((row + col) % 3 === 0 || (row - col + GRID_SIZE) % 3 === 0) {
+          newR = Math.max(0, r - variation);
+          newG = Math.max(0, g - variation);
+          newB = Math.max(0, b - variation);
+        }
+        break;
+    }
+
+    const newColor = `#${Math.round(newR).toString(16).padStart(2, '0')}${Math.round(newG).toString(16).padStart(2, '0')}${Math.round(newB).toString(16).padStart(2, '0')}`;
+    setPixels(prev => {
+      const newPixels = prev.map(r => [...r]);
+      newPixels[row][col] = newColor;
+      return newPixels;
+    });
+  };
+
+  // Generate depth shadows
+  const generateDepthShadows = () => {
+    if (depthState.depthLines.length === 0 || !depthState.lightDirection) return;
+    const newPixels = pixels.map(row => [...row]);
+
+    const lightAngle = Math.atan2(
+      depthState.lightDirection.y - GRID_SIZE / 2,
+      depthState.lightDirection.x - GRID_SIZE / 2
+    );
+
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const currentColor = newPixels[y][x];
+        if (currentColor === 'transparent') continue;
+
+        const inLightArea = depthState.lightAreaPoints.length >= 3
+          ? isPointInPolygon(x, y, depthState.lightAreaPoints)
+          : true;
+
+        let shadowLevel = 0;
+        depthState.depthLines.forEach(line => {
+          if (line.points.length >= 2) {
+            for (let i = 0; i < line.points.length - 1; i++) {
+              const p1 = line.points[i];
+              const p2 = line.points[i + 1];
+              const lineDx = p2.x - p1.x;
+              const lineDy = p2.y - p1.y;
+              const pointDx = x - p1.x;
+              const pointDy = y - p1.y;
+              const cross = lineDx * pointDy - lineDy * pointDx;
+              const lightDx = Math.cos(lightAngle);
+              const lightDy = Math.sin(lightAngle);
+              const lightCross = lineDx * lightDy - lineDy * lightDx;
+
+              if ((cross > 0) !== (lightCross > 0)) {
+                const dist = Math.abs(cross) / Math.sqrt(lineDx * lineDx + lineDy * lineDy);
+                if (dist < 3) {
+                  shadowLevel = Math.max(shadowLevel, 1 - dist / 3);
+                }
+              }
+            }
+          }
+        });
+
+        if (shadowLevel > 0 && !inLightArea) {
+          const r = parseInt(currentColor.slice(1, 3), 16);
+          const g = parseInt(currentColor.slice(3, 5), 16);
+          const b = parseInt(currentColor.slice(5, 7), 16);
+          const darken = Math.floor(shadowLevel * 60);
+          newPixels[y][x] = `#${Math.max(0, r - darken).toString(16).padStart(2, '0')}${Math.max(0, g - darken).toString(16).padStart(2, '0')}${Math.max(0, b - darken).toString(16).padStart(2, '0')}`;
+        } else if (inLightArea && depthState.lightAreaPoints.length >= 3) {
+          const r = parseInt(currentColor.slice(1, 3), 16);
+          const g = parseInt(currentColor.slice(3, 5), 16);
+          const b = parseInt(currentColor.slice(5, 7), 16);
+          const lighten = 15;
+          newPixels[y][x] = `#${Math.min(255, r + lighten).toString(16).padStart(2, '0')}${Math.min(255, g + lighten).toString(16).padStart(2, '0')}${Math.min(255, b + lighten).toString(16).padStart(2, '0')}`;
+        }
+      }
+    }
+
+    setPixels(newPixels);
+    setDepthState({
+      step: 'lines',
+      depthLines: [],
+      currentLinePoints: [],
+      lightAreaPoints: [],
+      lightDirection: null,
+    });
+  };
 
   // Clear canvas
   const handleClear = () => {
@@ -1282,13 +1679,201 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
               >
                 Ellipse
               </button>
+              <button
+                onClick={() => setCurrentTool('polygon')}
+                style={{
+                  padding: '8px 14px',
+                  background: currentTool === 'polygon' ? '#22c55e' : '#E8DDD1',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  color: currentTool === 'polygon' ? 'white' : '#333',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                }}
+              >
+                Polygon
+              </button>
+              <button
+                onClick={() => setCurrentTool('texture')}
+                style={{
+                  padding: '8px 14px',
+                  background: currentTool === 'texture' ? '#f59e0b' : '#E8DDD1',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  color: currentTool === 'texture' ? 'white' : '#333',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                }}
+              >
+                Texture
+              </button>
+              <button
+                onClick={() => setCurrentTool('depth')}
+                style={{
+                  padding: '8px 14px',
+                  background: currentTool === 'depth' ? '#8b5cf6' : '#E8DDD1',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  color: currentTool === 'depth' ? 'white' : '#333',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                }}
+              >
+                Depth
+              </button>
+              <button
+                onClick={() => setCurrentTool('alignment')}
+                style={{
+                  padding: '8px 14px',
+                  background: currentTool === 'alignment' ? '#ec4899' : '#E8DDD1',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  color: currentTool === 'alignment' ? 'white' : '#333',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                }}
+              >
+                Align
+              </button>
             </div>
 
             <p style={{ fontSize: '11px', color: '#666', marginBottom: '12px' }}>
-              {currentTool === 'paint'
-                ? 'Left-click paint, right-click erase'
-                : 'Drag to draw, right-click erases'}
+              {currentTool === 'paint' && 'Left-click paint, right-click erase'}
+              {currentTool === 'square' && 'Drag to draw, right-click erases'}
+              {currentTool === 'circle' && 'Drag to draw, right-click erases'}
+              {currentTool === 'polygon' && `Step: ${polygonState.step}. Press 1 to confirm, 3 for new highlight`}
+              {currentTool === 'texture' && 'Click and drag to apply texture'}
+              {currentTool === 'depth' && `K=confirm line, L=light area, P=light direction`}
+              {currentTool === 'alignment' && 'Click to select, arrow keys to shift'}
             </p>
+
+            {/* Polygon Tool Panel */}
+            {currentTool === 'polygon' && (
+              <div style={{ marginBottom: '12px', padding: '10px', background: '#e8f5e9', borderRadius: '4px' }}>
+                <div style={{ fontSize: '12px', marginBottom: '8px' }}>
+                  Points: {polygonState.boundaryPoints.length} | Highlights: {polygonState.highlights.length}
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '12px' }}>Base:</span>
+                  <input
+                    type="color"
+                    value={polygonState.baseColor}
+                    onChange={(e) => setPolygonState(prev => ({ ...prev, baseColor: e.target.value }))}
+                    style={{ width: '40px', height: '25px', cursor: 'pointer' }}
+                  />
+                </div>
+                <button
+                  onClick={generatePolygonShape}
+                  disabled={polygonState.boundaryPoints.length < 3}
+                  style={{
+                    padding: '6px 12px',
+                    background: polygonState.boundaryPoints.length >= 3 ? '#22c55e' : '#ccc',
+                    border: 'none',
+                    borderRadius: '4px',
+                    color: 'white',
+                    cursor: polygonState.boundaryPoints.length >= 3 ? 'pointer' : 'not-allowed',
+                    fontSize: '12px',
+                    marginRight: '8px',
+                  }}
+                >
+                  Generate Shape
+                </button>
+                <button
+                  onClick={() => setPolygonState({ step: 'boundary', boundaryPoints: [], highlights: [], currentHighlightPoints: [], baseColor: polygonState.baseColor })}
+                  style={{ padding: '6px 12px', background: '#666', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '12px' }}
+                >
+                  Reset
+                </button>
+              </div>
+            )}
+
+            {/* Texture Tool Panel */}
+            {currentTool === 'texture' && (
+              <div style={{ marginBottom: '12px', padding: '10px', background: '#fff8e1', borderRadius: '4px' }}>
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                  {(['noise', 'dither', 'grain', 'crosshatch'] as TexturePattern[]).map(p => (
+                    <button
+                      key={p}
+                      onClick={() => setTexturePattern(p)}
+                      style={{
+                        padding: '4px 8px',
+                        background: texturePattern === p ? '#f59e0b' : '#E8DDD1',
+                        border: 'none',
+                        borderRadius: '4px',
+                        color: texturePattern === p ? 'white' : '#333',
+                        cursor: 'pointer',
+                        fontSize: '11px',
+                        textTransform: 'capitalize',
+                      }}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ fontSize: '12px' }}>
+                  Intensity: {Math.round(textureIntensity * 100)}%
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="1"
+                    step="0.1"
+                    value={textureIntensity}
+                    onChange={(e) => setTextureIntensity(Number(e.target.value))}
+                    style={{ width: '100%', marginTop: '4px' }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Depth Tool Panel */}
+            {currentTool === 'depth' && (
+              <div style={{ marginBottom: '12px', padding: '10px', background: '#ede7f6', borderRadius: '4px' }}>
+                <div style={{ fontSize: '12px', marginBottom: '8px' }}>
+                  Lines: {depthState.depthLines.length} | Light: {depthState.lightDirection ? 'Set' : 'Not set'}
+                </div>
+                <button
+                  onClick={generateDepthShadows}
+                  disabled={depthState.depthLines.length === 0 || !depthState.lightDirection}
+                  style={{
+                    padding: '6px 12px',
+                    background: depthState.depthLines.length > 0 && depthState.lightDirection ? '#8b5cf6' : '#ccc',
+                    border: 'none',
+                    borderRadius: '4px',
+                    color: 'white',
+                    cursor: depthState.depthLines.length > 0 && depthState.lightDirection ? 'pointer' : 'not-allowed',
+                    fontSize: '12px',
+                    marginRight: '8px',
+                  }}
+                >
+                  Generate Shadows
+                </button>
+                <button
+                  onClick={() => setDepthState({ step: 'lines', depthLines: [], currentLinePoints: [], lightAreaPoints: [], lightDirection: null })}
+                  style={{ padding: '6px 12px', background: '#666', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '12px' }}
+                >
+                  Reset
+                </button>
+              </div>
+            )}
+
+            {/* Alignment Tool Panel */}
+            {currentTool === 'alignment' && (
+              <div style={{ marginBottom: '12px', padding: '10px', background: '#fce4ec', borderRadius: '4px' }}>
+                <div style={{ fontSize: '12px', marginBottom: '8px' }}>
+                  {alignmentSelection ? 'Selection active - use arrow keys!' : 'Click and drag to select'}
+                </div>
+                <button
+                  onClick={() => { setAlignmentSelection(null); setIsSelectingAlignment(false); setAlignmentStart(null); }}
+                  style={{ padding: '6px 12px', background: '#666', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '12px' }}
+                >
+                  Clear Selection
+                </button>
+              </div>
+            )}
 
             {/* Brush Size */}
             <div style={{ marginBottom: '12px' }}>
