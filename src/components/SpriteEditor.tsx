@@ -1778,16 +1778,16 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                             strokeDasharray={polygonState.isClosed ? 'none' : '6,3'}
                           />
                         )}
-                        {/* Boundary points (no numbers, smaller) */}
+                        {/* Boundary points (larger, more visible) */}
                         {polygonState.boundaryPoints.map((p, i) => (
                           <circle
                             key={`bp-${i}`}
                             cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
                             cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                            r={i === 0 ? 7 : 5}
+                            r={i === 0 ? 10 : 8}
                             fill={i === 0 ? '#16a34a' : '#22c55e'}
                             stroke="white"
-                            strokeWidth="2"
+                            strokeWidth="3"
                           />
                         ))}
 
@@ -1826,10 +1826,10 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                                 points={polygonState.currentHighlightPoints.map(p =>
                                   `${p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2},${p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}`
                                 ).join(' ')}
-                                fill="rgba(251, 191, 36, 0.25)"
-                                stroke="#fbbf24"
-                                strokeWidth="2"
-                                strokeDasharray="4,3"
+                                fill="rgba(255, 100, 100, 0.3)"
+                                stroke="#ff4444"
+                                strokeWidth="3"
+                                strokeDasharray="6,3"
                               />
                             )}
                             {polygonState.currentHighlightPoints.map((p, i) => (
@@ -1837,10 +1837,10 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                                 key={`chp-${i}`}
                                 cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
                                 cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                                r={5}
-                                fill="#fbbf24"
+                                r={8}
+                                fill="#ff4444"
                                 stroke="white"
-                                strokeWidth="2"
+                                strokeWidth="3"
                               />
                             ))}
                           </>
