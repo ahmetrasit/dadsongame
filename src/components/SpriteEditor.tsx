@@ -1688,6 +1688,247 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                         );
                       })
                     )}
+
+                    {/* Polygon Tool Visual Overlay */}
+                    {currentTool === 'polygon' && (
+                      <svg
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: scaledCanvasSize,
+                          height: scaledCanvasSize,
+                          pointerEvents: 'none',
+                          overflow: 'visible',
+                        }}
+                      >
+                        {/* Boundary polygon lines */}
+                        {polygonState.boundaryPoints.length >= 2 && (
+                          <polygon
+                            points={polygonState.boundaryPoints.map(p =>
+                              `${p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2},${p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}`
+                            ).join(' ')}
+                            fill="rgba(34, 197, 94, 0.2)"
+                            stroke="#22c55e"
+                            strokeWidth="3"
+                            strokeDasharray="8,4"
+                          />
+                        )}
+                        {/* Boundary points */}
+                        {polygonState.boundaryPoints.map((p, i) => (
+                          <g key={`bp-${i}`}>
+                            <circle
+                              cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                              cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                              r={8}
+                              fill="#22c55e"
+                              stroke="white"
+                              strokeWidth="2"
+                            />
+                            <text
+                              x={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                              y={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2 + 4}
+                              textAnchor="middle"
+                              fill="white"
+                              fontSize="10"
+                              fontWeight="bold"
+                            >
+                              {i + 1}
+                            </text>
+                          </g>
+                        ))}
+
+                        {/* Completed highlights */}
+                        {polygonState.highlights.map((highlight, hi) => (
+                          <g key={`h-${hi}`}>
+                            {highlight.points.length >= 2 && (
+                              <polygon
+                                points={highlight.points.map(p =>
+                                  `${p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2},${p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}`
+                                ).join(' ')}
+                                fill={`${highlight.color}66`}
+                                stroke={highlight.color}
+                                strokeWidth="2"
+                              />
+                            )}
+                            {highlight.points.map((p, i) => (
+                              <circle
+                                key={`hp-${hi}-${i}`}
+                                cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                                cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                                r={5}
+                                fill={highlight.color}
+                                stroke="white"
+                                strokeWidth="1"
+                              />
+                            ))}
+                          </g>
+                        ))}
+
+                        {/* Current highlight being drawn */}
+                        {polygonState.currentHighlightPoints.length >= 1 && (
+                          <>
+                            {polygonState.currentHighlightPoints.length >= 2 && (
+                              <polygon
+                                points={polygonState.currentHighlightPoints.map(p =>
+                                  `${p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2},${p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}`
+                                ).join(' ')}
+                                fill="rgba(251, 191, 36, 0.3)"
+                                stroke="#fbbf24"
+                                strokeWidth="2"
+                                strokeDasharray="4,4"
+                              />
+                            )}
+                            {polygonState.currentHighlightPoints.map((p, i) => (
+                              <circle
+                                key={`chp-${i}`}
+                                cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                                cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                                r={6}
+                                fill="#fbbf24"
+                                stroke="white"
+                                strokeWidth="2"
+                              />
+                            ))}
+                          </>
+                        )}
+                      </svg>
+                    )}
+
+                    {/* Depth Tool Visual Overlay */}
+                    {currentTool === 'depth' && (
+                      <svg
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: scaledCanvasSize,
+                          height: scaledCanvasSize,
+                          pointerEvents: 'none',
+                          overflow: 'visible',
+                        }}
+                      >
+                        {/* Completed depth lines */}
+                        {depthState.depthLines.map((line, li) => (
+                          <g key={`dl-${li}`}>
+                            {line.points.length >= 2 && (
+                              <polyline
+                                points={line.points.map(p =>
+                                  `${p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2},${p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}`
+                                ).join(' ')}
+                                fill="none"
+                                stroke="#8b5cf6"
+                                strokeWidth="3"
+                              />
+                            )}
+                            {line.points.map((p, i) => (
+                              <circle
+                                key={`dlp-${li}-${i}`}
+                                cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                                cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                                r={5}
+                                fill="#8b5cf6"
+                                stroke="white"
+                                strokeWidth="1"
+                              />
+                            ))}
+                          </g>
+                        ))}
+
+                        {/* Current depth line being drawn */}
+                        {depthState.currentLinePoints.length >= 1 && (
+                          <>
+                            {depthState.currentLinePoints.length >= 2 && (
+                              <polyline
+                                points={depthState.currentLinePoints.map(p =>
+                                  `${p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2},${p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}`
+                                ).join(' ')}
+                                fill="none"
+                                stroke="#a78bfa"
+                                strokeWidth="3"
+                                strokeDasharray="6,4"
+                              />
+                            )}
+                            {depthState.currentLinePoints.map((p, i) => (
+                              <circle
+                                key={`clp-${i}`}
+                                cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                                cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                                r={6}
+                                fill="#a78bfa"
+                                stroke="white"
+                                strokeWidth="2"
+                              />
+                            ))}
+                          </>
+                        )}
+
+                        {/* Light area */}
+                        {depthState.lightAreaPoints.length >= 2 && (
+                          <polygon
+                            points={depthState.lightAreaPoints.map(p =>
+                              `${p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2},${p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}`
+                            ).join(' ')}
+                            fill="rgba(251, 191, 36, 0.2)"
+                            stroke="#fbbf24"
+                            strokeWidth="2"
+                            strokeDasharray="6,3"
+                          />
+                        )}
+                        {depthState.lightAreaPoints.map((p, i) => (
+                          <circle
+                            key={`lap-${i}`}
+                            cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                            cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                            r={5}
+                            fill="#fbbf24"
+                            stroke="white"
+                            strokeWidth="1"
+                          />
+                        ))}
+
+                        {/* Light direction indicator */}
+                        {depthState.lightDirection && (
+                          <>
+                            <circle
+                              cx={depthState.lightDirection.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                              cy={depthState.lightDirection.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                              r={12}
+                              fill="#fde68a"
+                              stroke="#f59e0b"
+                              strokeWidth="3"
+                            />
+                            <text
+                              x={depthState.lightDirection.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                              y={depthState.lightDirection.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2 + 4}
+                              textAnchor="middle"
+                              fill="#92400e"
+                              fontSize="12"
+                              fontWeight="bold"
+                            >
+                              ☀
+                            </text>
+                          </>
+                        )}
+                      </svg>
+                    )}
+
+                    {/* Alignment Selection Overlay */}
+                    {currentTool === 'alignment' && alignmentSelection && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: Math.min(alignmentSelection.startX, alignmentSelection.endX) * PIXEL_SIZE * zoom,
+                          top: Math.min(alignmentSelection.startY, alignmentSelection.endY) * PIXEL_SIZE * zoom,
+                          width: (Math.abs(alignmentSelection.endX - alignmentSelection.startX) + 1) * PIXEL_SIZE * zoom,
+                          height: (Math.abs(alignmentSelection.endY - alignmentSelection.startY) + 1) * PIXEL_SIZE * zoom,
+                          border: '3px dashed #ec4899',
+                          background: 'rgba(236, 72, 153, 0.2)',
+                          pointerEvents: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
               </div>
