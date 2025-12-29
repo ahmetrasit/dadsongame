@@ -1,0 +1,30 @@
+{
+  "rules": {
+    "rooms": {
+      "$roomId": {
+        "players": {
+          "$playerId": {
+            ".read": true,
+            ".write": "auth != null && auth.uid == $playerId"
+          }
+        },
+        "state": {
+          "$playerId": {
+            ".read": true,
+            ".write": "auth != null && auth.uid == $playerId"
+          }
+        },
+        "events": {
+          ".read": true,
+          ".write": "auth != null",
+          "$eventId": {
+            ".validate": "newData.hasChildren(['type', 'timestamp'])"
+          }
+        }
+      }
+    },
+    ".info": {
+      ".read": true
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useDefinitionsStore, Season, SoilType, DeadYield, AliveYield, PlantSubCategory } from '@/stores/definitionsStore';
+import { useGameStateStore } from '@/stores/gameStateStore';
 import { Card, FieldRow, CompactInput, CompactSelect, TwoColumnRow, SliderField, CheckboxGroup } from './FormComponents';
 import { FaTrashAlt } from 'react-icons/fa';
 import { generatePlantPreview } from '@/utils/generatePreviewImage';
@@ -13,6 +14,7 @@ interface PlantFormProps {
 
 export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
   const { updatePlant, updateDraftPlant, deletePlant, plants, resources } = useDefinitionsStore();
+  const { openSpriteEditor } = useGameStateStore();
   const [draftDeadYield, setDraftDeadYield] = useState<DeadYield | null>(null);
 
   const handleChange = (field: string, value: any) => {
@@ -101,9 +103,9 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
           </div>
         )}
         <FieldRow>
-          {/* Image preview and upload */}
+          {/* Image preview - opens Sprite Editor */}
           <div
-            onClick={() => document.getElementById(`plant-image-upload-${item.id}`)?.click()}
+            onClick={() => openSpriteEditor('plant', item.id)}
             style={{
               width: '60px',
               height: '60px',
@@ -119,25 +121,9 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
               backgroundPosition: 'center',
               flexShrink: 0,
             }}
-            title={item.imageUrl ? "Click to change image" : "Click to upload custom image (default preview shown)"}
+            title="Click to open Sprite Editor"
           >
           </div>
-          <input
-            id={`plant-image-upload-${item.id}`}
-            type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                const reader = new FileReader();
-                reader.onload = () => {
-                  handleChange('imageUrl', reader.result as string);
-                };
-                reader.readAsDataURL(file);
-              }
-            }}
-          />
           <input
             type="text"
             value={item.name}

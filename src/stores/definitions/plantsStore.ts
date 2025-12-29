@@ -59,11 +59,25 @@ export interface PlantSlice {
   deletePlant: (id: string) => void;
 }
 
+// Initialize counter from existing plants to prevent ID collisions
 let plantIdCounter = 0;
-const genPlantId = () => `plant-${++plantIdCounter}`;
+const genPlantId = (existingPlants: PlantDefinition[] = []) => {
+  // Find the highest numeric ID from existing plants
+  const maxId = existingPlants.reduce((max, plant) => {
+    const match = plant.id.match(/^plant-(\d+)$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      return num > max ? num : max;
+    }
+    return max;
+  }, plantIdCounter);
 
-export const defaultPlant = (): PlantDefinition => ({
-  id: genPlantId(),
+  plantIdCounter = maxId + 1;
+  return `plant-${plantIdCounter}`;
+};
+
+export const defaultPlant = (existingPlants: PlantDefinition[] = []): PlantDefinition => ({
+  id: genPlantId(existingPlants),
   name: 'New Plant',
   subCategory: 'crop',
   growthTime: 7,
@@ -127,7 +141,8 @@ export const createPlantSlice: StateCreator<
   draftPlant: null,
 
   addPlant: () => {
-    set({ draftPlant: defaultPlant(), selectedId: null });
+    const plants = get().plants;
+    set({ draftPlant: defaultPlant(plants), selectedId: null });
   },
 
   savePlant: () => {

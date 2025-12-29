@@ -46,11 +46,25 @@ export interface AnimalSlice {
   deleteAnimal: (id: string) => void;
 }
 
+// Initialize counter from existing animals to prevent ID collisions
 let animalIdCounter = 0;
-const genAnimalId = () => `animal-${++animalIdCounter}`;
+const genAnimalId = (existingAnimals: AnimalDefinition[] = []) => {
+  // Find the highest numeric ID from existing animals
+  const maxId = existingAnimals.reduce((max, animal) => {
+    const match = animal.id.match(/^animal-(\d+)$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      return num > max ? num : max;
+    }
+    return max;
+  }, animalIdCounter);
 
-export const defaultAnimal = (): AnimalDefinition => ({
-  id: genAnimalId(),
+  animalIdCounter = maxId + 1;
+  return `animal-${animalIdCounter}`;
+};
+
+export const defaultAnimal = (existingAnimals: AnimalDefinition[] = []): AnimalDefinition => ({
+  id: genAnimalId(existingAnimals),
   name: 'New Animal',
   subCategory: 'wild',
   baseSpeed: 50,
@@ -117,7 +131,8 @@ export const createAnimalSlice: StateCreator<
   draftAnimal: null,
 
   addAnimal: () => {
-    set({ draftAnimal: defaultAnimal(), selectedId: null });
+    const animals = get().animals;
+    set({ draftAnimal: defaultAnimal(animals), selectedId: null });
   },
 
   saveAnimal: () => {

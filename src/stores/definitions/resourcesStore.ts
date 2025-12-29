@@ -30,11 +30,25 @@ export interface ResourceSlice {
   deleteResource: (id: string) => void;
 }
 
+// Initialize counter from existing resources to prevent ID collisions
 let resourceIdCounter = 0;
-const genResourceId = () => `resource-${++resourceIdCounter}`;
+const genResourceId = (existingResources: ResourceDefinition[] = []) => {
+  // Find the highest numeric ID from existing resources
+  const maxId = existingResources.reduce((max, resource) => {
+    const match = resource.id.match(/^resource-(\d+)$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      return num > max ? num : max;
+    }
+    return max;
+  }, resourceIdCounter);
 
-export const defaultResource = (): ResourceDefinition => ({
-  id: genResourceId(),
+  resourceIdCounter = maxId + 1;
+  return `resource-${resourceIdCounter}`;
+};
+
+export const defaultResource = (existingResources: ResourceDefinition[] = []): ResourceDefinition => ({
+  id: genResourceId(existingResources),
   name: 'New Resource',
   category: 'organics',
   spoilageRate: 'never',
@@ -61,7 +75,8 @@ export const createResourceSlice: StateCreator<
   draftResource: null,
 
   addResource: () => {
-    set({ draftResource: defaultResource(), selectedId: null });
+    const resources = get().resources;
+    set({ draftResource: defaultResource(resources), selectedId: null });
   },
 
   saveResource: () => {
