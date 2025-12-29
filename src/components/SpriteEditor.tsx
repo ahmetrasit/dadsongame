@@ -52,15 +52,13 @@ interface PolygonState {
 
 interface DepthState {
   step: DepthStep;
-  isClosed: boolean;
-  areaPoints: PolygonPoint[];
+  selection: AlignmentSelection | null;
   lightDirection: PolygonPoint | null;
 }
 
 interface TextureState {
   step: TextureStep;
-  isClosed: boolean;
-  areaPoints: PolygonPoint[];
+  selection: AlignmentSelection | null;
 }
 
 interface AlignmentSelection {
@@ -605,22 +603,24 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     baseColor: '#4a90d9',
   });
 
-  // Texture tool state - simplified
+  // Texture tool state - rectangle selection
   const [texturePattern, setTexturePattern] = useState<TexturePattern>('noise');
   const [textureIntensity, setTextureIntensity] = useState(0.3);
   const [textureState, setTextureState] = useState<TextureState>({
     step: 'drawing',
-    isClosed: false,
-    areaPoints: [],
+    selection: null,
   });
+  const [textureStart, setTextureStart] = useState<PolygonPoint | null>(null);
+  const [isSelectingTexture, setIsSelectingTexture] = useState(false);
 
-  // Depth tool state - simplified
+  // Depth tool state - rectangle selection
   const [depthState, setDepthState] = useState<DepthState>({
     step: 'drawing',
-    isClosed: false,
-    areaPoints: [],
+    selection: null,
     lightDirection: null,
   });
+  const [depthStart, setDepthStart] = useState<PolygonPoint | null>(null);
+  const [isSelectingDepth, setIsSelectingDepth] = useState(false);
 
   // Alignment tool state
   const [alignmentSelection, setAlignmentSelection] = useState<AlignmentSelection | null>(null);
@@ -817,21 +817,23 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
         }
       }
     } else if (currentTool === 'texture') {
-      const point: PolygonPoint = { x: col, y: row };
-
       if (textureState.step === 'drawing') {
-        // Just add points, use Next button to close
-        setTextureState(prev => ({ ...prev, areaPoints: [...prev.areaPoints, point] }));
+        // Rectangle selection like alignment tool
+        setIsSelectingTexture(true);
+        setTextureStart({ x: col, y: row });
+        setTextureState(prev => ({ ...prev, selection: { startX: col, startY: row, endX: col, endY: row } }));
+        setIsMouseDown(true);
       }
     } else if (currentTool === 'depth') {
-      const point: PolygonPoint = { x: col, y: row };
-
       if (depthState.step === 'drawing') {
-        // Just add points, use Next button to close
-        setDepthState(prev => ({ ...prev, areaPoints: [...prev.areaPoints, point] }));
+        // Rectangle selection like alignment tool
+        setIsSelectingDepth(true);
+        setDepthStart({ x: col, y: row });
+        setDepthState(prev => ({ ...prev, selection: { startX: col, startY: row, endX: col, endY: row } }));
+        setIsMouseDown(true);
       } else if (depthState.step === 'light') {
         // Set light direction
-        setDepthState(prev => ({ ...prev, lightDirection: point }));
+        setDepthState(prev => ({ ...prev, lightDirection: { x: col, y: row } }));
       }
     } else if (currentTool === 'alignment') {
       if (!isSelectingAlignment) {
@@ -854,8 +856,16 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
       } else if (isRightMouseDown) {
         paintPixels(row, col, true);
       }
-    } else if (currentTool === 'texture' && isMouseDown) {
-      applyTextureToPixel(row, col);
+    } else if (currentTool === 'texture' && isSelectingTexture && textureStart) {
+      setTextureState(prev => ({
+        ...prev,
+        selection: { startX: textureStart.x, startY: textureStart.y, endX: col, endY: row }
+      }));
+    } else if (currentTool === 'depth' && isSelectingDepth && depthStart) {
+      setDepthState(prev => ({
+        ...prev,
+        selection: { startX: depthStart.x, startY: depthStart.y, endX: col, endY: row }
+      }));
     } else if (currentTool === 'alignment' && isSelectingAlignment && alignmentStart) {
       setAlignmentSelection({
         startX: alignmentStart.x,
@@ -867,12 +877,26 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
   };
 
   const handleMouseUp = useCallback(() => {
+    if (currentTool === 'texture' && isSelectingTexture) {
+      setIsSelectingTexture(false);
+      // Move to apply step if we have a selection
+      if (textureState.selection) {
+        setTextureState(prev => ({ ...prev, step: 'apply' }));
+      }
+    }
+    if (currentTool === 'depth' && isSelectingDepth) {
+      setIsSelectingDepth(false);
+      // Move to light step if we have a selection
+      if (depthState.selection) {
+        setDepthState(prev => ({ ...prev, step: 'light' }));
+      }
+    }
     if (currentTool === 'alignment' && isSelectingAlignment) {
       setIsSelectingAlignment(false);
     }
     setIsMouseDown(false);
     setIsRightMouseDown(false);
-  }, [currentTool, isSelectingAlignment]);
+  }, [currentTool, isSelectingAlignment, isSelectingTexture, isSelectingDepth, textureState.selection, depthState.selection]);
 
   useEffect(() => {
     window.addEventListener('mouseup', handleMouseUp);
@@ -1036,78 +1060,31 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     }
   };
 
-  // Apply texture to a pixel
-  const applyTextureToPixel = (row: number, col: number) => {
-    const currentColor = pixels[row][col];
-    if (currentColor === 'transparent') return;
-
-    const r = parseInt(currentColor.slice(1, 3), 16);
-    const g = parseInt(currentColor.slice(3, 5), 16);
-    const b = parseInt(currentColor.slice(5, 7), 16);
-
-    let newR = r, newG = g, newB = b;
-    const variation = Math.floor(textureIntensity * 50);
-
-    switch (texturePattern) {
-      case 'noise':
-        newR = Math.max(0, Math.min(255, r + Math.floor(Math.random() * variation * 2) - variation));
-        newG = Math.max(0, Math.min(255, g + Math.floor(Math.random() * variation * 2) - variation));
-        newB = Math.max(0, Math.min(255, b + Math.floor(Math.random() * variation * 2) - variation));
-        break;
-      case 'dither':
-        if ((row + col) % 2 === 0) {
-          newR = Math.max(0, r - variation);
-          newG = Math.max(0, g - variation);
-          newB = Math.max(0, b - variation);
-        } else {
-          newR = Math.min(255, r + variation);
-          newG = Math.min(255, g + variation);
-          newB = Math.min(255, b + variation);
-        }
-        break;
-      case 'grain':
-        const grain = (Math.random() - 0.5) * variation * 2;
-        newR = Math.max(0, Math.min(255, r + grain));
-        newG = Math.max(0, Math.min(255, g + grain));
-        newB = Math.max(0, Math.min(255, b + grain));
-        break;
-      case 'crosshatch':
-        if ((row + col) % 3 === 0 || (row - col + GRID_SIZE) % 3 === 0) {
-          newR = Math.max(0, r - variation);
-          newG = Math.max(0, g - variation);
-          newB = Math.max(0, b - variation);
-        }
-        break;
-    }
-
-    const newColor = `#${Math.round(newR).toString(16).padStart(2, '0')}${Math.round(newG).toString(16).padStart(2, '0')}${Math.round(newB).toString(16).padStart(2, '0')}`;
-    setPixels(prev => {
-      const newPixels = prev.map(r => [...r]);
-      newPixels[row][col] = newColor;
-      return newPixels;
-    });
-  };
-
-  // Generate depth shadows - simplified: lighten inside area, darken outside based on light direction
+  // Generate depth shadows - rectangle selection based
   const generateDepthShadows = () => {
-    if (depthState.areaPoints.length < 3 || !depthState.lightDirection) return;
+    if (!depthState.selection || !depthState.lightDirection) return;
+    const { startX, startY, endX, endY } = depthState.selection;
+    const minX = Math.min(startX, endX);
+    const maxX = Math.max(startX, endX);
+    const minY = Math.min(startY, endY);
+    const maxY = Math.max(startY, endY);
+
     const newPixels = pixels.map(row => [...row]);
 
-    const centerX = depthState.areaPoints.reduce((sum, p) => sum + p.x, 0) / depthState.areaPoints.length;
-    const centerY = depthState.areaPoints.reduce((sum, p) => sum + p.y, 0) / depthState.areaPoints.length;
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
 
     const lightAngle = Math.atan2(
       depthState.lightDirection.y - centerY,
       depthState.lightDirection.x - centerX
     );
 
-    for (let y = 0; y < GRID_SIZE; y++) {
-      for (let x = 0; x < GRID_SIZE; x++) {
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        if (y < 0 || y >= GRID_SIZE || x < 0 || x >= GRID_SIZE) continue;
+
         const currentColor = newPixels[y][x];
         if (currentColor === 'transparent') continue;
-
-        const inArea = isPointInPolygon(x, y, depthState.areaPoints);
-        if (!inArea) continue;
 
         // Calculate angle from center to this pixel
         const pixelAngle = Math.atan2(y - centerY, x - centerX);
@@ -1129,22 +1106,24 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     }
 
     setPixels(newPixels);
-    setDepthState({
-      step: 'drawing',
-      isClosed: false,
-      areaPoints: [],
-      lightDirection: null,
-    });
+    setDepthState({ step: 'drawing', selection: null, lightDirection: null });
+    setDepthStart(null);
   };
 
-  // Apply texture to selected area
+  // Apply texture to selected rectangle area
   const applyTextureToArea = () => {
-    if (textureState.areaPoints.length < 3) return;
+    if (!textureState.selection) return;
+    const { startX, startY, endX, endY } = textureState.selection;
+    const minX = Math.min(startX, endX);
+    const maxX = Math.max(startX, endX);
+    const minY = Math.min(startY, endY);
+    const maxY = Math.max(startY, endY);
+
     const newPixels = pixels.map(row => [...row]);
 
-    for (let y = 0; y < GRID_SIZE; y++) {
-      for (let x = 0; x < GRID_SIZE; x++) {
-        if (!isPointInPolygon(x, y, textureState.areaPoints)) continue;
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        if (y < 0 || y >= GRID_SIZE || x < 0 || x >= GRID_SIZE) continue;
 
         const currentColor = newPixels[y][x];
         if (currentColor === 'transparent') continue;
@@ -1193,11 +1172,8 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     }
 
     setPixels(newPixels);
-    setTextureState({
-      step: 'drawing',
-      isClosed: false,
-      areaPoints: [],
-    });
+    setTextureState({ step: 'drawing', selection: null });
+    setTextureStart(null);
   };
 
   // Clear canvas
@@ -1848,8 +1824,25 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                       </svg>
                     )}
 
-                    {/* Depth Tool Visual Overlay - Simplified */}
-                    {currentTool === 'depth' && (
+                    {/* Depth Tool Visual Overlay - Rectangle Selection */}
+                    {currentTool === 'depth' && depthState.selection && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: Math.min(depthState.selection.startX, depthState.selection.endX) * PIXEL_SIZE * zoom,
+                          top: Math.min(depthState.selection.startY, depthState.selection.endY) * PIXEL_SIZE * zoom,
+                          width: (Math.abs(depthState.selection.endX - depthState.selection.startX) + 1) * PIXEL_SIZE * zoom,
+                          height: (Math.abs(depthState.selection.endY - depthState.selection.startY) + 1) * PIXEL_SIZE * zoom,
+                          border: '3px dashed #8b5cf6',
+                          background: 'rgba(139, 92, 246, 0.2)',
+                          pointerEvents: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    )}
+
+                    {/* Depth Light Direction Indicator */}
+                    {currentTool === 'depth' && depthState.lightDirection && (
                       <svg
                         style={{
                           position: 'absolute',
@@ -1861,95 +1854,42 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                           overflow: 'visible',
                         }}
                       >
-                        {/* Area polygon */}
-                        {depthState.areaPoints.length >= 2 && (
-                          <polygon
-                            points={depthState.areaPoints.map(p =>
-                              `${p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2},${p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}`
-                            ).join(' ')}
-                            fill={depthState.isClosed ? 'rgba(139, 92, 246, 0.2)' : 'rgba(139, 92, 246, 0.1)'}
-                            stroke="#8b5cf6"
-                            strokeWidth="2"
-                            strokeDasharray={depthState.isClosed ? 'none' : '6,3'}
-                          />
-                        )}
-                        {/* Area points */}
-                        {depthState.areaPoints.map((p, i) => (
-                          <circle
-                            key={`ap-${i}`}
-                            cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                            cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                            r={i === 0 ? 7 : 5}
-                            fill={i === 0 ? '#7c3aed' : '#8b5cf6'}
-                            stroke="white"
-                            strokeWidth="2"
-                          />
-                        ))}
-
-                        {/* Light direction indicator */}
-                        {depthState.lightDirection && (
-                          <>
-                            <circle
-                              cx={depthState.lightDirection.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                              cy={depthState.lightDirection.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                              r={12}
-                              fill="#fde68a"
-                              stroke="#f59e0b"
-                              strokeWidth="3"
-                            />
-                            <text
-                              x={depthState.lightDirection.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                              y={depthState.lightDirection.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2 + 4}
-                              textAnchor="middle"
-                              fill="#92400e"
-                              fontSize="12"
-                              fontWeight="bold"
-                            >
-                              ☀
-                            </text>
-                          </>
-                        )}
+                        <circle
+                          cx={depthState.lightDirection.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                          cy={depthState.lightDirection.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                          r={12}
+                          fill="#fde68a"
+                          stroke="#f59e0b"
+                          strokeWidth="3"
+                        />
+                        <text
+                          x={depthState.lightDirection.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
+                          y={depthState.lightDirection.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2 + 4}
+                          textAnchor="middle"
+                          fill="#92400e"
+                          fontSize="12"
+                          fontWeight="bold"
+                        >
+                          ☀
+                        </text>
                       </svg>
                     )}
 
-                    {/* Texture Tool Visual Overlay */}
-                    {currentTool === 'texture' && (
-                      <svg
+                    {/* Texture Tool Visual Overlay - Rectangle Selection */}
+                    {currentTool === 'texture' && textureState.selection && (
+                      <div
                         style={{
                           position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: scaledCanvasSize,
-                          height: scaledCanvasSize,
+                          left: Math.min(textureState.selection.startX, textureState.selection.endX) * PIXEL_SIZE * zoom,
+                          top: Math.min(textureState.selection.startY, textureState.selection.endY) * PIXEL_SIZE * zoom,
+                          width: (Math.abs(textureState.selection.endX - textureState.selection.startX) + 1) * PIXEL_SIZE * zoom,
+                          height: (Math.abs(textureState.selection.endY - textureState.selection.startY) + 1) * PIXEL_SIZE * zoom,
+                          border: '3px dashed #f59e0b',
+                          background: 'rgba(245, 158, 11, 0.2)',
                           pointerEvents: 'none',
-                          overflow: 'visible',
+                          boxSizing: 'border-box',
                         }}
-                      >
-                        {/* Area polygon */}
-                        {textureState.areaPoints.length >= 2 && (
-                          <polygon
-                            points={textureState.areaPoints.map(p =>
-                              `${p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2},${p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}`
-                            ).join(' ')}
-                            fill={textureState.isClosed ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.1)'}
-                            stroke="#f59e0b"
-                            strokeWidth="2"
-                            strokeDasharray={textureState.isClosed ? 'none' : '6,3'}
-                          />
-                        )}
-                        {/* Area points */}
-                        {textureState.areaPoints.map((p, i) => (
-                          <circle
-                            key={`tp-${i}`}
-                            cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                            cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                            r={i === 0 ? 7 : 5}
-                            fill={i === 0 ? '#d97706' : '#f59e0b'}
-                            stroke="white"
-                            strokeWidth="2"
-                          />
-                        ))}
-                      </svg>
+                      />
                     )}
 
                     {/* Alignment Selection Overlay */}
@@ -2163,7 +2103,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                 </div>
               )}
 
-              {/* Texture Tool Panel - Guided */}
+              {/* Texture Tool Panel - Rectangle Selection */}
               {currentTool === 'texture' && (
                 <div style={{ marginBottom: '15px', padding: '12px', background: '#fff8e1', borderRadius: '6px', border: '1px solid #ffcc80' }}>
                   <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '10px', color: '#f57c00' }}>
@@ -2172,14 +2112,11 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                   </div>
                   <div style={{ fontSize: '12px', color: '#555', marginBottom: '10px', lineHeight: '1.4' }}>
                     {textureState.step === 'drawing' && (
-                      <>Click pixels to add points. Press Next when done.</>
+                      <>Click and drag to select rectangle area.</>
                     )}
                     {textureState.step === 'apply' && (
                       <>Choose texture type and intensity, then click Apply.</>
                     )}
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>
-                    Points: {textureState.areaPoints.length}
                   </div>
                   {textureState.step === 'apply' && (
                     <>
@@ -2209,20 +2146,6 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                     </>
                   )}
                   <div style={{ display: 'flex', gap: '6px' }}>
-                    {textureState.step === 'drawing' && (
-                      <button
-                        onClick={() => setTextureState(prev => ({ ...prev, isClosed: true, step: 'apply' }))}
-                        disabled={textureState.areaPoints.length < 3}
-                        style={{
-                          padding: '6px 10px',
-                          background: textureState.areaPoints.length >= 3 ? '#3b82f6' : '#ccc',
-                          border: 'none', borderRadius: '4px', color: 'white',
-                          cursor: textureState.areaPoints.length >= 3 ? 'pointer' : 'not-allowed', fontSize: '11px',
-                        }}
-                      >
-                        Next
-                      </button>
-                    )}
                     {textureState.step === 'apply' && (
                       <button
                         onClick={applyTextureToArea}
@@ -2232,7 +2155,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                       </button>
                     )}
                     <button
-                      onClick={() => setTextureState({ step: 'drawing', isClosed: false, areaPoints: [] })}
+                      onClick={() => { setTextureState({ step: 'drawing', selection: null }); setTextureStart(null); }}
                       style={{ padding: '6px 10px', background: '#666', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '11px' }}
                     >
                       Reset
@@ -2241,7 +2164,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                 </div>
               )}
 
-              {/* Depth Tool Panel - Guided */}
+              {/* Depth Tool Panel - Rectangle Selection */}
               {currentTool === 'depth' && (
                 <div style={{ marginBottom: '15px', padding: '12px', background: '#ede7f6', borderRadius: '6px', border: '1px solid #b39ddb' }}>
                   <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '10px', color: '#7b1fa2' }}>
@@ -2250,30 +2173,16 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                   </div>
                   <div style={{ fontSize: '12px', color: '#555', marginBottom: '10px', lineHeight: '1.4' }}>
                     {depthState.step === 'drawing' && (
-                      <>Click pixels to add points. Press Next when done.</>
+                      <>Click and drag to select rectangle area.</>
                     )}
                     {depthState.step === 'light' && (
                       <>Click anywhere to set light direction. Pixels facing light will be brighter.</>
                     )}
                   </div>
                   <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>
-                    Points: {depthState.areaPoints.length} | Light: {depthState.lightDirection ? 'Set' : 'Not set'}
+                    Light: {depthState.lightDirection ? 'Set' : 'Not set'}
                   </div>
                   <div style={{ display: 'flex', gap: '6px' }}>
-                    {depthState.step === 'drawing' && (
-                      <button
-                        onClick={() => setDepthState(prev => ({ ...prev, isClosed: true, step: 'light' }))}
-                        disabled={depthState.areaPoints.length < 3}
-                        style={{
-                          padding: '6px 10px',
-                          background: depthState.areaPoints.length >= 3 ? '#3b82f6' : '#ccc',
-                          border: 'none', borderRadius: '4px', color: 'white',
-                          cursor: depthState.areaPoints.length >= 3 ? 'pointer' : 'not-allowed', fontSize: '11px',
-                        }}
-                      >
-                        Next
-                      </button>
-                    )}
                     {depthState.step === 'light' && depthState.lightDirection && (
                       <button
                         onClick={generateDepthShadows}
@@ -2283,7 +2192,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                       </button>
                     )}
                     <button
-                      onClick={() => setDepthState({ step: 'drawing', isClosed: false, areaPoints: [], lightDirection: null })}
+                      onClick={() => { setDepthState({ step: 'drawing', selection: null, lightDirection: null }); setDepthStart(null); }}
                       style={{ padding: '6px 10px', background: '#666', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '11px' }}
                     >
                       Reset
