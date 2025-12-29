@@ -576,20 +576,17 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
   const [selectedColor, setSelectedColor] = useState('#000000');
   const [brushSize, setBrushSize] = useState(1);
   const [zoom, setZoom] = useState(1); // Zoom level: 0.5x to 2x
-  const [currentTool, setCurrentTool] = useState<'paint' | 'square' | 'circle' | 'polygon' | 'texture' | 'depth' | 'alignment'>('paint');
-  const [shapeStart, setShapeStart] = useState<{ row: number; col: number } | null>(null);
-  const [shapeEnd, setShapeEnd] = useState<{ row: number; col: number } | null>(null);
+  const [currentTool, setCurrentTool] = useState<'paint' | 'polygon' | 'texture' | 'depth' | 'alignment'>('paint');
   const [isMouseDown, setIsMouseDown] = useState(false);
   const [isRightMouseDown, setIsRightMouseDown] = useState(false);
   const [selectedObjectType, setSelectedObjectType] = useState<'plant' | 'animal' | 'resource'>('plant');
   const [selectedObjectId, setSelectedObjectId] = useState<string>('');
 
   // Color management state
-  const [colorNames, setColorNames] = useState<Record<string, string>>({});
-  const [colorGroups, setColorGroups] = useState<{ id: string; name: string; colors: string[] }[]>([]);
+  const [colorNames] = useState<Record<string, string>>({});
+  const [colorGroups] = useState<{ id: string; name: string; colors: string[] }[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<string | null>(null);
-  const [newGroupName, setNewGroupName] = useState('');
 
   // Polygon tool state
   const [polygonState, setPolygonState] = useState<PolygonState>({
@@ -649,39 +646,6 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
 
     return colors;
   }, [searchQuery, selectedGroupFilter, colorGroups, colorNames]);
-
-  // Color management functions
-  const nameColor = (color: string, name: string) => {
-    setColorNames(prev => ({ ...prev, [color]: name }));
-  };
-
-  const createGroup = () => {
-    if (!newGroupName.trim()) return;
-    const newGroup = {
-      id: Date.now().toString(),
-      name: newGroupName.trim(),
-      colors: [],
-    };
-    setColorGroups(prev => [...prev, newGroup]);
-    setNewGroupName('');
-  };
-
-  const deleteGroup = (groupId: string) => {
-    setColorGroups(prev => prev.filter(g => g.id !== groupId));
-    if (selectedGroupFilter === groupId) {
-      setSelectedGroupFilter(null);
-    }
-  };
-
-  const addColorToGroup = (groupId: string, color: string) => {
-    setColorGroups(prev => prev.map(g => {
-      if (g.id === groupId && !g.colors.includes(color)) {
-        return { ...g, colors: [...g.colors, color] };
-      }
-      return g;
-    }));
-  };
-
 
   // Prevent default behavior
   const stopProp = (e: React.MouseEvent) => e.stopPropagation();
@@ -799,80 +763,6 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     });
   };
 
-  // Get pixels for a rectangle shape
-  const getSquarePixels = (start: { row: number; col: number }, end: { row: number; col: number }) => {
-    const pixels: { row: number; col: number }[] = [];
-    const minRow = Math.min(start.row, end.row);
-    const maxRow = Math.max(start.row, end.row);
-    const minCol = Math.min(start.col, end.col);
-    const maxCol = Math.max(start.col, end.col);
-
-    for (let r = minRow; r <= maxRow; r++) {
-      for (let c = minCol; c <= maxCol; c++) {
-        if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
-          pixels.push({ row: r, col: c });
-        }
-      }
-    }
-    return pixels;
-  };
-
-  // Get pixels for an ellipse/circle shape
-  const getCirclePixels = (start: { row: number; col: number }, end: { row: number; col: number }) => {
-    const pixels: { row: number; col: number }[] = [];
-    const minRow = Math.min(start.row, end.row);
-    const maxRow = Math.max(start.row, end.row);
-    const minCol = Math.min(start.col, end.col);
-    const maxCol = Math.max(start.col, end.col);
-
-    const centerRow = (minRow + maxRow) / 2;
-    const centerCol = (minCol + maxCol) / 2;
-    const radiusRow = (maxRow - minRow) / 2;
-    const radiusCol = (maxCol - minCol) / 2;
-
-    if (radiusRow === 0 || radiusCol === 0) return pixels;
-
-    for (let r = minRow; r <= maxRow; r++) {
-      for (let c = minCol; c <= maxCol; c++) {
-        // Check if point is inside ellipse
-        const normalizedRow = (r - centerRow) / radiusRow;
-        const normalizedCol = (c - centerCol) / radiusCol;
-        if (normalizedRow * normalizedRow + normalizedCol * normalizedCol <= 1) {
-          if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
-            pixels.push({ row: r, col: c });
-          }
-        }
-      }
-    }
-    return pixels;
-  };
-
-  // Draw shape to canvas
-  const drawShape = (erase: boolean) => {
-    if (!shapeStart || !shapeEnd) return;
-
-    const shapePixels = currentTool === 'square'
-      ? getSquarePixels(shapeStart, shapeEnd)
-      : getCirclePixels(shapeStart, shapeEnd);
-
-    setPixels(prev => {
-      const newPixels = prev.map(r => [...r]);
-      shapePixels.forEach(({ row, col }) => {
-        newPixels[row][col] = erase ? 'transparent' : selectedColor;
-      });
-      return newPixels;
-    });
-  };
-
-  // Get preview pixels for current shape
-  const shapePreviewPixels = useMemo(() => {
-    if (!shapeStart || !shapeEnd) return new Set<string>();
-    const pixels = currentTool === 'square'
-      ? getSquarePixels(shapeStart, shapeEnd)
-      : getCirclePixels(shapeStart, shapeEnd);
-    return new Set(pixels.map(p => `${p.row}-${p.col}`));
-  }, [shapeStart, shapeEnd, currentTool]);
-
   // Handle mouse down
   const handleMouseDown = (row: number, col: number, e: React.MouseEvent) => {
     if (currentTool === 'paint') {
@@ -913,17 +803,6 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
         setIsSelectingAlignment(false);
         setAlignmentStart(null);
       }
-    } else {
-      // Shape tools (square, circle)
-      if (e.button === 0 || e.button === 2) {
-        setShapeStart({ row, col });
-        setShapeEnd({ row, col });
-        if (e.button === 2) {
-          setIsRightMouseDown(true);
-        } else {
-          setIsMouseDown(true);
-        }
-      }
     }
   };
 
@@ -944,27 +823,16 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
         endX: col,
         endY: row,
       });
-    } else if (currentTool === 'square' || currentTool === 'circle') {
-      // Shape tools - update end point while dragging
-      if (isMouseDown || isRightMouseDown) {
-        setShapeEnd({ row, col });
-      }
     }
   };
 
   const handleMouseUp = useCallback(() => {
-    // If using shape tool and we have both points, draw the shape
-    if ((currentTool === 'square' || currentTool === 'circle') && shapeStart && shapeEnd) {
-      drawShape(isRightMouseDown);
-    }
     if (currentTool === 'alignment' && isSelectingAlignment) {
       setIsSelectingAlignment(false);
     }
     setIsMouseDown(false);
     setIsRightMouseDown(false);
-    setShapeStart(null);
-    setShapeEnd(null);
-  }, [currentTool, shapeStart, shapeEnd, isRightMouseDown, selectedColor, isSelectingAlignment]);
+  }, [currentTool, isSelectingAlignment]);
 
   useEffect(() => {
     window.addEventListener('mouseup', handleMouseUp);
@@ -1628,270 +1496,9 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
             Save & Link Sprite
           </button>
 
-          {/* Tools Section */}
+          {/* View Controls Section */}
           <div style={{ marginTop: '25px', borderTop: '1px solid #E8DDD1', paddingTop: '20px' }}>
-            <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#0D0D0D' }}>Tools</h2>
-
-            {/* Tool Selection */}
-            <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
-              <button
-                onClick={() => setCurrentTool('paint')}
-                style={{
-                  padding: '8px 14px',
-                  background: currentTool === 'paint' ? '#0D0D0D' : '#E8DDD1',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  color: currentTool === 'paint' ? '#FFF1E5' : '#333',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                }}
-              >
-                Paint
-              </button>
-              <button
-                onClick={() => setCurrentTool('square')}
-                style={{
-                  padding: '8px 14px',
-                  background: currentTool === 'square' ? '#0D0D0D' : '#E8DDD1',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  color: currentTool === 'square' ? '#FFF1E5' : '#333',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                }}
-              >
-                Rect
-              </button>
-              <button
-                onClick={() => setCurrentTool('circle')}
-                style={{
-                  padding: '8px 14px',
-                  background: currentTool === 'circle' ? '#0D0D0D' : '#E8DDD1',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  color: currentTool === 'circle' ? '#FFF1E5' : '#333',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                }}
-              >
-                Ellipse
-              </button>
-              <button
-                onClick={() => setCurrentTool('polygon')}
-                style={{
-                  padding: '8px 14px',
-                  background: currentTool === 'polygon' ? '#22c55e' : '#E8DDD1',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  color: currentTool === 'polygon' ? 'white' : '#333',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                }}
-              >
-                Polygon
-              </button>
-              <button
-                onClick={() => setCurrentTool('texture')}
-                style={{
-                  padding: '8px 14px',
-                  background: currentTool === 'texture' ? '#f59e0b' : '#E8DDD1',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  color: currentTool === 'texture' ? 'white' : '#333',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                }}
-              >
-                Texture
-              </button>
-              <button
-                onClick={() => setCurrentTool('depth')}
-                style={{
-                  padding: '8px 14px',
-                  background: currentTool === 'depth' ? '#8b5cf6' : '#E8DDD1',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  color: currentTool === 'depth' ? 'white' : '#333',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                }}
-              >
-                Depth
-              </button>
-              <button
-                onClick={() => setCurrentTool('alignment')}
-                style={{
-                  padding: '8px 14px',
-                  background: currentTool === 'alignment' ? '#ec4899' : '#E8DDD1',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  color: currentTool === 'alignment' ? 'white' : '#333',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                }}
-              >
-                Align
-              </button>
-            </div>
-
-            <p style={{ fontSize: '11px', color: '#666', marginBottom: '12px' }}>
-              {currentTool === 'paint' && 'Left-click paint, right-click erase'}
-              {currentTool === 'square' && 'Drag to draw, right-click erases'}
-              {currentTool === 'circle' && 'Drag to draw, right-click erases'}
-              {currentTool === 'polygon' && `Step: ${polygonState.step}. Press 1 to confirm, 3 for new highlight`}
-              {currentTool === 'texture' && 'Click and drag to apply texture'}
-              {currentTool === 'depth' && `K=confirm line, L=light area, P=light direction`}
-              {currentTool === 'alignment' && 'Click to select, arrow keys to shift'}
-            </p>
-
-            {/* Polygon Tool Panel */}
-            {currentTool === 'polygon' && (
-              <div style={{ marginBottom: '12px', padding: '10px', background: '#e8f5e9', borderRadius: '4px' }}>
-                <div style={{ fontSize: '12px', marginBottom: '8px' }}>
-                  Points: {polygonState.boundaryPoints.length} | Highlights: {polygonState.highlights.length}
-                </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '12px' }}>Base:</span>
-                  <input
-                    type="color"
-                    value={polygonState.baseColor}
-                    onChange={(e) => setPolygonState(prev => ({ ...prev, baseColor: e.target.value }))}
-                    style={{ width: '40px', height: '25px', cursor: 'pointer' }}
-                  />
-                </div>
-                <button
-                  onClick={generatePolygonShape}
-                  disabled={polygonState.boundaryPoints.length < 3}
-                  style={{
-                    padding: '6px 12px',
-                    background: polygonState.boundaryPoints.length >= 3 ? '#22c55e' : '#ccc',
-                    border: 'none',
-                    borderRadius: '4px',
-                    color: 'white',
-                    cursor: polygonState.boundaryPoints.length >= 3 ? 'pointer' : 'not-allowed',
-                    fontSize: '12px',
-                    marginRight: '8px',
-                  }}
-                >
-                  Generate Shape
-                </button>
-                <button
-                  onClick={() => setPolygonState({ step: 'boundary', boundaryPoints: [], highlights: [], currentHighlightPoints: [], baseColor: polygonState.baseColor })}
-                  style={{ padding: '6px 12px', background: '#666', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '12px' }}
-                >
-                  Reset
-                </button>
-              </div>
-            )}
-
-            {/* Texture Tool Panel */}
-            {currentTool === 'texture' && (
-              <div style={{ marginBottom: '12px', padding: '10px', background: '#fff8e1', borderRadius: '4px' }}>
-                <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                  {(['noise', 'dither', 'grain', 'crosshatch'] as TexturePattern[]).map(p => (
-                    <button
-                      key={p}
-                      onClick={() => setTexturePattern(p)}
-                      style={{
-                        padding: '4px 8px',
-                        background: texturePattern === p ? '#f59e0b' : '#E8DDD1',
-                        border: 'none',
-                        borderRadius: '4px',
-                        color: texturePattern === p ? 'white' : '#333',
-                        cursor: 'pointer',
-                        fontSize: '11px',
-                        textTransform: 'capitalize',
-                      }}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-                <div style={{ fontSize: '12px' }}>
-                  Intensity: {Math.round(textureIntensity * 100)}%
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="1"
-                    step="0.1"
-                    value={textureIntensity}
-                    onChange={(e) => setTextureIntensity(Number(e.target.value))}
-                    style={{ width: '100%', marginTop: '4px' }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Depth Tool Panel */}
-            {currentTool === 'depth' && (
-              <div style={{ marginBottom: '12px', padding: '10px', background: '#ede7f6', borderRadius: '4px' }}>
-                <div style={{ fontSize: '12px', marginBottom: '8px' }}>
-                  Lines: {depthState.depthLines.length} | Light: {depthState.lightDirection ? 'Set' : 'Not set'}
-                </div>
-                <button
-                  onClick={generateDepthShadows}
-                  disabled={depthState.depthLines.length === 0 || !depthState.lightDirection}
-                  style={{
-                    padding: '6px 12px',
-                    background: depthState.depthLines.length > 0 && depthState.lightDirection ? '#8b5cf6' : '#ccc',
-                    border: 'none',
-                    borderRadius: '4px',
-                    color: 'white',
-                    cursor: depthState.depthLines.length > 0 && depthState.lightDirection ? 'pointer' : 'not-allowed',
-                    fontSize: '12px',
-                    marginRight: '8px',
-                  }}
-                >
-                  Generate Shadows
-                </button>
-                <button
-                  onClick={() => setDepthState({ step: 'lines', depthLines: [], currentLinePoints: [], lightAreaPoints: [], lightDirection: null })}
-                  style={{ padding: '6px 12px', background: '#666', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '12px' }}
-                >
-                  Reset
-                </button>
-              </div>
-            )}
-
-            {/* Alignment Tool Panel */}
-            {currentTool === 'alignment' && (
-              <div style={{ marginBottom: '12px', padding: '10px', background: '#fce4ec', borderRadius: '4px' }}>
-                <div style={{ fontSize: '12px', marginBottom: '8px' }}>
-                  {alignmentSelection ? 'Selection active - use arrow keys!' : 'Click and drag to select'}
-                </div>
-                <button
-                  onClick={() => { setAlignmentSelection(null); setIsSelectingAlignment(false); setAlignmentStart(null); }}
-                  style={{ padding: '6px 12px', background: '#666', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '12px' }}
-                >
-                  Clear Selection
-                </button>
-              </div>
-            )}
-
-            {/* Brush Size */}
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', color: '#0D0D0D', fontSize: '13px' }}>
-                Brush: {brushSize}px
-              </label>
-              <input
-                type="range"
-                min="1"
-                max="8"
-                value={brushSize}
-                onChange={(e) => setBrushSize(parseInt(e.target.value))}
-                style={{
-                  width: '100%',
-                  cursor: 'pointer',
-                }}
-              />
-            </div>
+            <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#0D0D0D' }}>View</h2>
 
             {/* Zoom */}
             <div style={{ marginBottom: '12px' }}>
@@ -2022,8 +1629,6 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                                 // Checkerboard pattern for transparent pixels
                                 const isCheckerWhite = (globalRow + globalCol) % 2 === 0;
                                 const transparentColor = isCheckerWhite ? '#ffffff' : '#cccccc';
-                                // Check if pixel is in shape preview
-                                const isInShapePreview = shapePreviewPixels.has(`${globalRow}-${globalCol}`);
 
                                 return (
                                   <div
@@ -2031,10 +1636,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                                     style={{
                                       width: PIXEL_SIZE,
                                       height: PIXEL_SIZE,
-                                      backgroundColor: isInShapePreview
-                                        ? (isRightMouseDown ? 'rgba(255,0,0,0.4)' : selectedColor)
-                                        : (color === 'transparent' ? transparentColor : color),
-                                      opacity: isInShapePreview ? 0.7 : 1,
+                                      backgroundColor: color === 'transparent' ? transparentColor : color,
                                     }}
                                   />
                                 );
@@ -2092,7 +1694,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
 
             </div>
 
-            {/* Color Groups & Naming Panel (Right of Canvas) */}
+            {/* Tools Panel (Right of Canvas) */}
             <div style={{
               width: '280px',
               border: '1px solid #ccc',
@@ -2102,193 +1704,260 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
               maxHeight: VIEWPORT_SIZE,
               overflowY: 'auto',
             }}>
-              <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#0D0D0D' }}>Color Groups</h4>
+              <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#0D0D0D' }}>Tools</h4>
 
-              {/* Create new group */}
-              <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-                <input
-                  type="text"
-                  placeholder="New group name..."
-                  value={newGroupName}
-                  onChange={(e) => setNewGroupName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && createGroup()}
+              {/* Tool Selection */}
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => setCurrentTool('paint')}
                   style={{
-                    flex: 1,
-                    padding: '6px 8px',
+                    padding: '8px 14px',
+                    background: currentTool === 'paint' ? '#0D0D0D' : '#E8DDD1',
                     border: '1px solid #ccc',
                     borderRadius: '4px',
-                    fontSize: '12px',
-                  }}
-                />
-                <button
-                  onClick={createGroup}
-                  style={{
-                    padding: '6px 12px',
-                    background: '#0D0D0D',
-                    border: 'none',
-                    borderRadius: '4px',
-                    color: '#FFF1E5',
+                    color: currentTool === 'paint' ? '#FFF1E5' : '#333',
                     cursor: 'pointer',
                     fontSize: '12px',
                     fontWeight: 'bold',
                   }}
                 >
-                  Add
+                  Paint
+                </button>
+                <button
+                  onClick={() => setCurrentTool('polygon')}
+                  style={{
+                    padding: '8px 14px',
+                    background: currentTool === 'polygon' ? '#22c55e' : '#E8DDD1',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    color: currentTool === 'polygon' ? 'white' : '#333',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Polygon
+                </button>
+                <button
+                  onClick={() => setCurrentTool('texture')}
+                  style={{
+                    padding: '8px 14px',
+                    background: currentTool === 'texture' ? '#f59e0b' : '#E8DDD1',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    color: currentTool === 'texture' ? 'white' : '#333',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Texture
+                </button>
+                <button
+                  onClick={() => setCurrentTool('depth')}
+                  style={{
+                    padding: '8px 14px',
+                    background: currentTool === 'depth' ? '#8b5cf6' : '#E8DDD1',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    color: currentTool === 'depth' ? 'white' : '#333',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Depth
+                </button>
+                <button
+                  onClick={() => setCurrentTool('alignment')}
+                  style={{
+                    padding: '8px 14px',
+                    background: currentTool === 'alignment' ? '#ec4899' : '#E8DDD1',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    color: currentTool === 'alignment' ? 'white' : '#333',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Align
                 </button>
               </div>
 
-              {/* List of groups */}
-              <div style={{ marginBottom: '15px' }}>
-                {colorGroups.length === 0 ? (
-                  <p style={{ fontSize: '11px', color: '#666', margin: 0 }}>No groups yet. Create one above.</p>
-                ) : (
-                  colorGroups.map(group => (
-                    <div key={group.id} style={{
-                      padding: '8px',
-                      marginBottom: '6px',
-                      background: '#fff',
-                      borderRadius: '4px',
-                      border: '1px solid #ddd',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                        <span style={{ flex: 1, fontSize: '12px', fontWeight: 600 }}>{group.name}</span>
-                        <button
-                          onClick={() => {
-                            if (selectedColor) addColorToGroup(group.id, selectedColor);
-                          }}
-                          style={{
-                            padding: '3px 8px',
-                            background: '#4CAF50',
-                            border: 'none',
-                            borderRadius: '3px',
-                            color: 'white',
-                            cursor: 'pointer',
-                            fontSize: '10px',
-                          }}
-                          title="Add selected color"
-                        >
-                          +
-                        </button>
-                        <button
-                          onClick={() => deleteGroup(group.id)}
-                          style={{
-                            padding: '3px 8px',
-                            background: '#f44336',
-                            border: 'none',
-                            borderRadius: '3px',
-                            color: 'white',
-                            cursor: 'pointer',
-                            fontSize: '10px',
-                          }}
-                        >
-                          ×
-                        </button>
-                      </div>
-                      {/* Show colors in the group */}
-                      {group.colors.length > 0 ? (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
-                          {group.colors.map((color, idx) => (
-                            <div
-                              key={idx}
-                              onClick={() => setSelectedColor(color)}
-                              style={{
-                                width: '18px',
-                                height: '18px',
-                                backgroundColor: color,
-                                border: selectedColor === color ? '2px solid #0D0D0D' : '1px solid #999',
-                                borderRadius: '2px',
-                                cursor: 'pointer',
-                              }}
-                              title={colorNames[color] || color}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <p style={{ fontSize: '10px', color: '#999', margin: 0 }}>No colors yet</p>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
+              {/* Brush Size (for paint tool) */}
+              {currentTool === 'paint' && (
+                <div style={{ marginBottom: '15px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', color: '#0D0D0D', fontSize: '13px' }}>
+                    Brush: {brushSize}px
+                  </label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="8"
+                    value={brushSize}
+                    onChange={(e) => setBrushSize(parseInt(e.target.value))}
+                    style={{ width: '100%', cursor: 'pointer' }}
+                  />
+                  <p style={{ fontSize: '11px', color: '#666', marginTop: '8px' }}>
+                    Left-click paint, right-click erase
+                  </p>
+                </div>
+              )}
 
-              {/* Color naming section */}
+              {/* Polygon Tool Panel */}
+              {currentTool === 'polygon' && (
+                <div style={{ marginBottom: '15px', padding: '10px', background: '#e8f5e9', borderRadius: '4px' }}>
+                  <p style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>
+                    Step: {polygonState.step}. Press 1 to confirm, 3 for new highlight
+                  </p>
+                  <div style={{ fontSize: '12px', marginBottom: '8px' }}>
+                    Points: {polygonState.boundaryPoints.length} | Highlights: {polygonState.highlights.length}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '12px' }}>Base:</span>
+                    <input
+                      type="color"
+                      value={polygonState.baseColor}
+                      onChange={(e) => setPolygonState(prev => ({ ...prev, baseColor: e.target.value }))}
+                      style={{ width: '40px', height: '25px', cursor: 'pointer' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={generatePolygonShape}
+                      disabled={polygonState.boundaryPoints.length < 3}
+                      style={{
+                        padding: '6px 12px',
+                        background: polygonState.boundaryPoints.length >= 3 ? '#22c55e' : '#ccc',
+                        border: 'none',
+                        borderRadius: '4px',
+                        color: 'white',
+                        cursor: polygonState.boundaryPoints.length >= 3 ? 'pointer' : 'not-allowed',
+                        fontSize: '12px',
+                      }}
+                    >
+                      Generate
+                    </button>
+                    <button
+                      onClick={() => setPolygonState({ step: 'boundary', boundaryPoints: [], highlights: [], currentHighlightPoints: [], baseColor: polygonState.baseColor })}
+                      style={{ padding: '6px 12px', background: '#666', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '12px' }}
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Texture Tool Panel */}
+              {currentTool === 'texture' && (
+                <div style={{ marginBottom: '15px', padding: '10px', background: '#fff8e1', borderRadius: '4px' }}>
+                  <p style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>
+                    Click and drag to apply texture
+                  </p>
+                  <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                    {(['noise', 'dither', 'grain', 'crosshatch'] as TexturePattern[]).map(p => (
+                      <button
+                        key={p}
+                        onClick={() => setTexturePattern(p)}
+                        style={{
+                          padding: '4px 8px',
+                          background: texturePattern === p ? '#f59e0b' : '#E8DDD1',
+                          border: 'none',
+                          borderRadius: '4px',
+                          color: texturePattern === p ? 'white' : '#333',
+                          cursor: 'pointer',
+                          fontSize: '11px',
+                          textTransform: 'capitalize',
+                        }}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: '12px' }}>
+                    Intensity: {Math.round(textureIntensity * 100)}%
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="1"
+                      step="0.1"
+                      value={textureIntensity}
+                      onChange={(e) => setTextureIntensity(Number(e.target.value))}
+                      style={{ width: '100%', marginTop: '4px' }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Depth Tool Panel */}
+              {currentTool === 'depth' && (
+                <div style={{ marginBottom: '15px', padding: '10px', background: '#ede7f6', borderRadius: '4px' }}>
+                  <p style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>
+                    K=confirm line, L=light area, P=light direction
+                  </p>
+                  <div style={{ fontSize: '12px', marginBottom: '8px' }}>
+                    Lines: {depthState.depthLines.length} | Light: {depthState.lightDirection ? 'Set' : 'Not set'}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={generateDepthShadows}
+                      disabled={depthState.depthLines.length === 0 || !depthState.lightDirection}
+                      style={{
+                        padding: '6px 12px',
+                        background: depthState.depthLines.length > 0 && depthState.lightDirection ? '#8b5cf6' : '#ccc',
+                        border: 'none',
+                        borderRadius: '4px',
+                        color: 'white',
+                        cursor: depthState.depthLines.length > 0 && depthState.lightDirection ? 'pointer' : 'not-allowed',
+                        fontSize: '12px',
+                      }}
+                    >
+                      Generate
+                    </button>
+                    <button
+                      onClick={() => setDepthState({ step: 'lines', depthLines: [], currentLinePoints: [], lightAreaPoints: [], lightDirection: null })}
+                      style={{ padding: '6px 12px', background: '#666', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '12px' }}
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Alignment Tool Panel */}
+              {currentTool === 'alignment' && (
+                <div style={{ marginBottom: '15px', padding: '10px', background: '#fce4ec', borderRadius: '4px' }}>
+                  <p style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>
+                    Click to select, arrow keys to shift
+                  </p>
+                  <div style={{ fontSize: '12px', marginBottom: '8px' }}>
+                    {alignmentSelection ? 'Selection active - use arrow keys!' : 'Click and drag to select'}
+                  </div>
+                  <button
+                    onClick={() => { setAlignmentSelection(null); setIsSelectingAlignment(false); setAlignmentStart(null); }}
+                    style={{ padding: '6px 12px', background: '#666', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '12px' }}
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              )}
+
+              {/* Selected Color Display */}
               <div style={{ borderTop: '1px solid #ddd', paddingTop: '12px' }}>
-                <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#0D0D0D' }}>Name Color</h4>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
+                <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#0D0D0D' }}>Selected Color</h4>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <div style={{
-                    width: '32px',
-                    height: '32px',
+                    width: '40px',
+                    height: '40px',
                     backgroundColor: selectedColor,
                     border: '2px solid #ccc',
                     borderRadius: '4px',
                     flexShrink: 0,
                   }} />
-                  <div style={{ flex: 1 }}>
-                    <input
-                      type="text"
-                      placeholder="Enter name..."
-                      value={colorNames[selectedColor] || ''}
-                      onChange={(e) => nameColor(selectedColor, e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '6px 8px',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                    <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>{selectedColor}</div>
-                  </div>
+                  <div style={{ fontSize: '12px', color: '#666' }}>{selectedColor}</div>
                 </div>
               </div>
-
-              {/* Named colors list */}
-              {Object.keys(colorNames).filter(c => colorNames[c]).length > 0 && (
-                <div style={{ borderTop: '1px solid #ddd', paddingTop: '12px', marginTop: '12px' }}>
-                  <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#0D0D0D' }}>Named Colors</h4>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {Object.entries(colorNames).filter(([_, name]) => name).map(([color, name]) => (
-                      <div
-                        key={color}
-                        onClick={() => setSelectedColor(color)}
-                        style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          padding: '4px',
-                          background: selectedColor === color ? '#0D0D0D' : '#fff',
-                          border: '1px solid #ccc',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          minWidth: '40px',
-                        }}
-                        title={color}
-                      >
-                        <div style={{
-                          width: '24px',
-                          height: '24px',
-                          backgroundColor: color,
-                          borderRadius: '3px',
-                          border: '1px solid #999',
-                          marginBottom: '3px',
-                        }} />
-                        <span style={{
-                          fontSize: '9px',
-                          color: selectedColor === color ? '#FFF1E5' : '#333',
-                          textAlign: 'center',
-                          maxWidth: '50px',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}>
-                          {name}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
