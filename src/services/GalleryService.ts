@@ -76,11 +76,17 @@ class GalleryService {
       const snapshot = await getDocs(galleryRef);
 
       const items: GalleryItem[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data() as Omit<GalleryItem, 'id'>;
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        // Parse pixels back from JSON string (Firestore doesn't support nested arrays)
+        const pixels = typeof data.pixels === 'string' ? JSON.parse(data.pixels) : data.pixels;
         items.push({
-          id: doc.id,
-          ...data,
+          id: docSnap.id,
+          name: data.name,
+          pixels,
+          tilesUsed: data.tilesUsed,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
         });
       });
 
@@ -120,9 +126,10 @@ class GalleryService {
 
     try {
       const docRef = doc(this.db, 'gallery', id);
+      // Firestore doesn't support nested arrays, so stringify pixels
       await setDoc(docRef, {
         name: galleryItem.name,
-        pixels: galleryItem.pixels,
+        pixels: JSON.stringify(galleryItem.pixels),
         tilesUsed: galleryItem.tilesUsed,
         createdAt: galleryItem.createdAt,
         updatedAt: galleryItem.updatedAt,
@@ -269,9 +276,10 @@ class GalleryService {
     for (const item of localItems) {
       try {
         const docRef = doc(this.db, 'gallery', item.id);
+        // Stringify pixels for Firestore (doesn't support nested arrays)
         await setDoc(docRef, {
           name: item.name,
-          pixels: item.pixels,
+          pixels: JSON.stringify(item.pixels),
           tilesUsed: item.tilesUsed,
           createdAt: item.createdAt,
           updatedAt: item.updatedAt,
