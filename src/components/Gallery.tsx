@@ -14,7 +14,6 @@ export function Gallery({ onClose, onEditSprite }: GalleryProps) {
   const [editingName, setEditingName] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const lastClickRef = useRef<{ id: string; time: number } | null>(null);
   const [localCount, setLocalCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
@@ -52,18 +51,8 @@ export function Gallery({ onClose, onEditSprite }: GalleryProps) {
   }, [editingName]);
 
   const handleSpriteClick = (item: GalleryItem) => {
-    const now = Date.now();
-    const lastClick = lastClickRef.current;
-
-    // Check for double-click (within 300ms on same item)
-    if (lastClick && lastClick.id === item.id && now - lastClick.time < 300) {
-      // Double-click - open in editor
-      onEditSprite(item.pixels);
-      lastClickRef.current = null;
-    } else {
-      // Single click - record for potential double-click
-      lastClickRef.current = { id: item.id, time: now };
-    }
+    // Single click - open in editor
+    onEditSprite(item.pixels);
   };
 
   const handleNameClick = (e: React.MouseEvent, item: GalleryItem) => {

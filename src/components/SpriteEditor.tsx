@@ -743,13 +743,23 @@ export function SpriteEditor({ onClose, initialPixels }: SpriteEditorProps) {
       console.error('Failed to load layers:', e);
     }
     // Default: single layer with initialPixels or empty
+    // Gallery sprites may be smaller than GRID_SIZE, so place them on canvas
+    let pixelData = createEmptyPixels();
+    if (initialPixels && initialPixels.length > 0) {
+      const srcRows = initialPixels.length;
+      const srcCols = initialPixels[0]?.length || 0;
+      // Place sprite at top-left of canvas
+      for (let row = 0; row < srcRows && row < GRID_SIZE; row++) {
+        for (let col = 0; col < srcCols && col < GRID_SIZE; col++) {
+          pixelData[row][col] = initialPixels[row][col];
+        }
+      }
+    }
     const initialLayer: Layer = {
       id: 'layer-1',
       name: 'Layer 1',
       visible: true,
-      pixels: initialPixels && initialPixels.length === GRID_SIZE
-        ? initialPixels.map(row => [...row])
-        : createEmptyPixels(),
+      pixels: pixelData,
     };
     return [initialLayer];
   });
