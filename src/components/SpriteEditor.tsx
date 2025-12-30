@@ -730,7 +730,27 @@ export function SpriteEditor({ onClose, initialPixels }: SpriteEditorProps) {
 
   // Layer system
   const [layers, setLayers] = useState<Layer[]>(() => {
-    // Try to load from localStorage first
+    // If initialPixels provided (from gallery), use it instead of localStorage
+    if (initialPixels && initialPixels.length > 0) {
+      let pixelData = createEmptyPixels();
+      const srcRows = initialPixels.length;
+      const srcCols = initialPixels[0]?.length || 0;
+      // Place sprite at top-left of canvas
+      for (let row = 0; row < srcRows && row < GRID_SIZE; row++) {
+        for (let col = 0; col < srcCols && col < GRID_SIZE; col++) {
+          pixelData[row][col] = initialPixels[row][col];
+        }
+      }
+      const initialLayer: Layer = {
+        id: 'layer-1',
+        name: 'Layer 1',
+        visible: true,
+        pixels: pixelData,
+      };
+      return [initialLayer];
+    }
+
+    // No initialPixels - try to load from localStorage (autosave)
     try {
       const saved = localStorage.getItem(LAYERS_KEY);
       if (saved) {
@@ -742,24 +762,13 @@ export function SpriteEditor({ onClose, initialPixels }: SpriteEditorProps) {
     } catch (e) {
       console.error('Failed to load layers:', e);
     }
-    // Default: single layer with initialPixels or empty
-    // Gallery sprites may be smaller than GRID_SIZE, so place them on canvas
-    let pixelData = createEmptyPixels();
-    if (initialPixels && initialPixels.length > 0) {
-      const srcRows = initialPixels.length;
-      const srcCols = initialPixels[0]?.length || 0;
-      // Place sprite at top-left of canvas
-      for (let row = 0; row < srcRows && row < GRID_SIZE; row++) {
-        for (let col = 0; col < srcCols && col < GRID_SIZE; col++) {
-          pixelData[row][col] = initialPixels[row][col];
-        }
-      }
-    }
+
+    // Default: empty canvas
     const initialLayer: Layer = {
       id: 'layer-1',
       name: 'Layer 1',
       visible: true,
-      pixels: pixelData,
+      pixels: createEmptyPixels(),
     };
     return [initialLayer];
   });
