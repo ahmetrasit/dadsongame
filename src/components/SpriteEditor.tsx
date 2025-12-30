@@ -2484,7 +2484,6 @@ export function SpriteEditor({ onClose, initialPixels }: SpriteEditorProps) {
                 >
                   Paint
                 </button>
-{/* ARCHIVED: Texture and Depth tools - keeping code for future use
                 <button
                   onClick={() => setCurrentTool('texture')}
                   style={{
@@ -2515,7 +2514,6 @@ export function SpriteEditor({ onClose, initialPixels }: SpriteEditorProps) {
                 >
                   Depth
                 </button>
-                */}
                 <button
                   onClick={() => setCurrentTool('alignment')}
                   style={{
