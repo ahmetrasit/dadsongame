@@ -1490,14 +1490,20 @@ export function SpriteEditor({ onClose, initialPixels }: SpriteEditorProps) {
 
     try {
       const name = `Sprite ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
-      await saveSprite(name, extractedPixels, tilesUsed);
-      setSaveMessage('Saved to gallery!');
+      const result = await saveSprite(name, extractedPixels, tilesUsed);
+
+      if (result.savedToFirebase) {
+        setSaveMessage('Saved to gallery!');
+      } else {
+        setSaveMessage('Saved locally (Firebase unavailable)');
+        console.warn('Firebase save failed:', result.error);
+      }
 
       // Reset selection mode
       setIsSelectingTilesForSave(false);
       setSelectedTilesForSave(Array(TILES_PER_ROW).fill(null).map(() => Array(TILES_PER_ROW).fill(false)));
 
-      setTimeout(() => setSaveMessage(null), 2000);
+      setTimeout(() => setSaveMessage(null), 3000);
     } catch (error) {
       console.error('Failed to save:', error);
       setSaveMessage('Failed to save');

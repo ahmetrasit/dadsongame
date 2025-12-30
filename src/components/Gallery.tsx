@@ -10,15 +10,39 @@ interface GalleryProps {
 const PIXEL_SIZE = 4; // Display size for gallery thumbnails
 
 export function Gallery({ onClose, onEditSprite }: GalleryProps) {
-  const { items, isLoading, loadGallery, renameSprite, deleteSprite } = useGalleryStore();
+  const { items, isLoading, loadGallery, renameSprite, deleteSprite, syncLocalToFirebase, getLocalStorageCount } = useGalleryStore();
   const [editingName, setEditingName] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const lastClickRef = useRef<{ id: string; time: number } | null>(null);
+  const [localCount, setLocalCount] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   useEffect(() => {
     loadGallery();
-  }, [loadGallery]);
+    setLocalCount(getLocalStorageCount());
+  }, [loadGallery, getLocalStorageCount]);
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    setSyncMessage('Syncing...');
+    try {
+      const result = await syncLocalToFirebase();
+      if (result.synced > 0) {
+        setSyncMessage(`Synced ${result.synced} sprite(s) to Firebase!`);
+        setLocalCount(getLocalStorageCount());
+      } else if (result.failed > 0) {
+        setSyncMessage(`Failed to sync: ${result.errors[0]}`);
+      } else {
+        setSyncMessage('No sprites to sync');
+      }
+    } catch (error) {
+      setSyncMessage('Sync failed');
+    }
+    setIsSyncing(false);
+    setTimeout(() => setSyncMessage(null), 3000);
+  };
 
   useEffect(() => {
     if (editingName && inputRef.current) {
@@ -140,21 +164,46 @@ export function Gallery({ onClose, onEditSprite }: GalleryProps) {
         <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#0D0D0D', margin: 0 }}>
           Sprite Gallery
         </h1>
-        <button
-          onClick={onClose}
-          style={{
-            padding: '10px 24px',
-            fontSize: '14px',
-            fontWeight: 'bold',
-            background: '#E8DDD1',
-            border: 'none',
-            borderRadius: '6px',
-            color: '#333',
-            cursor: 'pointer',
-          }}
-        >
-          Back to Menu
-        </button>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {syncMessage && (
+            <span style={{ fontSize: '13px', color: syncMessage.includes('failed') || syncMessage.includes('Failed') ? '#ef4444' : '#22c55e' }}>
+              {syncMessage}
+            </span>
+          )}
+          {localCount > 0 && (
+            <button
+              onClick={handleSync}
+              disabled={isSyncing}
+              style={{
+                padding: '10px 24px',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                background: isSyncing ? '#ccc' : '#3b82f6',
+                border: 'none',
+                borderRadius: '6px',
+                color: 'white',
+                cursor: isSyncing ? 'wait' : 'pointer',
+              }}
+            >
+              {isSyncing ? 'Syncing...' : `Sync ${localCount} local`}
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            style={{
+              padding: '10px 24px',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              background: '#E8DDD1',
+              border: 'none',
+              borderRadius: '6px',
+              color: '#333',
+              cursor: 'pointer',
+            }}
+          >
+            Back to Menu
+          </button>
+        </div>
       </div>
 
       {/* Gallery Content */}

@@ -20,6 +20,12 @@ export interface GalleryItem {
   updatedAt: string;
 }
 
+export interface SaveResult {
+  item: GalleryItem;
+  savedToFirebase: boolean;
+  error?: string;
+}
+
 /**
  * Gallery Service
  * Handles saving and loading sprites to/from Firebase Firestore
@@ -92,7 +98,7 @@ class GalleryService {
   /**
    * Save a sprite to the gallery
    */
-  async saveSprite(item: Omit<GalleryItem, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<GalleryItem> {
+  async saveSprite(item: Omit<GalleryItem, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<SaveResult> {
     const now = new Date().toISOString();
     const id = item.id || `sprite_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -108,7 +114,8 @@ class GalleryService {
     if (!this.initializeFirebase() || !this.db) {
       // Fallback to localStorage
       this.saveToLocalStorage(galleryItem);
-      return galleryItem;
+      console.warn('[GalleryService] Firebase not available, saved to localStorage only');
+      return { item: galleryItem, savedToFirebase: false, error: 'Firebase not available' };
     }
 
     try {
@@ -126,12 +133,12 @@ class GalleryService {
       // Also save to localStorage as backup
       this.saveToLocalStorage(galleryItem);
 
-      return galleryItem;
+      return { item: galleryItem, savedToFirebase: true };
     } catch (error) {
       console.error('[GalleryService] Error saving sprite:', error);
       // Fallback to localStorage
       this.saveToLocalStorage(galleryItem);
-      return galleryItem;
+      return { item: galleryItem, savedToFirebase: false, error: String(error) };
     }
   }
 
@@ -239,6 +246,54 @@ class GalleryService {
    */
   isAvailable(): boolean {
     return this.initializeFirebase();
+  }
+
+  /**
+   * Sync all localStorage sprites to Firebase
+   * Use this to upload sprites that were saved locally when Firebase was unavailable
+   */
+  async syncLocalToFirebase(): Promise<{ synced: number; failed: number; errors: string[] }> {
+    const localItems = this.loadFromLocalStorage();
+    if (localItems.length === 0) {
+      return { synced: 0, failed: 0, errors: [] };
+    }
+
+    if (!this.initializeFirebase() || !this.db) {
+      return { synced: 0, failed: localItems.length, errors: ['Firebase not available'] };
+    }
+
+    let synced = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const item of localItems) {
+      try {
+        const docRef = doc(this.db, 'gallery', item.id);
+        await setDoc(docRef, {
+          name: item.name,
+          pixels: item.pixels,
+          tilesUsed: item.tilesUsed,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+        });
+        synced++;
+        console.log(`[GalleryService] Synced "${item.name}" to Firebase`);
+      } catch (error) {
+        failed++;
+        errors.push(`${item.name}: ${String(error)}`);
+        console.error(`[GalleryService] Failed to sync "${item.name}":`, error);
+      }
+    }
+
+    console.log(`[GalleryService] Sync complete: ${synced} synced, ${failed} failed`);
+    return { synced, failed, errors };
+  }
+
+  /**
+   * Get count of localStorage-only sprites
+   */
+  getLocalStorageCount(): number {
+    return this.loadFromLocalStorage().length;
   }
 }
 

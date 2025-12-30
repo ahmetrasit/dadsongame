@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { galleryService, type GalleryItem } from '@/services/GalleryService';
 
+interface SaveSpriteResult {
+  item: GalleryItem;
+  savedToFirebase: boolean;
+  error?: string;
+}
+
 interface GalleryStore {
   items: GalleryItem[];
   isLoading: boolean;
@@ -8,11 +14,13 @@ interface GalleryStore {
 
   // Actions
   loadGallery: () => Promise<void>;
-  saveSprite: (name: string, pixels: string[][], tilesUsed: { rows: number; cols: number }) => Promise<GalleryItem>;
-  updateSprite: (id: string, pixels: string[][], tilesUsed: { rows: number; cols: number }) => Promise<GalleryItem>;
+  saveSprite: (name: string, pixels: string[][], tilesUsed: { rows: number; cols: number }) => Promise<SaveSpriteResult>;
+  updateSprite: (id: string, pixels: string[][], tilesUsed: { rows: number; cols: number }) => Promise<SaveSpriteResult>;
   renameSprite: (id: string, newName: string) => Promise<void>;
   deleteSprite: (id: string) => Promise<void>;
   getSprite: (id: string) => GalleryItem | undefined;
+  syncLocalToFirebase: () => Promise<{ synced: number; failed: number; errors: string[] }>;
+  getLocalStorageCount: () => number;
 }
 
 export const useGalleryStore = create<GalleryStore>((set, get) => ({
@@ -33,11 +41,11 @@ export const useGalleryStore = create<GalleryStore>((set, get) => ({
 
   saveSprite: async (name, pixels, tilesUsed) => {
     try {
-      const item = await galleryService.saveSprite({ name, pixels, tilesUsed });
+      const result = await galleryService.saveSprite({ name, pixels, tilesUsed });
       set(state => ({
-        items: [item, ...state.items.filter(i => i.id !== item.id)],
+        items: [result.item, ...state.items.filter(i => i.id !== result.item.id)],
       }));
-      return item;
+      return result;
     } catch (error) {
       console.error('Failed to save sprite:', error);
       throw error;
@@ -49,11 +57,11 @@ export const useGalleryStore = create<GalleryStore>((set, get) => ({
     if (!existing) throw new Error('Sprite not found');
 
     try {
-      const item = await galleryService.saveSprite({ id, name: existing.name, pixels, tilesUsed });
+      const result = await galleryService.saveSprite({ id, name: existing.name, pixels, tilesUsed });
       set(state => ({
-        items: state.items.map(i => i.id === id ? item : i),
+        items: state.items.map(i => i.id === id ? result.item : i),
       }));
-      return item;
+      return result;
     } catch (error) {
       console.error('Failed to update sprite:', error);
       throw error;
@@ -88,5 +96,19 @@ export const useGalleryStore = create<GalleryStore>((set, get) => ({
 
   getSprite: (id) => {
     return get().items.find(i => i.id === id);
+  },
+
+  syncLocalToFirebase: async () => {
+    const result = await galleryService.syncLocalToFirebase();
+    // Reload gallery after sync to get latest data
+    if (result.synced > 0) {
+      const items = await galleryService.loadGallery();
+      set({ items });
+    }
+    return result;
+  },
+
+  getLocalStorageCount: () => {
+    return galleryService.getLocalStorageCount();
   },
 }));
