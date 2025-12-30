@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type GameScreen = 'menu' | 'game' | 'mapEditor' | 'materialEditor' | 'creatureEditor' | 'spriteEditor';
+export type GameScreen = 'menu' | 'game' | 'mapEditor' | 'materialEditor' | 'creatureEditor' | 'spriteEditor' | 'gallery';
 
 interface SpriteEditorContext {
   objectType: 'plant' | 'animal' | 'resource' | null;

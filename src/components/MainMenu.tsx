@@ -64,6 +64,7 @@ export function MainMenu() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '400px' }}>
           <MenuButton onClick={handleNewGame}>New Game</MenuButton>
           <MenuButton onClick={handleStartGame}>Resume</MenuButton>
+          <MenuButton onClick={() => setScreen('gallery')}>Gallery</MenuButton>
           <MenuButton onClick={() => setShowEditorMenu(true)}>Editor</MenuButton>
         </div>
       )}

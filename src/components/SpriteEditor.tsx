@@ -1,14 +1,16 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
+import { useGalleryStore } from '@/stores/galleryStore';
 import { generatePlantPreview, generateAnimalPreview, generateResourcePreview } from '@/utils/generatePreviewImage';
 
 interface SpriteEditorProps {
   onClose: () => void;
+  initialPixels?: string[][]; // For loading from gallery
 }
 
 const TILE_SIZE = 16; // 16x16 pixels per tile
-const TILES_PER_ROW = 3; // 3x3 grid of tiles
-const GRID_SIZE = TILE_SIZE * TILES_PER_ROW; // 48x48 total pixels
+const TILES_PER_ROW = 5; // 5x5 grid of tiles
+const GRID_SIZE = TILE_SIZE * TILES_PER_ROW; // 80x80 total pixels
 const PIXEL_SIZE = 12; // Display size of each pixel
 const TILE_BORDER = 2; // Black border between tiles
 const NUM_BORDERS = TILES_PER_ROW - 1; // 2 borders for 3 tiles
@@ -24,30 +26,14 @@ interface ColorEntry {
 // Tool types for sprite creation pipeline
 type TexturePattern = 'noise' | 'dither' | 'grain' | 'crosshatch';
 
-// Simplified polygon steps: draw boundary -> add highlights -> assign colors
-type PolygonStep = 'drawing' | 'highlights' | 'coloring';
-// Simplified depth steps: draw area -> set light
+// Depth steps: draw area -> set light
 type DepthStep = 'drawing' | 'light';
-// Simplified texture steps: draw area -> apply
+// Texture steps: draw area -> apply
 type TextureStep = 'drawing' | 'apply';
 
 interface PolygonPoint {
   x: number;
   y: number;
-}
-
-interface PolygonHighlight {
-  points: PolygonPoint[];
-  color: string;
-}
-
-interface PolygonState {
-  step: PolygonStep;
-  isClosed: boolean;
-  boundaryPoints: PolygonPoint[];
-  highlights: PolygonHighlight[];
-  currentHighlightPoints: PolygonPoint[];
-  baseColor: string;
 }
 
 interface DepthState {
@@ -67,6 +53,19 @@ interface AlignmentSelection {
   endX: number;
   endY: number;
 }
+
+interface Layer {
+  id: string;
+  name: string;
+  visible: boolean;
+  pixels: string[][];
+}
+
+const createEmptyPixels = (): string[][] =>
+  Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill('transparent'));
+
+const LAYERS_KEY = 'sprite_editor_layers';
+
 
 const DEFAULT_PALETTE: ColorEntry[] = [
   // Blacks & Grays (1-25)
@@ -570,22 +569,293 @@ const DEFAULT_PALETTE: ColorEntry[] = [
   { color: '#8e8a8a', name: 'Pale Warm Gray', tags: ['gray', 'warm', 'beige', 'natural', 'neutral', 'soft', 'balanced', 'gentle', 'subtle', 'light'] },
   { color: '#9e9a9a', name: 'Gentle Warm Gray', tags: ['gray', 'warm', 'beige', 'natural', 'neutral', 'soft', 'gentle', 'subtle', 'light', 'pale'] },
   { color: '#aeaaaa', name: 'Light Warm Silver', tags: ['gray', 'silver', 'warm', 'beige', 'natural', 'neutral', 'soft', 'gentle', 'light', 'pale'] },
+
+  // Twig colors - natural browns and greens
+  { color: '#c4a070', name: 'Twig Light', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#a88050', name: 'Twig Mid', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#8c6840', name: 'Twig Base', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#6e5030', name: 'Twig Dark', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#503820', name: 'Twig Shadow', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#90b060', name: 'Twig Leaf Light', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#709040', name: 'Twig Leaf', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#507030', name: 'Twig Leaf Dark', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+
+  // Stone colors - rough grays/browns (expanded)
+  { color: '#f0ece4', name: 'Stone Bright', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#e0dcd4', name: 'Stone Light', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#d4ccc0', name: 'Stone Soft', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#c8c0b4', name: 'Stone Pale', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#b8b0a0', name: 'Stone Warm', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#a8a090', name: 'Stone Mid', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#989080', name: 'Stone Gray', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#888070', name: 'Stone Base', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#787060', name: 'Stone Cool', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#686050', name: 'Stone Dark', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#585040', name: 'Stone Deep', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#484038', name: 'Stone Shadow', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#383028', name: 'Stone Black', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#a89878', name: 'Stone Dirt Pale', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#8a7a60', name: 'Stone Dirt Light', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#7a6a50', name: 'Stone Dirt Mid', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#6a5a44', name: 'Stone Dirt', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#5a4a38', name: 'Stone Dirt Deep', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#4a3c2c', name: 'Stone Dirt Dark', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#382c20', name: 'Stone Mud', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+  { color: '#2c2018', name: 'Stone Mud Dark', tags: ['stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex', 'stonex'] },
+
+  // Bone colors - off-white/cream
+  { color: '#f8f4e8', name: 'Bone Light', tags: ['bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone'] },
+  { color: '#e8e0d0', name: 'Bone Pale', tags: ['bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone'] },
+  { color: '#d4c8b8', name: 'Bone Mid', tags: ['bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone'] },
+  { color: '#c0b0a0', name: 'Bone Base', tags: ['bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone'] },
+  { color: '#a89888', name: 'Bone Dark', tags: ['bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone'] },
+  { color: '#887868', name: 'Bone Shadow', tags: ['bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone', 'bone'] },
+
+  // Common gem - blue gray quartz
+  { color: '#c8d4e0', name: 'Gem Quartz Light', tags: ['gem', 'gem', 'gem', 'gem', 'gem', 'gem', 'gem', 'gem', 'gem', 'gem'] },
+  { color: '#a8b8c8', name: 'Gem Quartz', tags: ['gem', 'gem', 'gem', 'gem', 'gem', 'gem', 'gem', 'gem', 'gem', 'gem'] },
+  { color: '#8898a8', name: 'Gem Quartz Dark', tags: ['gem', 'gem', 'gem', 'gem', 'gem', 'nori', 'nori', 'nori', 'nori', 'nori'] },
+
+  // Iron colors - steel blue metallic
+  { color: '#ffffff', name: 'Iron Shine', tags: ['nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori'] },
+  { color: '#e8eef5', name: 'Iron Bright', tags: ['nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori'] },
+  { color: '#d0dae8', name: 'Iron Highlight', tags: ['nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori'] },
+  { color: '#b8c8dc', name: 'Iron Light', tags: ['nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori'] },
+  { color: '#a0b4cc', name: 'Iron Pale', tags: ['nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori'] },
+  { color: '#8898b0', name: 'Iron Steel', tags: ['nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori'] },
+  { color: '#708098', name: 'Iron Mid', tags: ['nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori'] },
+  { color: '#5c6c80', name: 'Iron Base', tags: ['nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori'] },
+  { color: '#4a5868', name: 'Iron Dark', tags: ['nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori'] },
+  { color: '#384450', name: 'Iron Deep', tags: ['nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori'] },
+  { color: '#283038', name: 'Iron Shadow', tags: ['nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori'] },
+
+  // Handle colors - wood tones
+  { color: '#d4a86a', name: 'Handle Light', tags: ['nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori'] },
+  { color: '#c49458', name: 'Handle Mid', tags: ['nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori'] },
+  { color: '#a87840', name: 'Handle Wood', tags: ['nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori'] },
+  { color: '#8c6030', name: 'Handle Dark', tags: ['nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori'] },
+  { color: '#6e4820', name: 'Handle Shadow', tags: ['nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori', 'nori'] },
+
+  // Mushroom colors - tans, browns, cream
+  { color: '#faf8f4', name: 'Mushroom White', tags: ['mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom'] },
+  { color: '#f0ebe0', name: 'Mushroom Cream', tags: ['mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom'] },
+  { color: '#e4dcd0', name: 'Mushroom Pale', tags: ['mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom'] },
+  { color: '#d4c8b8', name: 'Mushroom Light', tags: ['mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom'] },
+  { color: '#c4b4a0', name: 'Mushroom Tan', tags: ['mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom'] },
+  { color: '#b0a088', name: 'Mushroom Cap', tags: ['mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom'] },
+  { color: '#a89878', name: 'Mushroom Soft', tags: ['mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom'] },
+  { color: '#9a8a70', name: 'Mushroom Brown', tags: ['mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom'] },
+  { color: '#928068', name: 'Mushroom Earthy', tags: ['mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom'] },
+  { color: '#887860', name: 'Mushroom Dark', tags: ['mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom'] },
+  { color: '#7c6c54', name: 'Mushroom Rich', tags: ['mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom'] },
+  { color: '#6e6050', name: 'Mushroom Deep', tags: ['mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom'] },
+  { color: '#625444', name: 'Mushroom Umber', tags: ['mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom'] },
+  { color: '#584838', name: 'Mushroom Gill', tags: ['mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom'] },
+  { color: '#4e3e30', name: 'Mushroom Dirt', tags: ['mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom'] },
+  { color: '#443828', name: 'Mushroom Shadow', tags: ['mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom', 'mushroom'] },
+
+  // Chili pepper colors - vibrant reds
+  { color: '#ffdddd', name: 'Pepper Highlight', tags: ['pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper'] },
+  { color: '#ff6666', name: 'Pepper Light', tags: ['pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper'] },
+  { color: '#ff4040', name: 'Pepper Bright', tags: ['pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper'] },
+  { color: '#e82020', name: 'Pepper Red', tags: ['pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper'] },
+  { color: '#cc1818', name: 'Pepper Rich', tags: ['pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper'] },
+  { color: '#b01010', name: 'Pepper Deep', tags: ['pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper'] },
+  { color: '#901010', name: 'Pepper Dark', tags: ['pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper'] },
+  { color: '#700808', name: 'Pepper Shadow', tags: ['pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper', 'pepper'] },
+
+  // Wheat colors - pale straw, golden, and brown tones
+  { color: '#f5f0e0', name: 'Wheat Highlight', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#e8e0c8', name: 'Wheat Light', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#ddd4b8', name: 'Wheat Pale', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#d0c4a0', name: 'Wheat Straw', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#e0d090', name: 'Wheat Sunny', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#d8c882', name: 'Wheat Golden', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#ccb870', name: 'Wheat Honey', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#c4b48c', name: 'Wheat Mid', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#bca86a', name: 'Wheat Grain', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#b8a478', name: 'Wheat Tan', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#b09860', name: 'Wheat Ochre', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#a89466', name: 'Wheat Brown', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#9c8858', name: 'Wheat Toast', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#948054', name: 'Wheat Dark', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#887448', name: 'Wheat Deep', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#7a6844', name: 'Wheat Shadow', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+
+  // Wheat gold variations (based on #eedd82)
+  { color: '#f8f0b0', name: 'Wheat Gold Light', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#f4e89c', name: 'Wheat Gold Pale', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#eedd82', name: 'Wheat Gold', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#e2d070', name: 'Wheat Gold Mid', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#d4c260', name: 'Wheat Gold Rich', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#c4b250', name: 'Wheat Gold Deep', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+  { color: '#b0a044', name: 'Wheat Gold Dark', tags: ['wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat', 'wheat'] },
+
+  // Potato colors - warm golden browns
+  { color: '#f5e6c8', name: 'Potato Light', tags: ['potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato'] },
+  { color: '#e8d4a8', name: 'Potato Pale', tags: ['potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato'] },
+  { color: '#dcc496', name: 'Potato Cream', tags: ['potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato'] },
+  { color: '#d8be88', name: 'Potato Soft', tags: ['potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato'] },
+  { color: '#d4b87a', name: 'Potato Golden', tags: ['potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato'] },
+  { color: '#c9a86a', name: 'Potato Tan', tags: ['potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato'] },
+  { color: '#b8935a', name: 'Potato Medium', tags: ['potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato'] },
+  { color: '#a67c4a', name: 'Potato Russet', tags: ['potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato'] },
+  { color: '#8b6538', name: 'Potato Dark', tags: ['potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato'] },
+  { color: '#6b4d28', name: 'Potato Shadow', tags: ['potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato'] },
+  { color: '#4a3520', name: 'Potato Eye', tags: ['potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato', 'potato'] },
+
+  // Leek colors - white to muted green gradient
+  { color: '#f8faf8', name: 'Leek White', tags: ['leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek'] },
+  { color: '#f0f5f0', name: 'Leek Pale', tags: ['leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek'] },
+  { color: '#e8f0e8', name: 'Leek Cream', tags: ['leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek'] },
+  { color: '#e0ebe0', name: 'Leek Light', tags: ['leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek'] },
+  { color: '#d4e4d4', name: 'Leek Soft', tags: ['leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek'] },
+  { color: '#c8d9c8', name: 'Leek Mint', tags: ['leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek'] },
+  { color: '#b8ceb8', name: 'Leek Sage', tags: ['leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek'] },
+  { color: '#a8c4a8', name: 'Leek Mid', tags: ['leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek'] },
+  { color: '#98b898', name: 'Leek Medium', tags: ['leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek'] },
+  { color: '#8ab08a', name: 'Leek Green', tags: ['leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek'] },
+  { color: '#7aa47a', name: 'Leek Deep', tags: ['leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek'] },
+  { color: '#6d9b6d', name: 'Leek Rich', tags: ['leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek'] },
+  { color: '#5a8a5a', name: 'Leek Dark', tags: ['leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek'] },
+  { color: '#4a7a4a', name: 'Leek Shadow', tags: ['leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek'] },
+  { color: '#3d6b3d', name: 'Leek Darkest', tags: ['leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek', 'leek'] },
 ];
 
-export function SpriteEditor({ onClose }: SpriteEditorProps) {
-  const { plants, animals, resources } = useDefinitionsStore();
+const AUTOSAVE_KEY = 'sprite_editor_autosave';
 
-  const [pixels, setPixels] = useState<string[][]>(
-    Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill('transparent'))
-  );
+export function SpriteEditor({ onClose, initialPixels }: SpriteEditorProps) {
+  const { plants, animals, resources } = useDefinitionsStore();
+  const { saveSprite } = useGalleryStore();
+
+  // Layer system
+  const [layers, setLayers] = useState<Layer[]>(() => {
+    // Try to load from localStorage first
+    try {
+      const saved = localStorage.getItem(LAYERS_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load layers:', e);
+    }
+    // Default: single layer with initialPixels or empty
+    const initialLayer: Layer = {
+      id: 'layer-1',
+      name: 'Layer 1',
+      visible: true,
+      pixels: initialPixels && initialPixels.length === GRID_SIZE
+        ? initialPixels.map(row => [...row])
+        : createEmptyPixels(),
+    };
+    return [initialLayer];
+  });
+  const [activeLayerId, setActiveLayerId] = useState<string>(() => 'layer-1');
+
+  // Composite all visible layers (bottom to top)
+  const pixels = useMemo(() => {
+    const result = createEmptyPixels();
+    // Layers are ordered bottom to top, so iterate in order
+    for (const layer of layers) {
+      if (!layer.visible) continue;
+      for (let row = 0; row < GRID_SIZE; row++) {
+        for (let col = 0; col < GRID_SIZE; col++) {
+          const color = layer.pixels[row]?.[col];
+          if (color && color !== 'transparent') {
+            result[row][col] = color;
+          }
+        }
+      }
+    }
+    return result;
+  }, [layers]);
+
+  // Update pixels on active layer (accepts updater function or direct value)
+  const setPixels = (updaterOrValue: ((prev: string[][]) => string[][]) | string[][]) => {
+    setLayers(prevLayers => prevLayers.map(layer => {
+      if (layer.id !== activeLayerId) return layer;
+      const newPixels = typeof updaterOrValue === 'function'
+        ? updaterOrValue(layer.pixels)
+        : updaterOrValue;
+      return { ...layer, pixels: newPixels };
+    }));
+  };
+
+  // Auto-save layers to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(LAYERS_KEY, JSON.stringify(layers));
+    } catch (e) {
+      console.error('Failed to save layers:', e);
+    }
+  }, [layers]);
+
+  // Layer management functions
+  const addLayer = () => {
+    const newId = `layer-${Date.now()}`;
+    const newLayer: Layer = {
+      id: newId,
+      name: `Layer ${layers.length + 1}`,
+      visible: true,
+      pixels: createEmptyPixels(),
+    };
+    setLayers([...layers, newLayer]);
+    setActiveLayerId(newId);
+  };
+
+  const deleteLayer = (id: string) => {
+    if (layers.length <= 1) return; // Keep at least one layer
+    const newLayers = layers.filter(l => l.id !== id);
+    setLayers(newLayers);
+    if (activeLayerId === id) {
+      setActiveLayerId(newLayers[newLayers.length - 1].id);
+    }
+  };
+
+  const toggleLayerVisibility = (id: string) => {
+    setLayers(layers.map(l => l.id === id ? { ...l, visible: !l.visible } : l));
+  };
+
+  const moveLayerUp = (id: string) => {
+    const idx = layers.findIndex(l => l.id === id);
+    if (idx < layers.length - 1) {
+      const newLayers = [...layers];
+      [newLayers[idx], newLayers[idx + 1]] = [newLayers[idx + 1], newLayers[idx]];
+      setLayers(newLayers);
+    }
+  };
+
+  const moveLayerDown = (id: string) => {
+    const idx = layers.findIndex(l => l.id === id);
+    if (idx > 0) {
+      const newLayers = [...layers];
+      [newLayers[idx], newLayers[idx - 1]] = [newLayers[idx - 1], newLayers[idx]];
+      setLayers(newLayers);
+    }
+  };
+
+  const _renameLayer = (id: string, newName: string) => {
+    setLayers(layers.map(l => l.id === id ? { ...l, name: newName } : l));
+  };
+  void _renameLayer; // Keep for future use
   const [selectedColor, setSelectedColor] = useState('#000000');
   const [brushSize, setBrushSize] = useState(1);
   const [zoom, setZoom] = useState(1); // Zoom level: 0.5x to 2x
-  const [currentTool, setCurrentTool] = useState<'paint' | 'polygon' | 'texture' | 'depth' | 'alignment'>('paint');
+  const [currentTool, setCurrentTool] = useState<'paint' | 'texture' | 'depth' | 'alignment'>('paint');
   const [isMouseDown, setIsMouseDown] = useState(false);
   const [isRightMouseDown, setIsRightMouseDown] = useState(false);
   const [selectedObjectType, setSelectedObjectType] = useState<'plant' | 'animal' | 'resource'>('plant');
   const [selectedObjectId, setSelectedObjectId] = useState<string>('');
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  // Tile selection for saving (3x3 grid of tiles)
+  const [selectedTilesForSave, setSelectedTilesForSave] = useState<boolean[][]>(
+    Array(TILES_PER_ROW).fill(null).map(() => Array(TILES_PER_ROW).fill(false))
+  );
+  const [isSelectingTilesForSave, setIsSelectingTilesForSave] = useState(false);
 
   // Color management state
   const [colorNames] = useState<Record<string, string>>({});
@@ -593,15 +863,9 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<string | null>(null);
 
-  // Polygon tool state - simplified
-  const [polygonState, setPolygonState] = useState<PolygonState>({
-    step: 'drawing',
-    isClosed: false,
-    boundaryPoints: [],
-    highlights: [],
-    currentHighlightPoints: [],
-    baseColor: '#4a90d9',
-  });
+  // Display toggles
+  const [showCheckerboard, setShowCheckerboard] = useState(true);
+  const [showTileBorders, setShowTileBorders] = useState(true);
 
   // Texture tool state - rectangle selection
   const [texturePattern, setTexturePattern] = useState<TexturePattern>('noise');
@@ -626,12 +890,41 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
   const [alignmentSelection, setAlignmentSelection] = useState<AlignmentSelection | null>(null);
   const [isSelectingAlignment, setIsSelectingAlignment] = useState(false);
   const [alignmentStart, setAlignmentStart] = useState<{ x: number; y: number } | null>(null);
+  const [alignmentCopyMode, setAlignmentCopyMode] = useState(false); // When true, arrow keys move preview, Place button pastes
+  const [alignmentCopyOffset, setAlignmentCopyOffset] = useState({ x: 0, y: 0 }); // Offset for copy preview
 
   // Ref for viewport to handle scroll-based zoom
   const viewportRef = useRef<HTMLDivElement>(null);
 
   // Calculate scaled canvas size for scrollable area
   const scaledCanvasSize = BASE_CANVAS_SIZE * zoom;
+
+  // Helper to calculate pixel position accounting for tile borders (no zoom - parent is scaled)
+  const getPixelPosition = (col: number, row: number) => {
+    const tileCol = Math.floor(col / TILE_SIZE);
+    const tileRow = Math.floor(row / TILE_SIZE);
+    const borderSize = showTileBorders ? TILE_BORDER : 0;
+    return {
+      x: col * PIXEL_SIZE + tileCol * borderSize,
+      y: row * PIXEL_SIZE + tileRow * borderSize,
+    };
+  };
+
+  // Helper to get selection rectangle position and size
+  const getSelectionRect = (selection: AlignmentSelection) => {
+    const minX = Math.min(selection.startX, selection.endX);
+    const maxX = Math.max(selection.startX, selection.endX);
+    const minY = Math.min(selection.startY, selection.endY);
+    const maxY = Math.max(selection.startY, selection.endY);
+    const topLeft = getPixelPosition(minX, minY);
+    const bottomRight = getPixelPosition(maxX, maxY);
+    return {
+      left: topLeft.x,
+      top: topLeft.y,
+      width: bottomRight.x - topLeft.x + PIXEL_SIZE,
+      height: bottomRight.y - topLeft.y + PIXEL_SIZE,
+    };
+  };
 
   // Filter colors based on search and group
   const filteredColors = useMemo(() => {
@@ -785,37 +1078,6 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
         setIsMouseDown(true);
         paintPixels(row, col, false);
       }
-    } else if (currentTool === 'polygon') {
-      const point: PolygonPoint = { x: col, y: row };
-
-      if (polygonState.step === 'drawing') {
-        // Just add points, use Next button to close
-        setPolygonState(prev => ({ ...prev, boundaryPoints: [...prev.boundaryPoints, point] }));
-      } else if (polygonState.step === 'highlights') {
-        // Add highlight points anywhere
-        setPolygonState(prev => ({ ...prev, currentHighlightPoints: [...prev.currentHighlightPoints, point] }));
-      } else if (polygonState.step === 'coloring') {
-        // Right-click to assign selected color to base or highlight
-        if (e.button === 2) {
-          e.preventDefault();
-          // Check if clicking inside a highlight first
-          const highlightIndex = polygonState.highlights.findIndex(h =>
-            h.points.length >= 3 && isPointInPolygon(col, row, h.points)
-          );
-          if (highlightIndex >= 0) {
-            // Assign color to this highlight
-            setPolygonState(prev => ({
-              ...prev,
-              highlights: prev.highlights.map((h, i) =>
-                i === highlightIndex ? { ...h, color: selectedColor } : h
-              )
-            }));
-          } else if (isPointInPolygon(col, row, polygonState.boundaryPoints)) {
-            // Assign color to base
-            setPolygonState(prev => ({ ...prev, baseColor: selectedColor }));
-          }
-        }
-      }
     } else if (currentTool === 'texture') {
       if (textureState.step === 'drawing') {
         // Rectangle selection like alignment tool
@@ -922,16 +1184,23 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
 
         if (shift.x !== 0 || shift.y !== 0) {
           e.preventDefault();
-          shiftSelectedPixels(shift.x, shift.y);
+          if (alignmentCopyMode) {
+            // In copy mode, just move the preview offset
+            setAlignmentCopyOffset(prev => ({ x: prev.x + shift.x, y: prev.y + shift.y }));
+          } else {
+            // In move mode, actually move the pixels
+            shiftSelectedPixels(shift.x, shift.y);
+          }
         }
       }
+
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, currentTool, alignmentSelection]);
+  }, [onClose, currentTool, alignmentSelection, alignmentCopyMode]);
 
-  // Shift selected pixels for alignment tool
+  // Shift selected pixels for alignment tool (move mode only)
   const shiftSelectedPixels = (dx: number, dy: number) => {
     if (!alignmentSelection) return;
 
@@ -984,80 +1253,43 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
     } : null);
   };
 
-  // Check if a point is inside a polygon
-  const isPointInPolygon = (x: number, y: number, polygon: PolygonPoint[]): boolean => {
-    if (polygon.length < 3) return false;
-    let inside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-      const xi = polygon[i].x, yi = polygon[i].y;
-      const xj = polygon[j].x, yj = polygon[j].y;
-      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
-        inside = !inside;
-      }
-    }
-    return inside;
-  };
+  // Place copied pixels at offset position (copy mode)
+  const placeCopiedPixels = () => {
+    if (!alignmentSelection) return;
 
-  // Generate polygon shape
-  const generatePolygonShape = () => {
-    if (polygonState.boundaryPoints.length < 3) return;
-    const newPixels = pixels.map(row => [...row]);
+    const { startX, startY, endX, endY } = alignmentSelection;
+    const minX = Math.min(startX, endX);
+    const maxX = Math.max(startX, endX);
+    const minY = Math.min(startY, endY);
+    const maxY = Math.max(startY, endY);
 
-    // Fill base shape
-    for (let y = 0; y < GRID_SIZE; y++) {
-      for (let x = 0; x < GRID_SIZE; x++) {
-        if (isPointInPolygon(x, y, polygonState.boundaryPoints)) {
-          newPixels[y][x] = polygonState.baseColor;
-        }
-      }
-    }
+    setPixels(prev => {
+      const newPixels = prev.map(row => [...row]);
 
-    // Fill highlights on top
-    polygonState.highlights.forEach(highlight => {
-      for (let y = 0; y < GRID_SIZE; y++) {
-        for (let x = 0; x < GRID_SIZE; x++) {
-          if (highlight.points.length >= 3 && isPointInPolygon(x, y, highlight.points)) {
-            newPixels[y][x] = highlight.color;
+      // Copy pixels to new position (don't clear original)
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          const color = prev[y]?.[x];
+          if (color && color !== 'transparent') {
+            const destY = y + alignmentCopyOffset.y;
+            const destX = x + alignmentCopyOffset.x;
+            if (destY >= 0 && destY < GRID_SIZE && destX >= 0 && destX < GRID_SIZE) {
+              newPixels[destY][destX] = color;
+            }
           }
         }
       }
+      return newPixels;
     });
 
-    setPixels(newPixels);
-    setPolygonState({
-      step: 'drawing',
-      isClosed: false,
-      boundaryPoints: [],
-      highlights: [],
-      currentHighlightPoints: [],
-      baseColor: polygonState.baseColor,
-    });
-  };
-
-  // Add current highlight to list
-  const addHighlight = () => {
-    if (polygonState.currentHighlightPoints.length >= 3) {
-      setPolygonState(prev => ({
-        ...prev,
-        highlights: [...prev.highlights, { points: prev.currentHighlightPoints, color: '#ffffff' }],
-        currentHighlightPoints: [],
-      }));
-    }
-  };
-
-  // Go to coloring step
-  const goToColoring = () => {
-    // Save any current highlight points first
-    if (polygonState.currentHighlightPoints.length >= 3) {
-      setPolygonState(prev => ({
-        ...prev,
-        highlights: [...prev.highlights, { points: prev.currentHighlightPoints, color: '#ffffff' }],
-        currentHighlightPoints: [],
-        step: 'coloring',
-      }));
-    } else {
-      setPolygonState(prev => ({ ...prev, step: 'coloring' }));
-    }
+    // Move selection to new position and reset offset
+    setAlignmentSelection(prev => prev ? {
+      startX: prev.startX + alignmentCopyOffset.x,
+      startY: prev.startY + alignmentCopyOffset.y,
+      endX: prev.endX + alignmentCopyOffset.x,
+      endY: prev.endY + alignmentCopyOffset.y,
+    } : null);
+    setAlignmentCopyOffset({ x: 0, y: 0 });
   };
 
   // Generate depth shadows - rectangle selection based
@@ -1179,6 +1411,105 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
   // Clear canvas
   const handleClear = () => {
     setPixels(Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill('transparent')));
+    localStorage.removeItem(AUTOSAVE_KEY);
+  };
+
+  // Toggle tile for save selection
+  const toggleTileForSave = (tileRow: number, tileCol: number) => {
+    setSelectedTilesForSave(prev => {
+      const newSelection = prev.map(row => [...row]);
+      newSelection[tileRow][tileCol] = !newSelection[tileRow][tileCol];
+      return newSelection;
+    });
+  };
+
+  // Check if any tiles are selected for saving
+  const hasSelectedTiles = selectedTilesForSave.some(row => row.some(selected => selected));
+
+  // Get bounding box of selected tiles
+  const getSelectedTilesBounds = () => {
+    let minRow = TILES_PER_ROW, maxRow = -1, minCol = TILES_PER_ROW, maxCol = -1;
+    for (let r = 0; r < TILES_PER_ROW; r++) {
+      for (let c = 0; c < TILES_PER_ROW; c++) {
+        if (selectedTilesForSave[r][c]) {
+          minRow = Math.min(minRow, r);
+          maxRow = Math.max(maxRow, r);
+          minCol = Math.min(minCol, c);
+          maxCol = Math.max(maxCol, c);
+        }
+      }
+    }
+    return { minRow, maxRow, minCol, maxCol };
+  };
+
+  // Extract pixels from selected tiles
+  const extractSelectedTilesPixels = (): string[][] => {
+    const { minRow, maxRow, minCol, maxCol } = getSelectedTilesBounds();
+    const rows = (maxRow - minRow + 1) * TILE_SIZE;
+    const cols = (maxCol - minCol + 1) * TILE_SIZE;
+
+    const extracted: string[][] = Array(rows).fill(null).map(() => Array(cols).fill('transparent'));
+
+    for (let r = minRow; r <= maxRow; r++) {
+      for (let c = minCol; c <= maxCol; c++) {
+        if (selectedTilesForSave[r][c]) {
+          // Copy this tile's pixels
+          for (let py = 0; py < TILE_SIZE; py++) {
+            for (let px = 0; px < TILE_SIZE; px++) {
+              const srcY = r * TILE_SIZE + py;
+              const srcX = c * TILE_SIZE + px;
+              const destY = (r - minRow) * TILE_SIZE + py;
+              const destX = (c - minCol) * TILE_SIZE + px;
+              extracted[destY][destX] = pixels[srcY][srcX];
+            }
+          }
+        }
+      }
+    }
+    return extracted;
+  };
+
+  // Save sprite to gallery (with tile selection)
+  const handleSaveToGallery = async () => {
+    if (!isSelectingTilesForSave) {
+      // Enter tile selection mode
+      setIsSelectingTilesForSave(true);
+      setSaveMessage('Click tiles to select, then Save');
+      return;
+    }
+
+    if (!hasSelectedTiles) {
+      setSaveMessage('Select at least one tile!');
+      setTimeout(() => setSaveMessage(null), 2000);
+      return;
+    }
+
+    const { minRow, maxRow, minCol, maxCol } = getSelectedTilesBounds();
+    const extractedPixels = extractSelectedTilesPixels();
+    const tilesUsed = { rows: maxRow - minRow + 1, cols: maxCol - minCol + 1 };
+
+    try {
+      const name = `Sprite ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+      await saveSprite(name, extractedPixels, tilesUsed);
+      setSaveMessage('Saved to gallery!');
+
+      // Reset selection mode
+      setIsSelectingTilesForSave(false);
+      setSelectedTilesForSave(Array(TILES_PER_ROW).fill(null).map(() => Array(TILES_PER_ROW).fill(false)));
+
+      setTimeout(() => setSaveMessage(null), 2000);
+    } catch (error) {
+      console.error('Failed to save:', error);
+      setSaveMessage('Failed to save');
+      setTimeout(() => setSaveMessage(null), 2000);
+    }
+  };
+
+  // Cancel tile selection mode
+  const cancelTileSelection = () => {
+    setIsSelectingTilesForSave(false);
+    setSelectedTilesForSave(Array(TILES_PER_ROW).fill(null).map(() => Array(TILES_PER_ROW).fill(false)));
+    setSaveMessage(null);
   };
 
   // Generate sprite as data URL
@@ -1583,6 +1914,229 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
               <p style={{ fontSize: '10px', color: '#888', marginTop: '4px' }}>Scroll on canvas to zoom</p>
             </div>
 
+            {/* Display Toggles */}
+            <div style={{ marginBottom: '12px', display: 'flex', gap: '6px' }}>
+              <button
+                onClick={() => setShowCheckerboard(!showCheckerboard)}
+                style={{
+                  flex: 1,
+                  padding: '6px',
+                  background: showCheckerboard ? '#0D0D0D' : '#ccc',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: showCheckerboard ? '#FFF1E5' : '#666',
+                  cursor: 'pointer',
+                  fontSize: '10px',
+                  fontWeight: 'bold',
+                }}
+              >
+                Grid
+              </button>
+              <button
+                onClick={() => setShowTileBorders(!showTileBorders)}
+                style={{
+                  flex: 1,
+                  padding: '6px',
+                  background: showTileBorders ? '#0D0D0D' : '#ccc',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: showTileBorders ? '#FFF1E5' : '#666',
+                  cursor: 'pointer',
+                  fontSize: '10px',
+                  fontWeight: 'bold',
+                }}
+              >
+                Borders
+              </button>
+            </div>
+
+            {/* Layers Panel */}
+            <div style={{ marginBottom: '15px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label style={{ color: '#0D0D0D', fontSize: '13px', fontWeight: 'bold' }}>Layers</label>
+                <button
+                  onClick={addLayer}
+                  style={{
+                    padding: '2px 8px',
+                    background: '#22c55e',
+                    border: 'none',
+                    borderRadius: '4px',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  + Add
+                </button>
+              </div>
+              <div style={{
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                background: '#fff',
+                maxHeight: '150px',
+                overflowY: 'auto',
+              }}>
+                {[...layers].reverse().map((layer, idx) => (
+                  <div
+                    key={layer.id}
+                    onClick={() => setActiveLayerId(layer.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 8px',
+                      background: layer.id === activeLayerId ? '#e0e7ff' : 'transparent',
+                      borderBottom: idx < layers.length - 1 ? '1px solid #eee' : 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(layer.id); }}
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        padding: 0,
+                        background: layer.visible ? '#3b82f6' : '#ccc',
+                        border: 'none',
+                        borderRadius: '3px',
+                        color: 'white',
+                        cursor: 'pointer',
+                        fontSize: '10px',
+                      }}
+                      title={layer.visible ? 'Hide layer' : 'Show layer'}
+                    >
+                      {layer.visible ? '👁' : '−'}
+                    </button>
+                    <span style={{ flex: 1, fontSize: '11px', color: '#333' }}>{layer.name}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); moveLayerUp(layer.id); }}
+                      style={{
+                        padding: '2px 4px',
+                        background: '#e8e8e8',
+                        border: 'none',
+                        borderRadius: '2px',
+                        cursor: 'pointer',
+                        fontSize: '9px',
+                      }}
+                      title="Move up"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); moveLayerDown(layer.id); }}
+                      style={{
+                        padding: '2px 4px',
+                        background: '#e8e8e8',
+                        border: 'none',
+                        borderRadius: '2px',
+                        cursor: 'pointer',
+                        fontSize: '9px',
+                      }}
+                      title="Move down"
+                    >
+                      ↓
+                    </button>
+                    {layers.length > 1 && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteLayer(layer.id); }}
+                        style={{
+                          padding: '2px 4px',
+                          background: '#fee2e2',
+                          border: 'none',
+                          borderRadius: '2px',
+                          color: '#dc2626',
+                          cursor: 'pointer',
+                          fontSize: '9px',
+                        }}
+                        title="Delete layer"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <p style={{ fontSize: '10px', color: '#888', marginTop: '4px' }}>
+                Higher layers show on top
+              </p>
+            </div>
+
+            {/* Save to Gallery */}
+            {!isSelectingTilesForSave ? (
+              <button
+                onClick={handleSaveToGallery}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  background: '#22c55e',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  marginBottom: '8px',
+                }}
+              >
+                Save to Gallery
+              </button>
+            ) : (
+              <div style={{ marginBottom: '8px' }}>
+                <p style={{ fontSize: '11px', color: '#22c55e', marginBottom: '6px', fontWeight: 'bold' }}>
+                  Click tiles to select for saving
+                </p>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    onClick={handleSaveToGallery}
+                    disabled={!hasSelectedTiles}
+                    style={{
+                      flex: 1,
+                      padding: '8px',
+                      background: hasSelectedTiles ? '#22c55e' : '#ccc',
+                      border: 'none',
+                      borderRadius: '4px',
+                      color: 'white',
+                      cursor: hasSelectedTiles ? 'pointer' : 'not-allowed',
+                      fontWeight: 'bold',
+                      fontSize: '12px',
+                    }}
+                  >
+                    Save Selected
+                  </button>
+                  <button
+                    onClick={cancelTileSelection}
+                    style={{
+                      padding: '8px 12px',
+                      background: '#666',
+                      border: 'none',
+                      borderRadius: '4px',
+                      color: 'white',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Save message */}
+            {saveMessage && !isSelectingTilesForSave && (
+              <div style={{
+                padding: '8px',
+                background: saveMessage.includes('Failed') ? '#fee2e2' : '#dcfce7',
+                color: saveMessage.includes('Failed') ? '#ef4444' : '#22c55e',
+                borderRadius: '4px',
+                fontSize: '12px',
+                textAlign: 'center',
+                marginBottom: '8px',
+              }}>
+                {saveMessage}
+              </div>
+            )}
+
             {/* Clear All */}
             <button
               onClick={handleClear}
@@ -1633,10 +2187,10 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                   <div
                     style={{
                       position: 'relative',
-                      width: BASE_CANVAS_SIZE,
-                      height: BASE_CANVAS_SIZE,
-                      background: '#000',
-                      border: '1px solid #000',
+                      width: showTileBorders ? BASE_CANVAS_SIZE : GRID_SIZE * PIXEL_SIZE,
+                      height: showTileBorders ? BASE_CANVAS_SIZE : GRID_SIZE * PIXEL_SIZE,
+                      background: showTileBorders ? '#000' : '#FFF1E5',
+                      border: showTileBorders ? '1px solid #000' : 'none',
                       transform: `scale(${zoom})`,
                       transformOrigin: 'top left',
                     }}
@@ -1644,8 +2198,9 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                     {/* Render 3x3 tiles */}
                     {Array.from({ length: TILES_PER_ROW }).map((_, tileRow) =>
                       Array.from({ length: TILES_PER_ROW }).map((_, tileCol) => {
-                        const tileX = tileCol * (TILE_SIZE * PIXEL_SIZE + TILE_BORDER);
-                        const tileY = tileRow * (TILE_SIZE * PIXEL_SIZE + TILE_BORDER);
+                        const borderSize = showTileBorders ? TILE_BORDER : 0;
+                        const tileX = tileCol * (TILE_SIZE * PIXEL_SIZE + borderSize);
+                        const tileY = tileRow * (TILE_SIZE * PIXEL_SIZE + borderSize);
                         return (
                           <div
                             key={`tile-${tileRow}-${tileCol}`}
@@ -1668,7 +2223,9 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                                 const color = pixels[globalRow][globalCol];
                                 // Checkerboard pattern for transparent pixels
                                 const isCheckerWhite = (globalRow + globalCol) % 2 === 0;
-                                const transparentColor = isCheckerWhite ? '#ffffff' : '#cccccc';
+                                const transparentColor = showCheckerboard
+                                  ? (isCheckerWhite ? '#ffffff' : '#cccccc')
+                                  : '#FFF1E5';
 
                                 return (
                                   <div
@@ -1690,8 +2247,9 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                     {/* Interaction grid overlay */}
                     {Array.from({ length: TILES_PER_ROW }).map((_, tileRow) =>
                       Array.from({ length: TILES_PER_ROW }).map((_, tileCol) => {
-                        const tileX = tileCol * (TILE_SIZE * PIXEL_SIZE + TILE_BORDER);
-                        const tileY = tileRow * (TILE_SIZE * PIXEL_SIZE + TILE_BORDER);
+                        const borderSize = showTileBorders ? TILE_BORDER : 0;
+                        const tileX = tileCol * (TILE_SIZE * PIXEL_SIZE + borderSize);
+                        const tileY = tileRow * (TILE_SIZE * PIXEL_SIZE + borderSize);
                         return (
                           <div
                             key={`interact-tile-${tileRow}-${tileCol}`}
@@ -1729,117 +2287,25 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                       })
                     )}
 
-                    {/* Polygon Tool Visual Overlay - Simplified (no numbers) */}
-                    {currentTool === 'polygon' && (
-                      <svg
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: scaledCanvasSize,
-                          height: scaledCanvasSize,
-                          pointerEvents: 'none',
-                          overflow: 'visible',
-                        }}
-                      >
-                        {/* Boundary polygon */}
-                        {polygonState.boundaryPoints.length >= 2 && (
-                          <polygon
-                            points={polygonState.boundaryPoints.map(p =>
-                              `${p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2},${p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}`
-                            ).join(' ')}
-                            fill={polygonState.isClosed ? `${polygonState.baseColor}33` : 'rgba(34, 197, 94, 0.15)'}
-                            stroke={polygonState.isClosed ? polygonState.baseColor : '#22c55e'}
-                            strokeWidth="2"
-                            strokeDasharray={polygonState.isClosed ? 'none' : '6,3'}
-                          />
-                        )}
-                        {/* Boundary points (larger, more visible) */}
-                        {polygonState.boundaryPoints.map((p, i) => (
-                          <circle
-                            key={`bp-${i}`}
-                            cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                            cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                            r={i === 0 ? 10 : 8}
-                            fill={i === 0 ? '#16a34a' : '#22c55e'}
-                            stroke="white"
-                            strokeWidth="3"
-                          />
-                        ))}
-
-                        {/* Completed highlights */}
-                        {polygonState.highlights.map((highlight, hi) => (
-                          <g key={`h-${hi}`}>
-                            {highlight.points.length >= 3 && (
-                              <polygon
-                                points={highlight.points.map(p =>
-                                  `${p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2},${p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}`
-                                ).join(' ')}
-                                fill={`${highlight.color}55`}
-                                stroke={highlight.color}
-                                strokeWidth="2"
-                              />
-                            )}
-                            {highlight.points.map((p, i) => (
-                              <circle
-                                key={`hp-${hi}-${i}`}
-                                cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                                cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                                r={4}
-                                fill={highlight.color}
-                                stroke="white"
-                                strokeWidth="1"
-                              />
-                            ))}
-                          </g>
-                        ))}
-
-                        {/* Current highlight being drawn */}
-                        {polygonState.currentHighlightPoints.length >= 1 && (
-                          <>
-                            {polygonState.currentHighlightPoints.length >= 2 && (
-                              <polygon
-                                points={polygonState.currentHighlightPoints.map(p =>
-                                  `${p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2},${p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}`
-                                ).join(' ')}
-                                fill="rgba(255, 100, 100, 0.3)"
-                                stroke="#ff4444"
-                                strokeWidth="3"
-                                strokeDasharray="6,3"
-                              />
-                            )}
-                            {polygonState.currentHighlightPoints.map((p, i) => (
-                              <circle
-                                key={`chp-${i}`}
-                                cx={p.x * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                                cy={p.y * PIXEL_SIZE * zoom + PIXEL_SIZE * zoom / 2}
-                                r={8}
-                                fill="#ff4444"
-                                stroke="white"
-                                strokeWidth="3"
-                              />
-                            ))}
-                          </>
-                        )}
-                      </svg>
-                    )}
-
                     {/* Depth Tool Visual Overlay - Rectangle Selection */}
-                    {currentTool === 'depth' && depthState.selection && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          left: Math.min(depthState.selection.startX, depthState.selection.endX) * PIXEL_SIZE * zoom,
-                          top: Math.min(depthState.selection.startY, depthState.selection.endY) * PIXEL_SIZE * zoom,
-                          width: (Math.abs(depthState.selection.endX - depthState.selection.startX) + 1) * PIXEL_SIZE * zoom,
-                          height: (Math.abs(depthState.selection.endY - depthState.selection.startY) + 1) * PIXEL_SIZE * zoom,
-                          border: '3px dashed #8b5cf6',
-                          background: 'rgba(139, 92, 246, 0.2)',
-                          pointerEvents: 'none',
-                          boxSizing: 'border-box',
-                        }}
-                      />
-                    )}
+                    {currentTool === 'depth' && depthState.selection && (() => {
+                      const rect = getSelectionRect(depthState.selection);
+                      return (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: rect.left,
+                            top: rect.top,
+                            width: rect.width,
+                            height: rect.height,
+                            border: '3px dashed #8b5cf6',
+                            background: 'rgba(139, 92, 246, 0.2)',
+                            pointerEvents: 'none',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      );
+                    })()}
 
                     {/* Depth Light Direction Indicator */}
                     {currentTool === 'depth' && depthState.lightDirection && (
@@ -1876,37 +2342,112 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                     )}
 
                     {/* Texture Tool Visual Overlay - Rectangle Selection */}
-                    {currentTool === 'texture' && textureState.selection && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          left: Math.min(textureState.selection.startX, textureState.selection.endX) * PIXEL_SIZE * zoom,
-                          top: Math.min(textureState.selection.startY, textureState.selection.endY) * PIXEL_SIZE * zoom,
-                          width: (Math.abs(textureState.selection.endX - textureState.selection.startX) + 1) * PIXEL_SIZE * zoom,
-                          height: (Math.abs(textureState.selection.endY - textureState.selection.startY) + 1) * PIXEL_SIZE * zoom,
-                          border: '3px dashed #f59e0b',
-                          background: 'rgba(245, 158, 11, 0.2)',
-                          pointerEvents: 'none',
-                          boxSizing: 'border-box',
-                        }}
-                      />
-                    )}
+                    {currentTool === 'texture' && textureState.selection && (() => {
+                      const rect = getSelectionRect(textureState.selection);
+                      return (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: rect.left,
+                            top: rect.top,
+                            width: rect.width,
+                            height: rect.height,
+                            border: '3px dashed #f59e0b',
+                            background: 'rgba(245, 158, 11, 0.2)',
+                            pointerEvents: 'none',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      );
+                    })()}
 
                     {/* Alignment Selection Overlay */}
-                    {currentTool === 'alignment' && alignmentSelection && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          left: Math.min(alignmentSelection.startX, alignmentSelection.endX) * PIXEL_SIZE * zoom,
-                          top: Math.min(alignmentSelection.startY, alignmentSelection.endY) * PIXEL_SIZE * zoom,
-                          width: (Math.abs(alignmentSelection.endX - alignmentSelection.startX) + 1) * PIXEL_SIZE * zoom,
-                          height: (Math.abs(alignmentSelection.endY - alignmentSelection.startY) + 1) * PIXEL_SIZE * zoom,
-                          border: '3px dashed #ec4899',
-                          background: 'rgba(236, 72, 153, 0.2)',
-                          pointerEvents: 'none',
-                          boxSizing: 'border-box',
-                        }}
-                      />
+                    {currentTool === 'alignment' && alignmentSelection && (() => {
+                      const rect = getSelectionRect(alignmentSelection);
+                      return (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: rect.left,
+                            top: rect.top,
+                            width: rect.width,
+                            height: rect.height,
+                            border: '3px dashed #ec4899',
+                            background: 'rgba(236, 72, 153, 0.2)',
+                            pointerEvents: 'none',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      );
+                    })()}
+
+                    {/* Copy Mode Ghost Preview */}
+                    {currentTool === 'alignment' && alignmentCopyMode && alignmentSelection && (alignmentCopyOffset.x !== 0 || alignmentCopyOffset.y !== 0) && (() => {
+                      const { startX, startY, endX, endY } = alignmentSelection;
+                      const minX = Math.min(startX, endX);
+                      const maxX = Math.max(startX, endX);
+                      const minY = Math.min(startY, endY);
+                      const maxY = Math.max(startY, endY);
+
+                      const ghostPixels: React.ReactNode[] = [];
+                      for (let y = minY; y <= maxY; y++) {
+                        for (let x = minX; x <= maxX; x++) {
+                          const color = pixels[y]?.[x];
+                          if (color && color !== 'transparent') {
+                            const destX = x + alignmentCopyOffset.x;
+                            const destY = y + alignmentCopyOffset.y;
+                            const pos = getPixelPosition(destX, destY);
+                            ghostPixels.push(
+                              <div
+                                key={`ghost-${x}-${y}`}
+                                style={{
+                                  position: 'absolute',
+                                  left: pos.x,
+                                  top: pos.y,
+                                  width: PIXEL_SIZE,
+                                  height: PIXEL_SIZE,
+                                  backgroundColor: color,
+                                  opacity: 0.6,
+                                  pointerEvents: 'none',
+                                }}
+                              />
+                            );
+                          }
+                        }
+                      }
+                      return <>{ghostPixels}</>;
+                    })()}
+
+                    {/* Tile Selection Overlay for Save */}
+                    {isSelectingTilesForSave && (
+                      <>
+                        {Array.from({ length: TILES_PER_ROW }).map((_, tileRow) =>
+                          Array.from({ length: TILES_PER_ROW }).map((_, tileCol) => {
+                            const borderSize = showTileBorders ? TILE_BORDER : 0;
+                            const tileX = tileCol * (TILE_SIZE * PIXEL_SIZE + borderSize);
+                            const tileY = tileRow * (TILE_SIZE * PIXEL_SIZE + borderSize);
+                            const isSelected = selectedTilesForSave[tileRow][tileCol];
+                            return (
+                              <div
+                                key={`tile-select-${tileRow}-${tileCol}`}
+                                onClick={() => toggleTileForSave(tileRow, tileCol)}
+                                style={{
+                                  position: 'absolute',
+                                  left: tileX,
+                                  top: tileY,
+                                  width: TILE_SIZE * PIXEL_SIZE,
+                                  height: TILE_SIZE * PIXEL_SIZE,
+                                  border: isSelected ? '4px solid #22c55e' : '2px dashed rgba(34, 197, 94, 0.5)',
+                                  background: isSelected ? 'rgba(34, 197, 94, 0.3)' : 'rgba(34, 197, 94, 0.1)',
+                                  cursor: 'pointer',
+                                  boxSizing: 'border-box',
+                                  zIndex: 100,
+                                }}
+                              />
+                            );
+                          })
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1943,21 +2484,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                 >
                   Paint
                 </button>
-                <button
-                  onClick={() => setCurrentTool('polygon')}
-                  style={{
-                    padding: '8px 14px',
-                    background: currentTool === 'polygon' ? '#22c55e' : '#E8DDD1',
-                    border: '1px solid #ccc',
-                    borderRadius: '4px',
-                    color: currentTool === 'polygon' ? 'white' : '#333',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  Polygon
-                </button>
+{/* ARCHIVED: Texture and Depth tools - keeping code for future use
                 <button
                   onClick={() => setCurrentTool('texture')}
                   style={{
@@ -1988,6 +2515,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                 >
                   Depth
                 </button>
+                */}
                 <button
                   onClick={() => setCurrentTool('alignment')}
                   style={{
@@ -2022,84 +2550,6 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                   <p style={{ fontSize: '11px', color: '#666', marginTop: '8px' }}>
                     Left-click paint, right-click erase
                   </p>
-                </div>
-              )}
-
-              {/* Polygon Tool Panel - Guided */}
-              {currentTool === 'polygon' && (
-                <div style={{ marginBottom: '15px', padding: '12px', background: '#e8f5e9', borderRadius: '6px', border: '1px solid #a5d6a7' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '10px', color: '#2e7d32' }}>
-                    {polygonState.step === 'drawing' && '1. Draw Shape'}
-                    {polygonState.step === 'highlights' && '2. Add Highlights'}
-                    {polygonState.step === 'coloring' && '3. Assign Colors'}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#555', marginBottom: '10px', lineHeight: '1.4' }}>
-                    {polygonState.step === 'drawing' && (
-                      <>Click pixels to add points. Press Next when done.</>
-                    )}
-                    {polygonState.step === 'highlights' && (
-                      <>Click to add highlight points. Click "Close Highlight" to finish, then add more.</>
-                    )}
-                    {polygonState.step === 'coloring' && (
-                      <>Select a color from palette, then right-click on shape or highlight to assign.</>
-                    )}
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>
-                    Points: {polygonState.boundaryPoints.length} | Highlights: {polygonState.highlights.length}
-                  </div>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    {polygonState.step === 'drawing' && (
-                      <button
-                        onClick={() => setPolygonState(prev => ({ ...prev, isClosed: true, step: 'highlights' }))}
-                        disabled={polygonState.boundaryPoints.length < 3}
-                        style={{
-                          padding: '6px 10px',
-                          background: polygonState.boundaryPoints.length >= 3 ? '#3b82f6' : '#ccc',
-                          border: 'none', borderRadius: '4px', color: 'white',
-                          cursor: polygonState.boundaryPoints.length >= 3 ? 'pointer' : 'not-allowed', fontSize: '11px',
-                        }}
-                      >
-                        Next
-                      </button>
-                    )}
-                    {polygonState.step === 'highlights' && (
-                      <>
-                        {polygonState.currentHighlightPoints.length > 0 && (
-                          <button
-                            onClick={addHighlight}
-                            disabled={polygonState.currentHighlightPoints.length < 3}
-                            style={{
-                              padding: '6px 10px',
-                              background: polygonState.currentHighlightPoints.length >= 3 ? '#22c55e' : '#ccc',
-                              border: 'none', borderRadius: '4px', color: 'white', cursor: polygonState.currentHighlightPoints.length >= 3 ? 'pointer' : 'not-allowed', fontSize: '11px',
-                            }}
-                          >
-                            Close Highlight
-                          </button>
-                        )}
-                        <button
-                          onClick={goToColoring}
-                          style={{ padding: '6px 10px', background: '#3b82f6', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '11px' }}
-                        >
-                          Next
-                        </button>
-                      </>
-                    )}
-                    {polygonState.step === 'coloring' && (
-                      <button
-                        onClick={generatePolygonShape}
-                        style={{ padding: '6px 12px', background: '#22c55e', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}
-                      >
-                        Generate Shape
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setPolygonState({ step: 'drawing', isClosed: false, boundaryPoints: [], highlights: [], currentHighlightPoints: [], baseColor: polygonState.baseColor })}
-                      style={{ padding: '6px 10px', background: '#666', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '11px' }}
-                    >
-                      Reset
-                    </button>
-                  </div>
                 </div>
               )}
 
@@ -2205,13 +2655,76 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
               {currentTool === 'alignment' && (
                 <div style={{ marginBottom: '15px', padding: '10px', background: '#fce4ec', borderRadius: '4px' }}>
                   <p style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>
-                    Click to select, arrow keys to shift
+                    {alignmentCopyMode
+                      ? 'Arrow keys to position, Place to paste'
+                      : 'Arrow keys to move selection'}
                   </p>
                   <div style={{ fontSize: '12px', marginBottom: '8px' }}>
-                    {alignmentSelection ? 'Selection active - use arrow keys!' : 'Click and drag to select'}
+                    {alignmentSelection
+                      ? (alignmentCopyMode && (alignmentCopyOffset.x !== 0 || alignmentCopyOffset.y !== 0)
+                          ? `Offset: (${alignmentCopyOffset.x}, ${alignmentCopyOffset.y})`
+                          : 'Selection active - use arrow keys!')
+                      : 'Click and drag to select'}
                   </div>
+
+                  {/* Move / Copy toggle */}
+                  <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
+                    <button
+                      onClick={() => { setAlignmentCopyMode(false); setAlignmentCopyOffset({ x: 0, y: 0 }); }}
+                      style={{
+                        padding: '6px 12px',
+                        background: !alignmentCopyMode ? '#ec4899' : '#E8DDD1',
+                        border: 'none',
+                        borderRadius: '4px',
+                        color: !alignmentCopyMode ? 'white' : '#333',
+                        cursor: 'pointer',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      Move
+                    </button>
+                    <button
+                      onClick={() => setAlignmentCopyMode(true)}
+                      style={{
+                        padding: '6px 12px',
+                        background: alignmentCopyMode ? '#22c55e' : '#E8DDD1',
+                        border: 'none',
+                        borderRadius: '4px',
+                        color: alignmentCopyMode ? 'white' : '#333',
+                        cursor: 'pointer',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      Copy
+                    </button>
+                  </div>
+
+                  {/* Place button for copy mode */}
+                  {alignmentCopyMode && alignmentSelection && (
+                    <button
+                      onClick={placeCopiedPixels}
+                      disabled={alignmentCopyOffset.x === 0 && alignmentCopyOffset.y === 0}
+                      style={{
+                        padding: '6px 12px',
+                        background: (alignmentCopyOffset.x !== 0 || alignmentCopyOffset.y !== 0) ? '#22c55e' : '#ccc',
+                        border: 'none',
+                        borderRadius: '4px',
+                        color: 'white',
+                        cursor: (alignmentCopyOffset.x !== 0 || alignmentCopyOffset.y !== 0) ? 'pointer' : 'not-allowed',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        marginBottom: '10px',
+                        width: '100%',
+                      }}
+                    >
+                      Place Copy
+                    </button>
+                  )}
+
                   <button
-                    onClick={() => { setAlignmentSelection(null); setIsSelectingAlignment(false); setAlignmentStart(null); }}
+                    onClick={() => { setAlignmentSelection(null); setIsSelectingAlignment(false); setAlignmentStart(null); setAlignmentCopyOffset({ x: 0, y: 0 }); }}
                     style={{ padding: '6px 12px', background: '#666', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', fontSize: '12px' }}
                   >
                     Clear Selection
@@ -2256,7 +2769,7 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                     fontSize: '12px',
                   }}
                 />
-                <select
+                                <select
                   value={selectedGroupFilter || ''}
                   onChange={(e) => setSelectedGroupFilter(e.target.value || null)}
                   style={{
@@ -2311,23 +2824,9 @@ export function SpriteEditor({ onClose }: SpriteEditorProps) {
                           borderRadius: '2px',
                           cursor: 'pointer',
                           boxShadow: selectedColor === entry.color ? '0 0 6px rgba(13, 13, 13, 0.5)' : 'none',
-                          position: 'relative',
                         }}
-                        title={colorNames[entry.color] ? `${colorNames[entry.color]} (${entry.color})` : entry.tags.slice(0, 5).join(', ')}
-                      >
-                        {colorNames[entry.color] && (
-                          <div style={{
-                            position: 'absolute',
-                            bottom: '-2px',
-                            right: '-2px',
-                            width: '8px',
-                            height: '8px',
-                            background: '#0D0D0D',
-                            borderRadius: '50%',
-                            border: '1px solid #fff',
-                          }} />
-                        )}
-                      </div>
+                        title={entry.tags.slice(0, 5).join(', ')}
+                      />
                     ))}
                   </div>
                 )}

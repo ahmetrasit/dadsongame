@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Game } from '@/components';
 import { EditorToolbar } from '@/components/EditorToolbar';
 import { DefinitionEditor } from '@/components/DefinitionEditor';
 import { SpriteEditor } from '@/components/SpriteEditor';
+import { Gallery } from '@/components/Gallery';
 import { MainMenu } from '@/components/MainMenu';
 import { VersionBadge } from '@/components/VersionBadge';
 import { InteractionPrompt } from '@/components/InteractionPrompt';
@@ -12,9 +13,14 @@ import { useDefinitionsStore } from '@/stores/definitionsStore';
 import '@/styles/game.css';
 
 function App() {
-  const { currentScreen, returnToMenu } = useGameStateStore();
+  const { currentScreen, returnToMenu, setScreen } = useGameStateStore();
   const { setEditing, initFromFirebase: initMapFromFirebase } = useMapEditorStore();
   const { closeEditor, initFromFirebase: initDefinitionsFromFirebase } = useDefinitionsStore();
+
+  // State for sprite editor when loading from gallery
+  const [spriteEditorProps, setSpriteEditorProps] = useState<{
+    initialPixels?: string[][];
+  }>({});
 
   // Initialize from Firebase on app start
   useEffect(() => {
@@ -38,6 +44,9 @@ function App() {
           returnToMenu();
         } else if (currentScreen === 'materialEditor' || currentScreen === 'creatureEditor' || currentScreen === 'spriteEditor') {
           closeEditor();
+          setSpriteEditorProps({});
+          returnToMenu();
+        } else if (currentScreen === 'gallery') {
           returnToMenu();
         }
       }
@@ -46,11 +55,39 @@ function App() {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [currentScreen, closeEditor, returnToMenu, setEditing]);
 
+  // Handle opening sprite editor from gallery
+  const handleEditSpriteFromGallery = (pixels: string[][]) => {
+    setSpriteEditorProps({ initialPixels: pixels });
+    setScreen('spriteEditor');
+  };
+
+  // Handle closing sprite editor
+  const handleCloseSpriteEditor = () => {
+    setSpriteEditorProps({});
+    returnToMenu();
+  };
+
   // Show sprite editor screen
   if (currentScreen === 'spriteEditor') {
     return (
       <>
-        <SpriteEditor onClose={returnToMenu} />
+        <SpriteEditor
+          onClose={handleCloseSpriteEditor}
+          initialPixels={spriteEditorProps.initialPixels}
+        />
+        <VersionBadge />
+      </>
+    );
+  }
+
+  // Show gallery screen
+  if (currentScreen === 'gallery') {
+    return (
+      <>
+        <Gallery
+          onClose={returnToMenu}
+          onEditSprite={handleEditSpriteFromGallery}
+        />
         <VersionBadge />
       </>
     );
