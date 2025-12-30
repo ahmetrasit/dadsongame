@@ -870,11 +870,12 @@ export function SpriteEditor({ onClose, initialPixels }: SpriteEditorProps) {
   const [selectedObjectId, setSelectedObjectId] = useState<string>('');
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-  // Tile selection for saving (3x3 grid of tiles)
+  // Tile selection for saving (5x5 grid of tiles)
   const [selectedTilesForSave, setSelectedTilesForSave] = useState<boolean[][]>(
     Array(TILES_PER_ROW).fill(null).map(() => Array(TILES_PER_ROW).fill(false))
   );
   const [isSelectingTilesForSave, setIsSelectingTilesForSave] = useState(false);
+  const [pendingSaveAction, setPendingSaveAction] = useState<'gallery' | 'link' | null>(null);
 
   // Color management state
   const [colorNames] = useState<Record<string, string>>({});
@@ -1488,11 +1489,48 @@ export function SpriteEditor({ onClose, initialPixels }: SpriteEditorProps) {
     return extracted;
   };
 
+  // Generate data URL from selected tiles only
+  const generateCroppedSpriteDataURL = (): string => {
+    const { minRow, maxRow, minCol, maxCol } = getSelectedTilesBounds();
+    const width = (maxCol - minCol + 1) * TILE_SIZE;
+    const height = (maxRow - minRow + 1) * TILE_SIZE;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+
+    // Draw only selected tiles
+    for (let r = minRow; r <= maxRow; r++) {
+      for (let c = minCol; c <= maxCol; c++) {
+        if (selectedTilesForSave[r][c]) {
+          for (let py = 0; py < TILE_SIZE; py++) {
+            for (let px = 0; px < TILE_SIZE; px++) {
+              const srcY = r * TILE_SIZE + py;
+              const srcX = c * TILE_SIZE + px;
+              const destY = (r - minRow) * TILE_SIZE + py;
+              const destX = (c - minCol) * TILE_SIZE + px;
+              const color = pixels[srcY][srcX];
+              if (color !== 'transparent') {
+                ctx.fillStyle = color;
+                ctx.fillRect(destX, destY, 1, 1);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return canvas.toDataURL();
+  };
+
   // Save sprite to gallery (with tile selection)
   const handleSaveToGallery = async () => {
     if (!isSelectingTilesForSave) {
       // Enter tile selection mode
       setIsSelectingTilesForSave(true);
+      setPendingSaveAction('gallery');
       setSaveMessage('Click tiles to select, then Save');
       return;
     }
@@ -1520,6 +1558,7 @@ export function SpriteEditor({ onClose, initialPixels }: SpriteEditorProps) {
 
       // Reset selection mode
       setIsSelectingTilesForSave(false);
+      setPendingSaveAction(null);
       setSelectedTilesForSave(Array(TILES_PER_ROW).fill(null).map(() => Array(TILES_PER_ROW).fill(false)));
 
       setTimeout(() => setSaveMessage(null), 3000);
@@ -1533,6 +1572,7 @@ export function SpriteEditor({ onClose, initialPixels }: SpriteEditorProps) {
   // Cancel tile selection mode
   const cancelTileSelection = () => {
     setIsSelectingTilesForSave(false);
+    setPendingSaveAction(null);
     setSelectedTilesForSave(Array(TILES_PER_ROW).fill(null).map(() => Array(TILES_PER_ROW).fill(false)));
     setSaveMessage(null);
   };
@@ -1564,14 +1604,30 @@ export function SpriteEditor({ onClose, initialPixels }: SpriteEditorProps) {
     return generateSpriteDataURL();
   };
 
-  // Save and link to object
+  // Save and link to object (with tile selection)
   const handleSaveAndLink = () => {
     if (!selectedObjectId) {
-      alert('Please select an object to link the sprite to.');
+      setSaveMessage('Please select an object first!');
+      setTimeout(() => setSaveMessage(null), 2000);
       return;
     }
 
-    const imageUrl = generateSpriteDataURL();
+    if (!isSelectingTilesForSave) {
+      // Enter tile selection mode
+      setIsSelectingTilesForSave(true);
+      setPendingSaveAction('link');
+      setSaveMessage('Click tiles to select, then Save & Link');
+      return;
+    }
+
+    if (!hasSelectedTiles) {
+      setSaveMessage('Select at least one tile!');
+      setTimeout(() => setSaveMessage(null), 2000);
+      return;
+    }
+
+    // Generate cropped image from selected tiles
+    const imageUrl = generateCroppedSpriteDataURL();
     const store = useDefinitionsStore.getState();
 
     // Get the current object to access existing versions
@@ -1610,8 +1666,13 @@ export function SpriteEditor({ onClose, initialPixels }: SpriteEditorProps) {
       });
     }
 
-    alert('Sprite saved and linked successfully!');
-    onClose();
+    // Reset selection mode
+    setIsSelectingTilesForSave(false);
+    setPendingSaveAction(null);
+    setSelectedTilesForSave(Array(TILES_PER_ROW).fill(null).map(() => Array(TILES_PER_ROW).fill(false)));
+
+    setSaveMessage('Sprite linked successfully!');
+    setTimeout(() => setSaveMessage(null), 2000);
   };
 
   // Get available objects based on type
@@ -1874,23 +1935,59 @@ export function SpriteEditor({ onClose, initialPixels }: SpriteEditorProps) {
             />
           </div>
 
-          <button
-            onClick={handleSaveAndLink}
-            disabled={!selectedObjectId}
-            style={{
-              width: '100%',
-              padding: '12px',
-              background: selectedObjectId ? '#22c55e' : '#555',
-              border: 'none',
-              borderRadius: '4px',
-              color: 'white',
-              cursor: selectedObjectId ? 'pointer' : 'not-allowed',
-              fontSize: '16px',
-              fontWeight: 'bold',
-            }}
-          >
-            Save & Link Sprite
-          </button>
+          {pendingSaveAction === 'link' && isSelectingTilesForSave ? (
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={handleSaveAndLink}
+                disabled={!hasSelectedTiles}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: hasSelectedTiles ? '#22c55e' : '#ccc',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: 'white',
+                  cursor: hasSelectedTiles ? 'pointer' : 'not-allowed',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                }}
+              >
+                Save & Link Selected
+              </button>
+              <button
+                onClick={cancelTileSelection}
+                style={{
+                  padding: '12px 16px',
+                  background: '#ef4444',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleSaveAndLink}
+              disabled={!selectedObjectId || (isSelectingTilesForSave && pendingSaveAction !== 'link')}
+              style={{
+                width: '100%',
+                padding: '12px',
+                background: selectedObjectId && !(isSelectingTilesForSave && pendingSaveAction !== 'link') ? '#22c55e' : '#555',
+                border: 'none',
+                borderRadius: '4px',
+                color: 'white',
+                cursor: selectedObjectId && !(isSelectingTilesForSave && pendingSaveAction !== 'link') ? 'pointer' : 'not-allowed',
+                fontSize: '16px',
+                fontWeight: 'bold',
+              }}
+            >
+              Save & Link Sprite
+            </button>
+          )}
 
           {/* View Controls Section */}
           <div style={{ marginTop: '25px', borderTop: '1px solid #E8DDD1', paddingTop: '20px' }}>
