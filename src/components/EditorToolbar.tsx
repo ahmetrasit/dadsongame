@@ -3,7 +3,7 @@ import { useMapEditorStore, EditorTool } from '@/stores/mapEditorStore';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
 import { generatePlantPreview, generateAnimalPreview } from '@/utils/generatePreviewImage';
 
-type Category = 'plants' | 'animals' | 'river' | 'spawn' | 'eraser';
+type Category = 'plants' | 'animals' | 'materials' | 'river' | 'spawn' | 'eraser';
 
 export function EditorToolbar() {
   const {
@@ -15,8 +15,10 @@ export function EditorToolbar() {
     cancelRiver,
     selectedPlantId,
     selectedAnimalId,
+    selectedResourceId,
     setSelectedPlantId,
     setSelectedAnimalId,
+    setSelectedResourceId,
     // Map state
     currentMapId,
     currentMapName,
@@ -36,7 +38,7 @@ export function EditorToolbar() {
     isOnline,
   } = useMapEditorStore();
 
-  const { plants, animals } = useDefinitionsStore();
+  const { plants, animals, resources } = useDefinitionsStore();
 
   const [expandedCategory, setExpandedCategory] = useState<Category | null>('plants');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -61,6 +63,12 @@ export function EditorToolbar() {
       setSelectedAnimalId(animals[0].id);
     }
   }, [selectedAnimalId, animals, setSelectedAnimalId]);
+
+  useEffect(() => {
+    if (!selectedResourceId && resources.length > 0) {
+      setSelectedResourceId(resources[0].id);
+    }
+  }, [selectedResourceId, resources, setSelectedResourceId]);
 
   if (!isEditing) return null;
 
@@ -93,6 +101,7 @@ export function EditorToolbar() {
     const toolMap: Record<Category, EditorTool> = {
       plants: 'plant',
       animals: 'animal',
+      materials: 'resource',
       river: 'river',
       spawn: 'spawn',
       eraser: 'eraser',
@@ -158,6 +167,10 @@ export function EditorToolbar() {
 
   const getAnimalImage = (animal: typeof animals[0]) => {
     return animal.imageUrl || generateAnimalPreview(animal.subCategory, animal.name);
+  };
+
+  const getResourceImage = (resource: typeof resources[0]) => {
+    return resource.imageUrl || '';
   };
 
   return (
@@ -474,6 +487,45 @@ export function EditorToolbar() {
                     >
                       <img src={getAnimalImage(animal)} alt={animal.name} style={badgeImageStyle} />
                       <span style={badgeLabelStyle}>{animal.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Materials */}
+        <div>
+          <button
+            style={categoryHeaderStyle('materials', currentTool === 'resource')}
+            onClick={() => toggleCategory('materials')}
+          >
+            <span>Materials ({resources.length})</span>
+            <span>{expandedCategory === 'materials' ? '▼' : '▶'}</span>
+          </button>
+          {expandedCategory === 'materials' && (
+            <div style={{ padding: '8px', background: '#1a1a1a', borderRadius: '0 0 4px 4px', marginBottom: '4px' }}>
+              {resources.length === 0 ? (
+                <div style={{ fontSize: '11px', color: '#888', textAlign: 'center', padding: '8px' }}>
+                  No materials defined
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {resources.map(resource => (
+                    <div
+                      key={resource.id}
+                      style={badgeStyle(selectedResourceId === resource.id)}
+                      onClick={() => setSelectedResourceId(resource.id)}
+                    >
+                      {getResourceImage(resource) ? (
+                        <img src={getResourceImage(resource)} alt={resource.name} style={badgeImageStyle} />
+                      ) : (
+                        <div style={{ ...badgeImageStyle, background: '#666', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>
+                          📦
+                        </div>
+                      )}
+                      <span style={badgeLabelStyle}>{resource.name}</span>
                     </div>
                   ))}
                 </div>

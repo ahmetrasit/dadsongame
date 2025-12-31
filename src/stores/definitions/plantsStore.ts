@@ -1,23 +1,11 @@
 import { StateCreator } from 'zustand';
-import type { Season } from './index';
+import type { Season, AliveYield, DeadYield } from './index';
 
 // Plant-specific types
 export type PlantStage = 'seed' | 'sprout' | 'mature' | 'withered';
 export type SoilType = 'grass' | 'sand' | 'rock' | 'fertile' | 'swamp';
 export type PlantSubCategory = 'tree' | 'crop' | 'flower' | 'bush';
 export type PlantInteractionType = 'harvest' | 'chop' | 'water' | 'inspect' | 'pick';
-
-export interface AliveYield {
-  resourceId: string;
-  amount: number;
-  interval: number;
-  seasons: Season[];
-}
-
-export interface DeadYield {
-  resourceId: string;
-  quantity: number;
-}
 
 export interface SpriteVersion {
   imageUrl: string;
@@ -105,7 +93,7 @@ export const initialPlants: PlantDefinition[] = [
     suitableSoils: ['grass', 'fertile'],
     waterNeed: 40,
     sunNeed: 60,
-    aliveYields: [{ resourceId: 'res-apple', amount: 2, interval: 7, seasons: ['spring', 'summer', 'autumn'] }],
+    aliveYields: [{ resourceId: 'res-apple', amount: 5, interval: 1, seasons: ['spring', 'summer', 'autumn'], shedding: true }],
     deadYields: [{ resourceId: 'res-wood', quantity: 10 }],
     spriteKey: 'plant-apple-tree',
     interactionRadius: 50,

@@ -35,22 +35,33 @@ export interface WaterPlacement {
   y: number;
 }
 
+export interface ResourcePlacement {
+  id: string;
+  definitionId: string;   // Reference to resource definition
+  x: number;
+  y: number;
+  placedAtDay: number;    // Game day when placed (for spoilage calculation)
+  sourceId?: string;      // ID of plant/animal that produced this (if shed)
+}
+
 export interface MapData {
   rivers: River[];
   plants: PlantPlacement[];
   animals: AnimalPlacement[];
   waters: WaterPlacement[];
+  resources: ResourcePlacement[];
   spawn: Point;
   // Legacy support
   trees?: { id: string; x: number; y: number }[];
 }
 
-export type EditorTool = 'none' | 'river' | 'plant' | 'animal' | 'water' | 'eraser' | 'spawn';
+export type EditorTool = 'none' | 'river' | 'plant' | 'animal' | 'water' | 'resource' | 'eraser' | 'spawn';
 
 export interface IdCounters {
   plant: number;
   animal: number;
   water: number;
+  resource: number;
   river: number;
 }
 
@@ -70,6 +81,7 @@ interface MapEditorState {
   selectedPlantId: string | null;
   selectedAnimalId: string | null;
   selectedWaterId: string | null;
+  selectedResourceId: string | null;
 
   // Current river being drawn
   activeRiver: Point[];
@@ -103,6 +115,7 @@ interface MapEditorState {
   setSelectedPlantId: (id: string | null) => void;
   setSelectedAnimalId: (id: string | null) => void;
   setSelectedWaterId: (id: string | null) => void;
+  setSelectedResourceId: (id: string | null) => void;
 
   // River actions
   addRiverPoint: (point: Point) => void;
@@ -120,6 +133,10 @@ interface MapEditorState {
   // Water actions
   addWater: (x: number, y: number) => void;
   removeWater: (id: string) => void;
+
+  // Resource actions
+  addResource: (x: number, y: number) => void;
+  removeResource: (id: string) => void;
 
   // Legacy tree support
   addTree: (x: number, y: number) => void;
@@ -159,7 +176,7 @@ const PLACEMENT_RADIUS = 32; // pixels - 1 meter (TILE_SIZE) - prevents overlapp
 /**
  * Validate that a definition ID exists
  */
-function validateDefinitionId(type: 'plant' | 'animal' | 'water', id: string): boolean {
+function validateDefinitionId(type: 'plant' | 'animal' | 'water' | 'resource', id: string): boolean {
   const definitions = useDefinitionsStore.getState();
   switch (type) {
     case 'plant':
@@ -168,6 +185,8 @@ function validateDefinitionId(type: 'plant' | 'animal' | 'water', id: string): b
       return definitions.animals.some(a => a.id === id);
     case 'water':
       return definitions.waters.some(w => w.id === id);
+    case 'resource':
+      return definitions.resources.some(r => r.id === id);
     default:
       return false;
   }
@@ -209,6 +228,15 @@ function hasCollision(
     }
   }
 
+  // Check resources
+  for (const resource of (mapData.resources || [])) {
+    const dx = resource.x - x;
+    const dy = resource.y - y;
+    if (Math.sqrt(dx * dx + dy * dy) < radius) {
+      return { collides: true, type: 'resource' };
+    }
+  }
+
   return { collides: false };
 }
 
@@ -226,6 +254,7 @@ export const useMapEditorStore = create<MapEditorState>()(
         selectedPlantId: null,
         selectedAnimalId: null,
         selectedWaterId: null,
+        selectedResourceId: null,
         activeRiver: [],
 
         mapData: {
@@ -233,6 +262,7 @@ export const useMapEditorStore = create<MapEditorState>()(
           plants: [],
           animals: [],
           waters: [],
+          resources: [],
           spawn: { x: 160, y: 320 }
         },
 
@@ -241,6 +271,7 @@ export const useMapEditorStore = create<MapEditorState>()(
           plant: 0,
           animal: 0,
           water: 0,
+          resource: 0,
           river: 0,
         },
 
@@ -274,6 +305,7 @@ export const useMapEditorStore = create<MapEditorState>()(
       setSelectedPlantId: (id) => set({ selectedPlantId: id }),
       setSelectedAnimalId: (id) => set({ selectedAnimalId: id }),
       setSelectedWaterId: (id) => set({ selectedWaterId: id }),
+      setSelectedResourceId: (id) => set({ selectedResourceId: id }),
 
       addRiverPoint: (point) => set((state) => ({
         activeRiver: [...state.activeRiver, point]
@@ -417,6 +449,45 @@ export const useMapEditorStore = create<MapEditorState>()(
         }
       })),
 
+      addResource: (x, y) => set((state) => {
+        const definitionId = state.selectedResourceId;
+        if (!definitionId) {
+          console.warn('No resource type selected');
+          return state;
+        }
+
+        // Validate definition exists
+        if (!validateDefinitionId('resource', definitionId)) {
+          console.warn(`Invalid resource definition: ${definitionId}`);
+          return state;
+        }
+
+        // Check for collision
+        const collision = hasCollision(x, y, state.mapData);
+        if (collision.collides) {
+          console.warn(`Cannot place resource: collision with ${collision.type}`);
+          return state;
+        }
+
+        return {
+          idCounters: { ...state.idCounters, resource: state.idCounters.resource + 1 },
+          mapData: {
+            ...state.mapData,
+            resources: [
+              ...(state.mapData.resources || []),
+              { id: `resource-${state.idCounters.resource}`, definitionId, x, y, placedAtDay: 1 }  // Day set by caller or default to 1
+            ]
+          }
+        };
+      }),
+
+      removeResource: (id) => set((state) => ({
+        mapData: {
+          ...state.mapData,
+          resources: (state.mapData.resources || []).filter(r => r.id !== id)
+        }
+      })),
+
       // Legacy tree support - converts to plant placement
       addTree: (x, y) => set((state) => {
         const definitionId = state.selectedPlantId || 'plant-apple-tree';
@@ -465,6 +536,13 @@ export const useMapEditorStore = create<MapEditorState>()(
           return Math.sqrt(dx * dx + dy * dy) > radius;
         });
 
+        // Remove resources within radius
+        const resources = state.mapData.resources.filter(r => {
+          const dx = r.x - x;
+          const dy = r.y - y;
+          return Math.sqrt(dx * dx + dy * dy) > radius;
+        });
+
         // Remove points within radius from rivers, delete river if < 3 points remain
         const rivers = state.mapData.rivers
           .map(r => ({
@@ -478,7 +556,7 @@ export const useMapEditorStore = create<MapEditorState>()(
           .filter(r => r.points.length >= 3); // River needs at least 3 points
 
         return {
-          mapData: { ...state.mapData, plants, animals, waters, rivers }
+          mapData: { ...state.mapData, plants, animals, waters, resources, rivers }
         };
       }),
 
@@ -513,11 +591,11 @@ export const useMapEditorStore = create<MapEditorState>()(
       },
 
       clearMap: () => set({
-        mapData: { rivers: [], plants: [], animals: [], waters: [], spawn: { x: 160, y: 320 } },
+        mapData: { rivers: [], plants: [], animals: [], waters: [], resources: [], spawn: { x: 160, y: 320 } },
         activeRiver: [],
         currentMapId: null,
         currentMapName: 'Untitled Map',
-        idCounters: { plant: 0, animal: 0, water: 0, river: 0 },
+        idCounters: { plant: 0, animal: 0, water: 0, resource: 0, river: 0 },
       }),
 
       // Map save/load actions
@@ -581,6 +659,7 @@ export const useMapEditorStore = create<MapEditorState>()(
                 plant: extractMaxId(result.mapData.plants, 'plant'),
                 animal: extractMaxId(result.mapData.animals, 'animal'),
                 water: extractMaxId(result.mapData.waters, 'water'),
+                resource: extractMaxId(result.mapData.resources || [], 'resource'),
                 river: extractMaxId(result.mapData.rivers, 'river'),
               },
             });
@@ -614,9 +693,9 @@ export const useMapEditorStore = create<MapEditorState>()(
         set({
           currentMapId: null,
           currentMapName: 'Untitled Map',
-          mapData: { rivers: [], plants: [], animals: [], waters: [], spawn: { x: 160, y: 320 } },
+          mapData: { rivers: [], plants: [], animals: [], waters: [], resources: [], spawn: { x: 160, y: 320 } },
           activeRiver: [],
-          idCounters: { plant: 0, animal: 0, water: 0, river: 0 },
+          idCounters: { plant: 0, animal: 0, water: 0, resource: 0, river: 0 },
           firebaseSyncEnabled: false,
         });
       },
@@ -722,6 +801,7 @@ export const useMapEditorStore = create<MapEditorState>()(
               plant: extractMaxId(mapData.plants, 'plant'),
               animal: extractMaxId(mapData.animals, 'animal'),
               water: extractMaxId(mapData.waters, 'water'),
+              resource: extractMaxId(mapData.resources || [], 'resource'),
               river: extractMaxId(mapData.rivers, 'river'),
             };
           }

@@ -1489,11 +1489,12 @@ export function SpriteEditor({ onClose, initialPixels }: SpriteEditorProps) {
     return extracted;
   };
 
-  // Generate data URL from selected tiles only
+  // Generate data URL from selected tiles only (4x upscaled for higher resolution)
+  const EXPORT_SCALE = 4; // 16px tile → 64px tile
   const generateCroppedSpriteDataURL = (): string => {
     const { minRow, maxRow, minCol, maxCol } = getSelectedTilesBounds();
-    const width = (maxCol - minCol + 1) * TILE_SIZE;
-    const height = (maxRow - minRow + 1) * TILE_SIZE;
+    const width = (maxCol - minCol + 1) * TILE_SIZE * EXPORT_SCALE;
+    const height = (maxRow - minRow + 1) * TILE_SIZE * EXPORT_SCALE;
 
     const canvas = document.createElement('canvas');
     canvas.width = width;
@@ -1501,7 +1502,7 @@ export function SpriteEditor({ onClose, initialPixels }: SpriteEditorProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return '';
 
-    // Draw only selected tiles
+    // Draw only selected tiles (upscaled)
     for (let r = minRow; r <= maxRow; r++) {
       for (let c = minCol; c <= maxCol; c++) {
         if (selectedTilesForSave[r][c]) {
@@ -1509,12 +1510,12 @@ export function SpriteEditor({ onClose, initialPixels }: SpriteEditorProps) {
             for (let px = 0; px < TILE_SIZE; px++) {
               const srcY = r * TILE_SIZE + py;
               const srcX = c * TILE_SIZE + px;
-              const destY = (r - minRow) * TILE_SIZE + py;
-              const destX = (c - minCol) * TILE_SIZE + px;
+              const destY = (r - minRow) * TILE_SIZE * EXPORT_SCALE + py * EXPORT_SCALE;
+              const destX = (c - minCol) * TILE_SIZE * EXPORT_SCALE + px * EXPORT_SCALE;
               const color = pixels[srcY][srcX];
               if (color !== 'transparent') {
                 ctx.fillStyle = color;
-                ctx.fillRect(destX, destY, 1, 1);
+                ctx.fillRect(destX, destY, EXPORT_SCALE, EXPORT_SCALE);
               }
             }
           }

@@ -2,8 +2,9 @@ import { create } from 'zustand';
 import type { PlantDefinition } from './definitions/plantsStore';
 import type { AnimalDefinition } from './definitions/animalsStore';
 import type { WaterDefinition } from './definitions/waterStore';
+import type { ResourceDefinition } from './definitions/resourcesStore';
 
-export type InteractableType = 'plant' | 'animal' | 'water';
+export type InteractableType = 'plant' | 'animal' | 'water' | 'resource';
 
 export interface InteractableObject {
   id: string;
@@ -15,7 +16,7 @@ export interface InteractableObject {
 
 export interface InteractionTarget {
   object: InteractableObject;
-  definition: PlantDefinition | AnimalDefinition | WaterDefinition;
+  definition: PlantDefinition | AnimalDefinition | WaterDefinition | ResourceDefinition;
   distance: number;
   interactionTypes: string[];
 }

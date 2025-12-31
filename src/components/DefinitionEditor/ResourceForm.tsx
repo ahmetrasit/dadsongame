@@ -131,6 +131,27 @@ export function ResourceForm({ item, isDraft, onSave, onCancel }: ResourceFormPr
             onChange={(e) => handleChange('weight', Number(e.target.value))}
             width="80px"
           />
+          {/* Emoji picker - simple input for now */}
+          <div style={{ display: 'flex', alignItems: 'center', marginLeft: '8px' }}>
+            <input
+              type="text"
+              value={item.emoji || '📦'}
+              onChange={(e) => handleChange('emoji', e.target.value)}
+              style={{
+                width: '40px',
+                height: '36px',
+                fontSize: '24px',
+                textAlign: 'center',
+                padding: '0',
+                background: '#FFFFFF',
+                border: '1px solid #D4C4B0',
+                borderRadius: '4px',
+                cursor: 'text',
+              }}
+              title="Type or paste an emoji for this resource"
+              maxLength={2}
+            />
+          </div>
           {isDraft ? (
             <>
               <button

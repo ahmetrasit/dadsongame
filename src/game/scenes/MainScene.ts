@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { TILE_SIZE, MAP_SIZE } from '@/game/config';
-import { useMapEditorStore, PlantPlacement, AnimalPlacement, WaterPlacement } from '@/stores/mapEditorStore';
+import { useMapEditorStore, PlantPlacement, AnimalPlacement, WaterPlacement, ResourcePlacement } from '@/stores/mapEditorStore';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
 import { useGameStateStore } from '@/stores/gameStateStore';
 import { useInteractionStore } from '@/stores/interactionStore';
@@ -8,6 +8,9 @@ import { smoothPolygon } from '@/game/utils/splineUtils';
 import { checkCollision } from '@/game/utils/collisionDetection';
 import { findNearestInteractable } from '@/game/utils/interactionDetection';
 import { generatePlantPreview, generateAnimalPreview } from '@/utils/generatePreviewImage';
+import { initYieldSystem } from '@/services/YieldService';
+import { initSpoilageSystem } from '@/services/SpoilageService';
+import { useYieldStateStore } from '@/stores/yieldStateStore';
 
 export class MainScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite;
@@ -20,6 +23,7 @@ export class MainScene extends Phaser.Scene {
   private plantSprites: Map<string, Phaser.GameObjects.Container> = new Map();
   private animalSprites: Map<string, Phaser.GameObjects.Container> = new Map();
   private waterSprites: Map<string, Phaser.GameObjects.Container> = new Map();
+  private resourceSprites: Map<string, Phaser.GameObjects.Container> = new Map();
   private spawnMarker!: Phaser.GameObjects.Graphics;
 
   // State tracking for diff-based rendering
@@ -28,6 +32,7 @@ export class MainScene extends Phaser.Scene {
   private lastPlantsHash = '';
   private lastAnimalsHash = '';
   private lastWatersHash = '';
+  private lastResourcesHash = '';
   private lastSpawnHash = '';
   private lastIsEditing = false;
 
@@ -50,6 +55,10 @@ export class MainScene extends Phaser.Scene {
     ENTER: Phaser.Input.Keyboard.Key;
     ESC: Phaser.Input.Keyboard.Key;
   };
+
+  // System cleanup handlers
+  private unsubscribeYieldSystem: (() => void) | null = null;
+  private unsubscribeSpoilageSystem: (() => void) | null = null;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -136,8 +145,26 @@ export class MainScene extends Phaser.Scene {
     document.addEventListener('focusin', handleFocusIn);
     document.addEventListener('focusout', handleFocusOut);
 
+    // Initialize game systems
+    this.unsubscribeYieldSystem = initYieldSystem();
+    this.unsubscribeSpoilageSystem = initSpoilageSystem();
+    console.log('[MainScene] Yield and spoilage systems initialized');
+
     // Initial render (force full render)
     this.renderMapData(true);
+  }
+
+  shutdown(): void {
+    // Cleanup game systems
+    if (this.unsubscribeYieldSystem) {
+      this.unsubscribeYieldSystem();
+      this.unsubscribeYieldSystem = null;
+    }
+    if (this.unsubscribeSpoilageSystem) {
+      this.unsubscribeSpoilageSystem();
+      this.unsubscribeSpoilageSystem = null;
+    }
+    console.log('[MainScene] Yield and spoilage systems cleaned up');
   }
 
   update(_time: number, delta: number): void {
@@ -186,6 +213,7 @@ export class MainScene extends Phaser.Scene {
         plants: defStore.plants,
         animals: defStore.animals,
         waters: defStore.waters,
+        resources: defStore.resources,
       }
     );
 
@@ -262,6 +290,9 @@ export class MainScene extends Phaser.Scene {
       case 'water':
         store.addWater(x, y);
         break;
+      case 'resource':
+        store.addResource(x, y);
+        break;
       case 'river':
         store.addRiverPoint({ x, y });
         break;
@@ -321,6 +352,13 @@ export class MainScene extends Phaser.Scene {
     if (forceRender || watersHash !== this.lastWatersHash || editingChanged) {
       this.lastWatersHash = watersHash;
       this.updateWaters(mapData.waters, defStore.waters, isEditing);
+    }
+
+    // Resources - only update if changed or editing mode changed
+    const resourcesHash = this.hashData(mapData.resources);
+    if (forceRender || resourcesHash !== this.lastResourcesHash || editingChanged) {
+      this.lastResourcesHash = resourcesHash;
+      this.updateResources(mapData.resources, defStore.resources, isEditing);
     }
 
     // Spawn marker - only update if changed or editing mode changed
@@ -396,6 +434,8 @@ export class MainScene extends Phaser.Scene {
         }
         // Update label visibility based on editing mode
         this.updatePlantLabel(existing, placement, definitions, isEditing);
+        // Update yield badge
+        this.updateYieldBadge(existing, placement.id);
       } else {
         // Create new sprite
         const container = this.createPlantSprite(placement, definitions, isEditing);
@@ -456,6 +496,9 @@ export class MainScene extends Phaser.Scene {
     }
     container.add(sprite);
 
+    // Add yield badge (top-right corner)
+    this.addYieldBadge(container, placement.id);
+
     // Add label if editing
     if (isEditing && definition) {
       const label = this.add.text(0, 20, definition.name, {
@@ -472,6 +515,76 @@ export class MainScene extends Phaser.Scene {
 
     container.setDepth(5);
     return container;
+  }
+
+  private addYieldBadge(container: Phaser.GameObjects.Container, placementId: string): void {
+    const yieldStore = useYieldStateStore.getState();
+    const yieldState = yieldStore.getPlacementYields(placementId);
+
+    // Calculate total remaining yield across all yield types
+    const totalRemaining = yieldState?.yields.reduce((sum, y) => sum + (y.isAvailable ? y.remaining : 0), 0) ?? 0;
+
+    if (totalRemaining > 0) {
+      // Create badge background (green circle)
+      const badge = this.add.graphics();
+      badge.fillStyle(0x22c55e, 1);
+      badge.fillCircle(12, -12, 8);
+      badge.lineStyle(1, 0xffffff, 1);
+      badge.strokeCircle(12, -12, 8);
+      badge.setName('yieldBadgeBg');
+      container.add(badge);
+
+      // Create badge text showing count
+      const badgeText = this.add.text(12, -12, String(totalRemaining), {
+        fontSize: '10px',
+        color: '#ffffff',
+        fontStyle: 'bold',
+      });
+      badgeText.setOrigin(0.5, 0.5);
+      badgeText.setName('yieldBadgeText');
+      container.add(badgeText);
+    }
+  }
+
+  private updateYieldBadge(container: Phaser.GameObjects.Container, placementId: string): void {
+    const yieldStore = useYieldStateStore.getState();
+    const yieldState = yieldStore.getPlacementYields(placementId);
+
+    // Calculate total remaining yield
+    const totalRemaining = yieldState?.yields.reduce((sum, y) => sum + (y.isAvailable ? y.remaining : 0), 0) ?? 0;
+
+    // Get existing badge elements
+    const existingBadgeBg = container.getByName('yieldBadgeBg') as Phaser.GameObjects.Graphics | null;
+    const existingBadgeText = container.getByName('yieldBadgeText') as Phaser.GameObjects.Text | null;
+
+    if (totalRemaining > 0) {
+      if (!existingBadgeBg) {
+        // Create badge if it doesn't exist
+        const badge = this.add.graphics();
+        badge.fillStyle(0x22c55e, 1);
+        badge.fillCircle(12, -12, 8);
+        badge.lineStyle(1, 0xffffff, 1);
+        badge.strokeCircle(12, -12, 8);
+        badge.setName('yieldBadgeBg');
+        container.add(badge);
+
+        const badgeText = this.add.text(12, -12, String(totalRemaining), {
+          fontSize: '10px',
+          color: '#ffffff',
+          fontStyle: 'bold',
+        });
+        badgeText.setOrigin(0.5, 0.5);
+        badgeText.setName('yieldBadgeText');
+        container.add(badgeText);
+      } else if (existingBadgeText) {
+        // Update text if badge exists
+        existingBadgeText.setText(String(totalRemaining));
+      }
+    } else {
+      // Remove badge if no yield remaining
+      if (existingBadgeBg) existingBadgeBg.destroy();
+      if (existingBadgeText) existingBadgeText.destroy();
+    }
   }
 
   private updatePlantLabel(
@@ -527,6 +640,8 @@ export class MainScene extends Phaser.Scene {
         }
         // Update label visibility based on editing mode
         this.updateAnimalLabel(existing, placement, definitions, isEditing);
+        // Update yield badge
+        this.updateYieldBadge(existing, placement.id);
       } else {
         // Create new sprite
         const container = this.createAnimalSprite(placement, definitions, isEditing);
@@ -593,6 +708,9 @@ export class MainScene extends Phaser.Scene {
       graphics.strokeCircle(0, 0, 16);
       container.add(graphics);
     }
+
+    // Add yield badge (top-right corner)
+    this.addYieldBadge(container, placement.id);
 
     // Add label if editing
     if (isEditing && definition) {
@@ -751,6 +869,102 @@ export class MainScene extends Phaser.Scene {
   ): void {
     const existingLabel = container.getByName('label') as Phaser.GameObjects.Text | null;
     const definition = definitions.find(w => w.id === placement.definitionId);
+
+    if (isEditing && definition) {
+      if (!existingLabel) {
+        const label = this.add.text(0, 20, definition.name, {
+          fontFamily: 'Avenir, system-ui, sans-serif',
+          fontSize: '10px',
+          color: '#ffffff',
+          backgroundColor: '#000000aa',
+          padding: { x: 2, y: 1 },
+        });
+        label.setOrigin(0.5, 0);
+        label.setName('label');
+        container.add(label);
+      }
+    } else if (existingLabel) {
+      existingLabel.destroy();
+    }
+  }
+
+  private updateResources(
+    placements: ResourcePlacement[],
+    definitions: { id: string; name: string; category: string; imageUrl?: string }[],
+    isEditing: boolean
+  ): void {
+    const currentIds = new Set(placements.map(p => p.id));
+
+    // Remove sprites that no longer exist
+    for (const [id, container] of this.resourceSprites) {
+      if (!currentIds.has(id)) {
+        container.destroy();
+        this.resourceSprites.delete(id);
+      }
+    }
+
+    // Add or update sprites
+    for (const placement of placements) {
+      const existing = this.resourceSprites.get(placement.id);
+
+      if (existing) {
+        // Update position if changed
+        if (existing.x !== placement.x || existing.y !== placement.y) {
+          existing.setPosition(placement.x, placement.y);
+        }
+        // Update label visibility based on editing mode
+        this.updateResourceLabel(existing, placement, definitions, isEditing);
+      } else {
+        // Create new sprite
+        const container = this.createResourceSprite(placement, definitions, isEditing);
+        this.resourceSprites.set(placement.id, container);
+      }
+    }
+  }
+
+  private createResourceSprite(
+    placement: ResourcePlacement,
+    definitions: { id: string; name: string; category: string; emoji?: string; imageUrl?: string }[],
+    isEditing: boolean
+  ): Phaser.GameObjects.Container {
+    const definition = definitions.find(r => r.id === placement.definitionId);
+    const container = this.add.container(placement.x, placement.y);
+
+    // Use emoji from definition for ground resources
+    const emoji = definition?.emoji || '📦';
+    const emojiText = this.add.text(0, 0, emoji, {
+      fontSize: '24px',
+    });
+    emojiText.setOrigin(0.5, 0.5);
+    emojiText.setName('emoji');
+    container.add(emojiText);
+
+    // Add label if editing
+    if (isEditing && definition) {
+      const label = this.add.text(0, 20, definition.name, {
+        fontFamily: 'Avenir, system-ui, sans-serif',
+        fontSize: '10px',
+        color: '#ffffff',
+        backgroundColor: '#000000aa',
+        padding: { x: 2, y: 1 },
+      });
+      label.setOrigin(0.5, 0);
+      label.setName('label');
+      container.add(label);
+    }
+
+    container.setDepth(4); // Same as waters
+    return container;
+  }
+
+  private updateResourceLabel(
+    container: Phaser.GameObjects.Container,
+    placement: ResourcePlacement,
+    definitions: { id: string; name: string; category: string; imageUrl?: string }[],
+    isEditing: boolean
+  ): void {
+    const existingLabel = container.getByName('label') as Phaser.GameObjects.Text | null;
+    const definition = definitions.find(r => r.id === placement.definitionId);
 
     if (isEditing && definition) {
       if (!existingLabel) {

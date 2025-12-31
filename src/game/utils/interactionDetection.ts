@@ -1,19 +1,22 @@
-import type { PlantPlacement, AnimalPlacement, WaterPlacement } from '@/stores/mapEditorStore';
+import type { PlantPlacement, AnimalPlacement, WaterPlacement, ResourcePlacement } from '@/stores/mapEditorStore';
 import type { PlantDefinition } from '@/stores/definitions/plantsStore';
 import type { AnimalDefinition } from '@/stores/definitions/animalsStore';
 import type { WaterDefinition } from '@/stores/definitions/waterStore';
+import type { ResourceDefinition } from '@/stores/definitions/resourcesStore';
 import type { InteractionTarget, InteractableType } from '@/stores/interactionStore';
 
 interface MapData {
   plants: PlantPlacement[];
   animals: AnimalPlacement[];
   waters: WaterPlacement[];
+  resources: ResourcePlacement[];
 }
 
 interface Definitions {
   plants: PlantDefinition[];
   animals: AnimalDefinition[];
   waters: WaterDefinition[];
+  resources: ResourceDefinition[];
 }
 
 /**
@@ -99,6 +102,29 @@ export function findNearestInteractable(
           type: 'water' as InteractableType,
           x: water.x,
           y: water.y,
+        },
+        definition: def,
+        distance: dist,
+        interactionTypes: def.interactionTypes,
+      };
+    }
+  }
+
+  // Check resources (ground items)
+  for (const resource of mapData.resources || []) {
+    const def = definitions.resources.find(r => r.id === resource.definitionId);
+    if (!def) continue;
+
+    const dist = distance(playerX, playerY, resource.x, resource.y);
+    if (dist <= def.interactionRadius && dist < nearestDistance) {
+      nearestDistance = dist;
+      nearest = {
+        object: {
+          id: resource.id,
+          definitionId: resource.definitionId,
+          type: 'resource' as InteractableType,
+          x: resource.x,
+          y: resource.y,
         },
         definition: def,
         distance: dist,

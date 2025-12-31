@@ -5,7 +5,7 @@ import { definitionsService, type GameDefinitions } from '@/services/Definitions
 // Re-export types from entity stores
 export type { PlantDefinition, PlantStage, SoilType, PlantSubCategory, PlantInteractionType } from './plantsStore';
 export type { AnimalDefinition, AnimalCapability, AnimalSubCategory, AnimalInteractionType } from './animalsStore';
-export type { ResourceDefinition } from './resourcesStore';
+export type { ResourceDefinition, ResourceInteractionType } from './resourcesStore';
 export type { WaterDefinition, WaterType, WaterInteractionType, FishType } from './waterStore';
 
 // Re-export GameDefinitions from service (single source of truth)
@@ -17,8 +17,10 @@ export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 export interface AliveYield {
   resourceId: string;
   amount: number;
-  interval: number;
+  interval: number;              // Days (not used for timing, just for reference)
   seasons: Season[];
+  shedding: boolean;             // true = auto-drops at season end, false = must collect or lose
+  yieldLayerImageUrl?: string;   // Overlay sprite shown when yield is available
 }
 
 export interface DeadYield {
@@ -357,5 +359,4 @@ useDefinitionsStore.subscribe(
   { equalityFn: (a, b) => JSON.stringify(a) === JSON.stringify(b) }
 );
 
-// Re-export types for backward compatibility
-export type { AliveYield as AliveYieldType, DeadYield as DeadYieldType } from './plantsStore';
+// AliveYield and DeadYield are now defined directly in this file (above)

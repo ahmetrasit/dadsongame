@@ -7,13 +7,20 @@ export interface SpriteVersion {
   version: number;
 }
 
+// Resource interaction types
+export type ResourceInteractionType = 'collect' | 'inspect';
+
 export interface ResourceDefinition {
   id: string;
   name: string;
   category: 'food' | 'water' | 'metal' | 'rock' | 'wood' | 'organics';
   spoilageRate: 'fast' | 'medium' | 'slow' | 'never';
   weight: number;
-  imageUrl?: string;
+  emoji: string;                                    // Emoji for ground display (e.g., '🍎')
+  interactionTypes: ResourceInteractionType[];     // Available interactions
+  interactionRadius: number;                       // Detection range in pixels
+  isBlocking: boolean;                             // Whether it blocks movement (usually false)
+  imageUrl?: string;                               // Optional sprite for inventory/UI
   spriteVersions?: SpriteVersion[];
 }
 
@@ -53,16 +60,20 @@ export const defaultResource = (existingResources: ResourceDefinition[] = []): R
   category: 'organics',
   spoilageRate: 'never',
   weight: 1,
+  emoji: '📦',
+  interactionTypes: ['collect'],
+  interactionRadius: 24,
+  isBlocking: false,
 });
 
 export const initialResources: ResourceDefinition[] = [
-  { id: 'res-apple', name: 'Apple', category: 'food', spoilageRate: 'medium', weight: 0.2 },
-  { id: 'res-wood', name: 'Wood', category: 'wood', spoilageRate: 'never', weight: 5 },
-  { id: 'res-wheat', name: 'Wheat', category: 'food', spoilageRate: 'slow', weight: 0.5 },
-  { id: 'res-milk', name: 'Milk', category: 'food', spoilageRate: 'fast', weight: 1 },
-  { id: 'res-meat', name: 'Meat', category: 'food', spoilageRate: 'fast', weight: 2 },
-  { id: 'res-leather', name: 'Leather', category: 'organics', spoilageRate: 'never', weight: 0.5 },
-  { id: 'res-egg', name: 'Egg', category: 'food', spoilageRate: 'medium', weight: 0.1 },
+  { id: 'res-apple', name: 'Apple', category: 'food', spoilageRate: 'medium', weight: 0.2, emoji: '🍎', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false },
+  { id: 'res-wood', name: 'Wood', category: 'wood', spoilageRate: 'never', weight: 5, emoji: '🪵', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false },
+  { id: 'res-wheat', name: 'Wheat', category: 'food', spoilageRate: 'slow', weight: 0.5, emoji: '🌾', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false },
+  { id: 'res-milk', name: 'Milk', category: 'food', spoilageRate: 'fast', weight: 1, emoji: '🥛', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false },
+  { id: 'res-meat', name: 'Meat', category: 'food', spoilageRate: 'fast', weight: 2, emoji: '🥩', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false },
+  { id: 'res-leather', name: 'Leather', category: 'organics', spoilageRate: 'never', weight: 0.5, emoji: '🟫', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false },
+  { id: 'res-egg', name: 'Egg', category: 'food', spoilageRate: 'medium', weight: 0.1, emoji: '🥚', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false },
 ];
 
 export const createResourceSlice: StateCreator<

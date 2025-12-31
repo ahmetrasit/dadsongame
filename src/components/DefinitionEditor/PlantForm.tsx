@@ -40,7 +40,7 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
   };
 
   const handleAddAliveYield = () => {
-    handleChange('aliveYields', [...item.aliveYields, { resourceId: '', amount: 1, interval: 7, seasons: ['spring', 'summer', 'autumn', 'winter'] }]);
+    handleChange('aliveYields', [...item.aliveYields, { resourceId: '', amount: 1, interval: 7, seasons: ['spring', 'summer', 'autumn', 'winter'], shedding: true }]);
   };
 
   const handleRemoveAliveYield = (index: number) => {
@@ -313,6 +313,25 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
                     handleAliveYieldChange(i, { ...ay, seasons: newSeasons });
                   }}
                 />
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '12px',
+                    color: '#666',
+                    cursor: 'pointer',
+                    marginLeft: '8px',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={ay.shedding ?? true}
+                    onChange={(e) => handleAliveYieldChange(i, { ...ay, shedding: e.target.checked })}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  Shed
+                </label>
                 <div style={{ flex: 1 }}></div>
                 <button
                   onClick={() => handleRemoveAliveYield(i)}

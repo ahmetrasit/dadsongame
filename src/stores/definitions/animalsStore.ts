@@ -92,7 +92,7 @@ export const initialAnimals: AnimalDefinition[] = [
     canPull: true,
     foodNeeds: 8,
     waterNeeds: 10,
-    aliveYields: [{ resourceId: 'res-milk', amount: 1, interval: 1, seasons: ['spring', 'summer', 'autumn', 'winter'] }],
+    aliveYields: [{ resourceId: 'res-milk', amount: 2, interval: 1, seasons: ['spring', 'summer', 'autumn', 'winter'], shedding: false }],
     deadYields: [
       { resourceId: 'res-meat', quantity: 8 },
       { resourceId: 'res-leather', quantity: 2 },
@@ -112,7 +112,7 @@ export const initialAnimals: AnimalDefinition[] = [
     canPull: false,
     foodNeeds: 2,
     waterNeeds: 2,
-    aliveYields: [{ resourceId: 'res-egg', amount: 1, interval: 1, seasons: ['spring', 'summer', 'autumn', 'winter'] }],
+    aliveYields: [{ resourceId: 'res-egg', amount: 3, interval: 1, seasons: ['spring', 'summer', 'autumn', 'winter'], shedding: false }],
     deadYields: [{ resourceId: 'res-meat', quantity: 2 }],
     spriteKey: 'animal-chicken',
     interactionRadius: 30,

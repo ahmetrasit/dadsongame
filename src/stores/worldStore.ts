@@ -1,6 +1,21 @@
 import { create } from 'zustand';
 import type { WorldChunk, BiomeType, Tile } from '@/types';
 import { getChunkKey } from '@/services';
+import type { Season } from '@/stores/definitions';
+
+// Time constants
+export const MINUTES_PER_DAY = 24 * 60;  // 1440 minutes
+export const DAYS_PER_SEASON = 30;
+export const SEASONS: Season[] = ['spring', 'summer', 'autumn', 'winter'];
+export const DAYS_PER_YEAR = DAYS_PER_SEASON * SEASONS.length;  // 120 days
+
+// Spoilage durations in days
+export const SPOILAGE_DAYS: Record<string, number> = {
+  fast: 14,
+  medium: 30,
+  slow: 120,
+  never: Infinity,
+};
 
 // Tile definitions - will be expanded
 export const TILE_DEFINITIONS: Record<number, Tile> = {
@@ -17,12 +32,23 @@ export const TILE_DEFINITIONS: Record<number, Tile> = {
 export const CHUNK_SIZE = 16;
 export const TILE_SIZE = 32;
 
+// Event callbacks for time changes
+type TimeEventCallback = () => void;
+type SeasonEventCallback = (newSeason: Season, oldSeason: Season) => void;
+
 interface WorldState {
   chunks: Map<string, WorldChunk>;
   currentBiome: BiomeType;
-  time: number;          // 0-24000 (minutes in game day)
+  time: number;          // 0-1440 (minutes in game day)
+  day: number;           // Current day (1-based, continuous)
+  season: Season;        // Current season
+  year: number;          // Current year (1-based)
   weather: 'clear' | 'rain' | 'snow' | 'storm';
   seed: number;
+
+  // Event subscribers
+  onDayChangeCallbacks: TimeEventCallback[];
+  onSeasonChangeCallbacks: SeasonEventCallback[];
 
   // Actions
   initWorld: (seed?: number) => void;
@@ -33,6 +59,34 @@ interface WorldState {
   isWalkable: (worldX: number, worldY: number) => boolean;
   advanceTime: (deltaMinutes: number) => void;
   setWeather: (weather: WorldState['weather']) => void;
+
+  // Time helpers
+  getSeason: () => Season;
+  getDayOfSeason: () => number;  // 1-30
+  getSeasonProgress: () => number;  // 0-1
+  isSeasonEnd: () => boolean;
+
+  // Event subscriptions
+  onDayChange: (callback: TimeEventCallback) => () => void;
+  onSeasonChange: (callback: SeasonEventCallback) => () => void;
+}
+
+// Helper to calculate season from day
+function calculateSeason(day: number): Season {
+  const dayOfYear = ((day - 1) % DAYS_PER_YEAR) + 1;  // 1-120
+  const seasonIndex = Math.floor((dayOfYear - 1) / DAYS_PER_SEASON);
+  return SEASONS[seasonIndex];
+}
+
+// Helper to calculate year from day
+function calculateYear(day: number): number {
+  return Math.floor((day - 1) / DAYS_PER_YEAR) + 1;
+}
+
+// Helper to get day within current season (1-30)
+function calculateDayOfSeason(day: number): number {
+  const dayOfYear = ((day - 1) % DAYS_PER_YEAR) + 1;
+  return ((dayOfYear - 1) % DAYS_PER_SEASON) + 1;
 }
 
 // Simple seeded random for deterministic world gen
@@ -80,14 +134,22 @@ export const useWorldStore = create<WorldState>((set, get) => ({
   chunks: new Map(),
   currentBiome: 'forest',
   time: 8 * 60, // Start at 8:00 AM
+  day: 1,       // Start at day 1
+  season: 'spring',
+  year: 1,
   weather: 'clear',
   seed: 12345,
+  onDayChangeCallbacks: [],
+  onSeasonChangeCallbacks: [],
 
   initWorld: (seed = Date.now()) => {
     set({
       chunks: new Map(),
       seed,
       time: 8 * 60,
+      day: 1,
+      season: 'spring',
+      year: 1,
       weather: 'clear'
     });
   },
@@ -158,18 +220,85 @@ export const useWorldStore = create<WorldState>((set, get) => ({
   },
 
   advanceTime: (deltaMinutes) => {
-    set((state) => ({
-      time: (state.time + deltaMinutes) % (24 * 60)
-    }));
+    const state = get();
+    const newTime = state.time + deltaMinutes;
+    const daysPassed = Math.floor(newTime / MINUTES_PER_DAY);
+    const remainingTime = newTime % MINUTES_PER_DAY;
+
+    if (daysPassed > 0) {
+      const oldSeason = state.season;
+      const newDay = state.day + daysPassed;
+      const newSeason = calculateSeason(newDay);
+      const newYear = calculateYear(newDay);
+
+      set({
+        time: remainingTime,
+        day: newDay,
+        season: newSeason,
+        year: newYear,
+      });
+
+      // Trigger day change callbacks
+      state.onDayChangeCallbacks.forEach(cb => cb());
+
+      // Trigger season change callbacks if season changed
+      if (newSeason !== oldSeason) {
+        state.onSeasonChangeCallbacks.forEach(cb => cb(newSeason, oldSeason));
+      }
+    } else {
+      set({ time: remainingTime });
+    }
   },
 
   setWeather: (weather) => {
     set({ weather });
-  }
+  },
+
+  // Time helpers
+  getSeason: () => get().season,
+
+  getDayOfSeason: () => calculateDayOfSeason(get().day),
+
+  getSeasonProgress: () => {
+    const dayOfSeason = calculateDayOfSeason(get().day);
+    return dayOfSeason / DAYS_PER_SEASON;
+  },
+
+  isSeasonEnd: () => {
+    return calculateDayOfSeason(get().day) === DAYS_PER_SEASON;
+  },
+
+  // Event subscriptions
+  onDayChange: (callback) => {
+    set((state) => ({
+      onDayChangeCallbacks: [...state.onDayChangeCallbacks, callback]
+    }));
+    // Return unsubscribe function
+    return () => {
+      set((state) => ({
+        onDayChangeCallbacks: state.onDayChangeCallbacks.filter(cb => cb !== callback)
+      }));
+    };
+  },
+
+  onSeasonChange: (callback) => {
+    set((state) => ({
+      onSeasonChangeCallbacks: [...state.onSeasonChangeCallbacks, callback]
+    }));
+    // Return unsubscribe function
+    return () => {
+      set((state) => ({
+        onSeasonChangeCallbacks: state.onSeasonChangeCallbacks.filter(cb => cb !== callback)
+      }));
+    };
+  },
 }));
 
 // Selectors
 export const useGameTime = () => useWorldStore((s) => s.time);
+export const useGameDay = () => useWorldStore((s) => s.day);
+export const useGameSeason = () => useWorldStore((s) => s.season);
+export const useGameYear = () => useWorldStore((s) => s.year);
 export const useWeather = () => useWorldStore((s) => s.weather);
 export const useCurrentBiome = () => useWorldStore((s) => s.currentBiome);
 

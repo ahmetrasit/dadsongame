@@ -15,10 +15,14 @@
 ## Time
 **Day length by season:** Summer=75%, Spring=50%, Fall=40%, Winter=30%
 **Year:** 4 season slots × 30 days = 120 days. Player chooses season order during map design. Can repeat (tropical=summer×4). Instant switch at day 30/60/90.
+**Implementation:** worldStore.ts tracks day/season/year. Events: onDayChange, onSeasonChange (used by SpoilageService, YieldService).
+**Season flow:** Season start → initializeYieldsForSeason() | Season end → processSeasonEnd() (shed/lose)
 
 ## Creatures
 **Hierarchy:** Creature(base: age,health,growthRate,hunger,needs,yield) → Plant(+water,sun,soil) | Animal(+interaction,speed,intelligence,energy) | Human(+crafting,trading,noYield)
-**Yield:** aliveYield{resource,rate,requiresFed} deadYield{resources[]}
+**Yield:** aliveYield{resourceId,amount,interval,seasons[],shedding,yieldLayerImageUrl?} deadYield{resourceId,quantity}
+**Shedding:** If true, uncollected yields drop to ground at season end. If false, yields are lost.
+**Yield badge:** Green circle with count shown on plants/animals with available yields (MainScene:addYieldBadge)
 
 ## Plants
 **Stages:** seed→sprout→mature→withered(gone). Trees: permanent at mature.
@@ -69,7 +73,9 @@ Wheels(2+baskets,≤6 materials each)→speed. Body→capacity. Handle+Binder re
 ## Materials(6)
 Food(perishable), Water(perishable), Metal, Rock, Wood, Organics
 **Special:** Branches=wood subtype(natural only). Brick=rock subtype(rock+water+fire)
-**Spoilage:** Fast(milk,meat,juice), Medium(vegetables,cooked), Slow(preserved), Never(rock,metal,wood,organics)
+**Spoilage:** Fast=14d(milk,meat), Medium=30d(vegetables), Slow=120d(preserved), Never(rock,metal,wood,organics)
+**Ground display:** Emoji per resource (editable in ResourceForm). Rendered at 24px in MainScene.
+**ResourcePlacement:** `{ id, definitionId, x, y, placedAtDay, sourceId? }` - placedAtDay used for spoilage calc
 
 ## Economy
 **Marketplace:** Physical location, global scope, async trading, player-set prices, partial trades OK, NPC-facilitated.
@@ -136,26 +142,24 @@ Teams(no size limit), shared resources, division of labor. Marketplace for inter
 ## Key Files
 - src/App.tsx - main app with screen routing
 - src/stores/gameStateStore.ts - menu/game state
-- src/stores/mapEditorStore.ts - map editor state + map data
-- src/stores/definitionsStore.ts - plants/animals/resources definitions
-- src/components/MainMenu.tsx - main menu
-- src/components/DefinitionEditor.tsx - definition editor UI
-- src/components/EditorToolbar.tsx - map editor toolbar
-- src/game/scenes/MainScene.ts - Phaser game scene
+- src/stores/mapEditorStore.ts - map editor state + map data (ResourcePlacement includes placedAtDay)
+- src/stores/definitionsStore.ts - plants/animals/resources definitions (re-exports from definitions/)
+- src/stores/definitions/index.ts - AliveYield, DeadYield, Season types
+- src/stores/definitions/resourcesStore.ts - ResourceDefinition (emoji, interactionTypes, spoilageRate)
+- src/stores/yieldStateStore.ts - per-placement yield tracking (remaining counts)
+- src/stores/worldStore.ts - day/season/year, SPOILAGE_DAYS, event subscriptions
+- src/services/YieldService.ts - initializeYieldsForSeason, processSeasonEnd, harvestYield
+- src/services/SpoilageService.ts - isResourceExpired, removeExpiredResources
+- src/game/scenes/MainScene.ts - Phaser scene, addYieldBadge, createResourceSprite (emoji)
+- src/game/utils/interactionDetection.ts - findNearestInteractable (plants/animals/waters/resources)
+- src/components/DefinitionEditor/ - PlantForm, AnimalForm, ResourceForm (shedding checkbox, emoji picker)
 
-## Current Phase: Editor Foundation (v0.015)
-**Version:** v0.015
+## Current Phase: Yield & Spoilage Complete (v0.053)
+**Version:** v0.053
 **Theme:** FT salmon (#FFF1E5) with Avenir font
-**Main Menu:** New Game, Resume, Editor (Map Editor, Object Editor)
-**Object Editor:**
-- Three tabs: Plants, Animals, Materials
-- Tree sidebar navigation with subcategories
-- Draft pattern for new items with Save/Cancel buttons and unique name validation
-- Draft pattern for dead yields with Save/Cancel when adding
-- No abbreviations (full words: Spring, Summer, Autumn, Winter, Quantity)
-**Controls:** ESC returns to menu from game
-**Persistence:** localStorage via zustand persist middleware
-**Player:** Top-down sprite (20×20px), WASD movement
-**Camera:** Factorio-style (arrows=pan, wheel=zoom)
-**Map:** Polygon rivers with Catmull-Rom smoothing, placeable trees
-**Next:** Resource gathering, spawning defined creatures on map
+**Completed this session:**
+- Yield system: season-based yields, per-instance tracking, shedding at season end
+- Spoilage system: day-based expiry (fast=14d, medium=30d, slow=120d)
+- Visual indicators: emoji for resources, yield badges for plants/animals
+- Editor UI: shedding checkbox, emoji picker
+**Next:** Resource collection (E key → inventory), harvest interaction, yield layer sprites
