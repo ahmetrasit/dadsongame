@@ -5,7 +5,7 @@ import type { Season, AliveYield, DeadYield } from './index';
 export type PlantStage = 'seed' | 'sprout' | 'mature' | 'withered';
 export type SoilType = 'grass' | 'sand' | 'rock' | 'fertile' | 'swamp';
 export type PlantSubCategory = 'tree' | 'crop' | 'flower' | 'bush';
-export type PlantInteractionType = 'harvest' | 'chop' | 'water' | 'inspect' | 'pick';
+export type PlantInteractionType = 'collect' | 'pick' | 'harvest' | 'chop' | 'prune' | 'uproot' | 'water' | 'fertilize' | 'inspect';
 
 export interface SpriteVersion {
   imageUrl: string;

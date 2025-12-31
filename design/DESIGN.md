@@ -41,6 +41,33 @@
 **Recruitment:** Find→complete quest→joins→keep fed
 **Abilities:** Same as player: gather,craft,tame,carry,trade
 
+## Interactions (Master List)
+**Plants:** collect, pick, harvest, chop, prune, uproot, water, fertilize
+**Animals:** pet, feed, milk, shear, brush, ride, hitch, tame, gather, collect
+**Resources:** collect, eat, drink
+
+| Interaction | Applies To | Description |
+|-------------|-----------|-------------|
+| collect | Plants, Animals, Resources | Pick up from ground or gather items |
+| pick | Plants | Harvest fruit/flowers without destroying plant |
+| harvest | Plants | Collect crop (may consume plant for annuals) |
+| chop | Plants | Cut down tree for wood |
+| prune | Plants | Trim branches (improves health/yield) |
+| uproot | Plants | Remove plant entirely |
+| water | Plants | Provide water |
+| fertilize | Plants | Add nutrients to soil |
+| milk | Animals | Collect milk |
+| shear | Animals | Collect wool/fur |
+| gather | Animals | Collect eggs/feathers (passive drops) |
+| pet | Animals | Increase happiness |
+| feed | Animals | Give food |
+| brush | Animals | Groom animal (happiness boost) |
+| ride | Animals | Mount for transport |
+| hitch | Animals | Attach to cart |
+| tame | Animals | Begin taming process |
+| eat | Resources | Consume food for nutrition |
+| drink | Resources | Consume water for hydration |
+
 ## Tool Properties(10)
 cutting,digging,smashing,hammering,reaching,damaging,piercing,grinding,scooping,precision
 

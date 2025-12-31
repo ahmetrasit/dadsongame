@@ -8,7 +8,7 @@ export interface SpriteVersion {
 }
 
 // Resource interaction types
-export type ResourceInteractionType = 'collect' | 'inspect';
+export type ResourceInteractionType = 'collect' | 'eat' | 'drink' | 'inspect';
 
 // Nutrient types for food
 export type VitaminType = 'A' | 'B' | 'C' | 'D' | 'E' | 'K' | 'fiber' | 'calcium' | 'iron' | 'magnesium' | 'potassium' | 'zinc' | 'phosphorus';

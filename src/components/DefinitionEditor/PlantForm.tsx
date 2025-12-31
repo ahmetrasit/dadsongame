@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useDefinitionsStore, Season, SoilType, DeadYield, AliveYield, PlantSubCategory } from '@/stores/definitionsStore';
+import { useDefinitionsStore, Season, SoilType, DeadYield, AliveYield, PlantSubCategory, PlantInteractionType } from '@/stores/definitionsStore';
 import { useGameStateStore } from '@/stores/gameStateStore';
 import { Card, FieldRow, CompactInput, CompactSelect, TwoColumnRow, SliderField, CheckboxGroup } from './FormComponents';
 import { FaTrashAlt } from 'react-icons/fa';
@@ -37,6 +37,13 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
       ? item.suitableSoils.filter((s: SoilType) => s !== soil)
       : [...item.suitableSoils, soil];
     handleChange('suitableSoils', soils);
+  };
+
+  const handleInteractionToggle = (interaction: PlantInteractionType) => {
+    const interactions = item.interactionTypes.includes(interaction)
+      ? item.interactionTypes.filter((i: PlantInteractionType) => i !== interaction)
+      : [...item.interactionTypes, interaction];
+    handleChange('interactionTypes', interactions);
   };
 
   const handleAddAliveYield = () => {
@@ -83,6 +90,7 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
   const seasons: Season[] = ['spring', 'summer', 'autumn', 'winter'];
   const soils: SoilType[] = ['grass', 'fertile', 'sand', 'rock', 'swamp'];
   const subCategories: PlantSubCategory[] = ['tree', 'crop', 'flower', 'bush'];
+  const plantInteractions: PlantInteractionType[] = ['collect', 'pick', 'harvest', 'chop', 'prune', 'uproot', 'water', 'fertilize'];
 
   // Sort resources alphabetically for dropdowns
   const sortedResources = useMemo(() =>
@@ -248,6 +256,12 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
             options={soils}
             selected={item.suitableSoils}
             onChange={(soil: string) => handleSoilToggle(soil as SoilType)}
+          />
+          <CheckboxGroup
+            label="Interactions"
+            options={plantInteractions}
+            selected={item.interactionTypes}
+            onChange={(interaction: string) => handleInteractionToggle(interaction as PlantInteractionType)}
           />
         </Card>
 

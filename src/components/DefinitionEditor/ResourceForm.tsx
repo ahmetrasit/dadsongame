@@ -4,7 +4,7 @@ import { useGameStateStore } from '@/stores/gameStateStore';
 import { Card, FieldRow, CompactInput, CompactSelect, CheckboxGroup } from './FormComponents';
 import { FaTrashAlt } from 'react-icons/fa';
 import { generateResourcePreview } from '@/utils/generatePreviewImage';
-import type { VitaminType, FoodNutrition } from '@/stores/definitions/resourcesStore';
+import type { VitaminType, FoodNutrition, ResourceInteractionType } from '@/stores/definitions/resourcesStore';
 
 interface ResourceFormProps {
   item: any;
@@ -40,6 +40,14 @@ export function ResourceForm({ item, isDraft, onSave, onCancel }: ResourceFormPr
 
   const isSpoilageDisabled = ['metal', 'rock', 'wood', 'organics'].includes(item.category);
   const isFood = item.category === 'food';
+  const resourceInteractions: ResourceInteractionType[] = ['collect', 'eat', 'drink'];
+
+  const handleInteractionToggle = (interaction: ResourceInteractionType) => {
+    const interactions = item.interactionTypes.includes(interaction)
+      ? item.interactionTypes.filter((i: ResourceInteractionType) => i !== interaction)
+      : [...item.interactionTypes, interaction];
+    handleChange('interactionTypes', interactions);
+  };
 
   // Default nutrition values
   const defaultNutrition: FoodNutrition = {
@@ -266,6 +274,16 @@ export function ResourceForm({ item, isDraft, onSave, onCancel }: ResourceFormPr
             </button>
           )}
         </FieldRow>
+      </Card>
+
+      {/* Interactions section */}
+      <Card title="Interactions">
+        <CheckboxGroup
+          label=""
+          options={resourceInteractions}
+          selected={item.interactionTypes}
+          onChange={(interaction: string) => handleInteractionToggle(interaction as ResourceInteractionType)}
+        />
       </Card>
 
       {/* Nutrition section - only for food category */}

@@ -4,7 +4,7 @@ import type { AliveYield, DeadYield } from './index';
 // Animal-specific types
 export type AnimalCapability = 'eat' | 'carry' | 'transport' | 'produce';
 export type AnimalSubCategory = 'livestock' | 'poultry' | 'wild' | 'pet';
-export type AnimalInteractionType = 'pet' | 'feed' | 'milk' | 'shear' | 'ride' | 'collect' | 'tame' | 'inspect';
+export type AnimalInteractionType = 'pet' | 'feed' | 'milk' | 'shear' | 'brush' | 'ride' | 'hitch' | 'tame' | 'gather' | 'collect' | 'inspect';
 
 export interface SpriteVersion {
   imageUrl: string;

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useDefinitionsStore, Season, DeadYield, AliveYield, AnimalSubCategory } from '@/stores/definitionsStore';
+import { useDefinitionsStore, Season, DeadYield, AliveYield, AnimalSubCategory, AnimalInteractionType } from '@/stores/definitionsStore';
 import { useGameStateStore } from '@/stores/gameStateStore';
 import { Card, FieldRow, CompactInput, CompactSelect, TwoColumnRow, SliderField, CheckboxGroup } from './FormComponents';
 import { FaTrashAlt } from 'react-icons/fa';
@@ -68,6 +68,14 @@ export function AnimalForm({ item, isDraft, onSave, onCancel }: AnimalFormProps)
 
   const subCategories: AnimalSubCategory[] = ['livestock', 'poultry', 'wild', 'pet'];
   const seasons: Season[] = ['spring', 'summer', 'autumn', 'winter'];
+  const animalInteractions: AnimalInteractionType[] = ['pet', 'feed', 'milk', 'shear', 'brush', 'ride', 'hitch', 'tame', 'gather', 'collect'];
+
+  const handleInteractionToggle = (interaction: AnimalInteractionType) => {
+    const interactions = item.interactionTypes.includes(interaction)
+      ? item.interactionTypes.filter((i: AnimalInteractionType) => i !== interaction)
+      : [...item.interactionTypes, interaction];
+    handleChange('interactionTypes', interactions);
+  };
 
   // Sort resources alphabetically for dropdowns
   const sortedResources = useMemo(() =>
@@ -252,6 +260,12 @@ export function AnimalForm({ item, isDraft, onSave, onCancel }: AnimalFormProps)
             />
             <span style={{ color: '#888', fontSize: '13px' }}>per day</span>
           </FieldRow>
+          <CheckboxGroup
+            label="Interactions"
+            options={animalInteractions}
+            selected={item.interactionTypes}
+            onChange={(interaction: string) => handleInteractionToggle(interaction as AnimalInteractionType)}
+          />
         </Card>
       </TwoColumnRow>
 
