@@ -31,7 +31,10 @@ export function TreeSidebar({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
       {categories.map((category) => {
-        const categoryItems = itemsByCategory[category] || [];
+        // Sort items alphabetically by name within each category (case-insensitive)
+        const categoryItems = (itemsByCategory[category] || [])
+          .slice()
+          .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
         const isExpanded = expandedCategories.has(category);
 
         return (

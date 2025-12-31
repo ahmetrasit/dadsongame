@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
 import { useGameStateStore } from '@/stores/gameStateStore';
-import { Card, FieldRow, CompactInput, CompactSelect } from './FormComponents';
+import { Card, FieldRow, CompactInput, CompactSelect, CheckboxGroup } from './FormComponents';
 import { FaTrashAlt } from 'react-icons/fa';
 import { generateResourcePreview } from '@/utils/generatePreviewImage';
+import type { VitaminType, FoodNutrition } from '@/stores/definitions/resourcesStore';
 
 interface ResourceFormProps {
   item: any;
@@ -38,6 +39,58 @@ export function ResourceForm({ item, isDraft, onSave, onCancel }: ResourceFormPr
   };
 
   const isSpoilageDisabled = ['metal', 'rock', 'wood', 'organics'].includes(item.category);
+  const isFood = item.category === 'food';
+
+  // Default nutrition values
+  const defaultNutrition: FoodNutrition = {
+    kcalPerKg: 100,
+    vitamins: [],
+    protein: 25,
+    carbs: 25,
+    goodFat: 25,
+    badFat: 25,
+  };
+
+  const nutrition = item.nutrition || defaultNutrition;
+
+  // Handle nutrition field changes
+  const handleNutritionChange = useCallback((field: keyof FoodNutrition, value: any) => {
+    const updatedNutrition = { ...nutrition, [field]: value };
+    handleChange('nutrition', updatedNutrition);
+  }, [nutrition, handleChange]);
+
+  // Handle macro slider change - adjusts others to maintain 100% total
+  const handleMacroChange = useCallback((field: 'protein' | 'carbs' | 'goodFat' | 'badFat', newValue: number) => {
+    // Get the other fields
+    const otherFields = (['protein', 'carbs', 'goodFat', 'badFat'] as const).filter(f => f !== field);
+    const otherTotal = otherFields.reduce((sum, f) => sum + nutrition[f], 0);
+
+    // Calculate new values for other fields proportionally
+    const updatedNutrition = { ...nutrition, [field]: newValue };
+
+    if (otherTotal > 0) {
+      const remaining = 100 - newValue;
+      otherFields.forEach(f => {
+        updatedNutrition[f] = Math.round((nutrition[f] / otherTotal) * remaining);
+      });
+      // Fix rounding errors
+      const newTotal = updatedNutrition.protein + updatedNutrition.carbs + updatedNutrition.goodFat + updatedNutrition.badFat;
+      if (newTotal !== 100) {
+        updatedNutrition[otherFields[0]] += 100 - newTotal;
+      }
+    }
+
+    handleChange('nutrition', updatedNutrition);
+  }, [nutrition, handleChange]);
+
+  // Handle vitamin toggle
+  const handleVitaminToggle = useCallback((vitamin: string) => {
+    const vitamins = nutrition.vitamins || [];
+    const newVitamins = vitamins.includes(vitamin as VitaminType)
+      ? vitamins.filter((v: VitaminType) => v !== vitamin)
+      : [...vitamins, vitamin as VitaminType];
+    handleNutritionChange('vitamins', newVitamins);
+  }, [nutrition.vitamins, handleNutritionChange]);
 
   // Check for duplicate name
   const isDuplicateName = resources.some(r => r.name.toLowerCase() === item.name.toLowerCase() && r.id !== item.id);
@@ -131,26 +184,30 @@ export function ResourceForm({ item, isDraft, onSave, onCancel }: ResourceFormPr
             onChange={(e) => handleChange('weight', Number(e.target.value))}
             width="80px"
           />
-          {/* Emoji picker - simple input for now */}
-          <div style={{ display: 'flex', alignItems: 'center', marginLeft: '8px' }}>
-            <input
-              type="text"
-              value={item.emoji || '📦'}
-              onChange={(e) => handleChange('emoji', e.target.value)}
-              style={{
-                width: '40px',
-                height: '36px',
-                fontSize: '24px',
-                textAlign: 'center',
-                padding: '0',
-                background: '#FFFFFF',
-                border: '1px solid #D4C4B0',
-                borderRadius: '4px',
-                cursor: 'text',
-              }}
-              title="Type or paste an emoji for this resource"
-              maxLength={2}
-            />
+          {/* Emoji picker - click to edit */}
+          <div
+            onClick={() => {
+              const emoji = prompt('Enter an emoji for this resource:', item.emoji || '📦');
+              if (emoji !== null) {
+                handleChange('emoji', emoji.trim() || '📦');
+              }
+            }}
+            style={{
+              width: '40px',
+              height: '36px',
+              fontSize: '24px',
+              textAlign: 'center',
+              lineHeight: '36px',
+              background: '#FFFFFF',
+              border: '1px solid #D4C4B0',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              marginLeft: '8px',
+              userSelect: 'none',
+            }}
+            title="Click to change emoji"
+          >
+            {item.emoji || '📦'}
           </div>
           {isDraft ? (
             <>
@@ -210,6 +267,110 @@ export function ResourceForm({ item, isDraft, onSave, onCancel }: ResourceFormPr
           )}
         </FieldRow>
       </Card>
+
+      {/* Nutrition section - only for food category */}
+      {isFood && (
+        <Card title="Nutrition">
+          <FieldRow style={{ marginBottom: '12px' }}>
+            <CompactInput
+              label="kcal/kg"
+              type="number"
+              value={nutrition.kcalPerKg}
+              onChange={(e) => handleNutritionChange('kcalPerKg', Number(e.target.value))}
+              width="100px"
+            />
+            <div style={{ marginLeft: '24px' }}>
+              <CheckboxGroup
+                label=""
+                options={['A', 'B', 'C', 'D', 'E', 'K', 'fiber', 'calcium', 'iron', 'magnesium', 'potassium', 'zinc', 'phosphorus']}
+                selected={nutrition.vitamins || []}
+                onChange={handleVitaminToggle}
+              />
+            </div>
+          </FieldRow>
+
+          <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>
+            Macronutrients (must total 100%)
+          </div>
+
+          {/* Macro sliders */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#666', marginBottom: '4px' }}>
+                <span>Protein</span>
+                <span>{nutrition.protein}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={nutrition.protein}
+                onChange={(e) => handleMacroChange('protein', Number(e.target.value))}
+                style={{ width: '100%', accentColor: '#0D7680' }}
+              />
+            </div>
+
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#666', marginBottom: '4px' }}>
+                <span>Carbohydrates</span>
+                <span>{nutrition.carbs}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={nutrition.carbs}
+                onChange={(e) => handleMacroChange('carbs', Number(e.target.value))}
+                style={{ width: '100%', accentColor: '#0D7680' }}
+              />
+            </div>
+
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#666', marginBottom: '4px' }}>
+                <span>Good Fat</span>
+                <span>{nutrition.goodFat}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={nutrition.goodFat}
+                onChange={(e) => handleMacroChange('goodFat', Number(e.target.value))}
+                style={{ width: '100%', accentColor: '#22c55e' }}
+              />
+            </div>
+
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#666', marginBottom: '4px' }}>
+                <span>Bad Fat</span>
+                <span>{nutrition.badFat}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={nutrition.badFat}
+                onChange={(e) => handleMacroChange('badFat', Number(e.target.value))}
+                style={{ width: '100%', accentColor: '#ef4444' }}
+              />
+            </div>
+          </div>
+
+          {/* Total indicator */}
+          <div style={{
+            marginTop: '12px',
+            padding: '8px',
+            background: nutrition.protein + nutrition.carbs + nutrition.goodFat + nutrition.badFat === 100 ? '#d1fae5' : '#fee2e2',
+            borderRadius: '4px',
+            fontSize: '12px',
+            textAlign: 'center',
+            color: nutrition.protein + nutrition.carbs + nutrition.goodFat + nutrition.badFat === 100 ? '#065f46' : '#991b1b',
+          }}>
+            Total: {nutrition.protein + nutrition.carbs + nutrition.goodFat + nutrition.badFat}%
+            {nutrition.protein + nutrition.carbs + nutrition.goodFat + nutrition.badFat !== 100 && ' (must be 100%)'}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

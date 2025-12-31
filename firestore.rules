@@ -2,17 +2,14 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Global game definitions - read by all, write by admins only
+    // Global game definitions - public read/write for development
     match /definitions/global {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read, write: if true;
     }
 
-    // Maps collection - public read, authenticated write
+    // Maps collection - public read/write for development
     match /maps/{mapId} {
-      allow read: if true;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null;
+      allow read, write: if true;
     }
 
     // Player saves - only accessible by the player who owns them

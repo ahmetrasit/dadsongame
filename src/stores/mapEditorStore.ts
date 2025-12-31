@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 import { mapService } from '@/services/MapService';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
+import { useWorldStore } from '@/stores/worldStore';
 
 export interface Point {
   x: number;
@@ -475,7 +476,7 @@ export const useMapEditorStore = create<MapEditorState>()(
             ...state.mapData,
             resources: [
               ...(state.mapData.resources || []),
-              { id: `resource-${state.idCounters.resource}`, definitionId, x, y, placedAtDay: 1 }  // Day set by caller or default to 1
+              { id: `resource-${state.idCounters.resource}`, definitionId, x, y, placedAtDay: useWorldStore.getState().day }
             ]
           }
         };
@@ -537,7 +538,7 @@ export const useMapEditorStore = create<MapEditorState>()(
         });
 
         // Remove resources within radius
-        const resources = state.mapData.resources.filter(r => {
+        const resources = (state.mapData.resources || []).filter(r => {
           const dx = r.x - x;
           const dy = r.y - y;
           return Math.sqrt(dx * dx + dy * dy) > radius;

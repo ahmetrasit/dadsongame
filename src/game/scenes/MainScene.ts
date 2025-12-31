@@ -355,10 +355,10 @@ export class MainScene extends Phaser.Scene {
     }
 
     // Resources - only update if changed or editing mode changed
-    const resourcesHash = this.hashData(mapData.resources);
+    const resourcesHash = this.hashData(mapData.resources || []);
     if (forceRender || resourcesHash !== this.lastResourcesHash || editingChanged) {
       this.lastResourcesHash = resourcesHash;
-      this.updateResources(mapData.resources, defStore.resources, isEditing);
+      this.updateResources(mapData.resources || [], defStore.resources, isEditing);
     }
 
     // Spawn marker - only update if changed or editing mode changed

@@ -10,6 +10,20 @@ export interface SpriteVersion {
 // Resource interaction types
 export type ResourceInteractionType = 'collect' | 'inspect';
 
+// Nutrient types for food
+export type VitaminType = 'A' | 'B' | 'C' | 'D' | 'E' | 'K' | 'fiber' | 'calcium' | 'iron' | 'magnesium' | 'potassium' | 'zinc' | 'phosphorus';
+
+// Nutritional info for food category resources
+export interface FoodNutrition {
+  kcalPerKg: number;              // Calories per kilogram
+  vitamins: VitaminType[];        // Which vitamins this food contains
+  protein: number;                // Percentage (0-100)
+  carbs: number;                  // Percentage (0-100)
+  goodFat: number;                // Percentage (0-100)
+  badFat: number;                 // Percentage (0-100)
+  // protein + carbs + goodFat + badFat should equal 100
+}
+
 export interface ResourceDefinition {
   id: string;
   name: string;
@@ -22,6 +36,8 @@ export interface ResourceDefinition {
   isBlocking: boolean;                             // Whether it blocks movement (usually false)
   imageUrl?: string;                               // Optional sprite for inventory/UI
   spriteVersions?: SpriteVersion[];
+  // Nutritional info - only for food category
+  nutrition?: FoodNutrition;
 }
 
 // Resource slice state and actions
@@ -67,13 +83,18 @@ export const defaultResource = (existingResources: ResourceDefinition[] = []): R
 });
 
 export const initialResources: ResourceDefinition[] = [
-  { id: 'res-apple', name: 'Apple', category: 'food', spoilageRate: 'medium', weight: 0.2, emoji: '🍎', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false },
+  { id: 'res-apple', name: 'Apple', category: 'food', spoilageRate: 'medium', weight: 0.2, emoji: '🍎', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false,
+    nutrition: { kcalPerKg: 520, vitamins: ['C'], protein: 2, carbs: 96, goodFat: 1, badFat: 1 } },
   { id: 'res-wood', name: 'Wood', category: 'wood', spoilageRate: 'never', weight: 5, emoji: '🪵', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false },
-  { id: 'res-wheat', name: 'Wheat', category: 'food', spoilageRate: 'slow', weight: 0.5, emoji: '🌾', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false },
-  { id: 'res-milk', name: 'Milk', category: 'food', spoilageRate: 'fast', weight: 1, emoji: '🥛', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false },
-  { id: 'res-meat', name: 'Meat', category: 'food', spoilageRate: 'fast', weight: 2, emoji: '🥩', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false },
+  { id: 'res-wheat', name: 'Wheat', category: 'food', spoilageRate: 'slow', weight: 0.5, emoji: '🌾', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false,
+    nutrition: { kcalPerKg: 3390, vitamins: ['B', 'E'], protein: 15, carbs: 80, goodFat: 4, badFat: 1 } },
+  { id: 'res-milk', name: 'Milk', category: 'food', spoilageRate: 'fast', weight: 1, emoji: '🥛', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false,
+    nutrition: { kcalPerKg: 610, vitamins: ['A', 'B', 'D'], protein: 21, carbs: 30, goodFat: 27, badFat: 22 } },
+  { id: 'res-meat', name: 'Meat', category: 'food', spoilageRate: 'fast', weight: 2, emoji: '🥩', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false,
+    nutrition: { kcalPerKg: 2500, vitamins: ['B'], protein: 43, carbs: 0, goodFat: 30, badFat: 27 } },
   { id: 'res-leather', name: 'Leather', category: 'organics', spoilageRate: 'never', weight: 0.5, emoji: '🟫', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false },
-  { id: 'res-egg', name: 'Egg', category: 'food', spoilageRate: 'medium', weight: 0.1, emoji: '🥚', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false },
+  { id: 'res-egg', name: 'Egg', category: 'food', spoilageRate: 'medium', weight: 0.1, emoji: '🥚', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false,
+    nutrition: { kcalPerKg: 1430, vitamins: ['A', 'B', 'D', 'E'], protein: 35, carbs: 3, goodFat: 38, badFat: 24 } },
 ];
 
 export const createResourceSlice: StateCreator<

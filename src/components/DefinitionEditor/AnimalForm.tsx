@@ -69,6 +69,12 @@ export function AnimalForm({ item, isDraft, onSave, onCancel }: AnimalFormProps)
   const subCategories: AnimalSubCategory[] = ['livestock', 'poultry', 'wild', 'pet'];
   const seasons: Season[] = ['spring', 'summer', 'autumn', 'winter'];
 
+  // Sort resources alphabetically for dropdowns
+  const sortedResources = useMemo(() =>
+    [...resources].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+    [resources]
+  );
+
   // Check for duplicate name
   const isDuplicateName = animals.some(a => a.name.toLowerCase() === item.name.toLowerCase() && a.id !== item.id);
   const canSave = item.name.trim() !== '' && !isDuplicateName;
@@ -278,7 +284,7 @@ export function AnimalForm({ item, isDraft, onSave, onCancel }: AnimalFormProps)
                   width="150px"
                   options={[
                     { value: '', label: '-- Select --' },
-                    ...resources.map(res => ({ value: res.id, label: res.name }))
+                    ...sortedResources.map(res => ({ value: res.id, label: res.name }))
                   ]}
                 />
                 <span style={{ color: '#888', fontSize: '13px', marginLeft: '8px' }}>Every</span>

@@ -162,10 +162,35 @@ class DefinitionsService {
       try {
         const docRef = doc(this.db, 'definitions', 'global');
 
+        // Sanitize resources to ensure no undefined values (Firebase rejects undefined)
+        const sanitizedResources = (definitions.resources || []).map(r => ({
+          id: r.id,
+          name: r.name,
+          category: r.category,
+          spoilageRate: r.spoilageRate,
+          weight: r.weight,
+          emoji: r.emoji || '📦',
+          interactionTypes: r.interactionTypes || ['collect'],
+          interactionRadius: r.interactionRadius ?? 24,
+          isBlocking: r.isBlocking ?? false,
+          ...(r.imageUrl ? { imageUrl: r.imageUrl } : {}),
+          ...(r.spriteVersions ? { spriteVersions: r.spriteVersions } : {}),
+          ...(r.nutrition ? {
+            nutrition: {
+              kcalPerKg: r.nutrition.kcalPerKg ?? 100,
+              vitamins: r.nutrition.vitamins || [],
+              protein: r.nutrition.protein ?? 25,
+              carbs: r.nutrition.carbs ?? 25,
+              goodFat: r.nutrition.goodFat ?? 25,
+              badFat: r.nutrition.badFat ?? 25,
+            }
+          } : {}),
+        }));
+
         await setDoc(docRef, {
           plants: definitions.plants,
           animals: definitions.animals,
-          resources: definitions.resources,
+          resources: sanitizedResources,
           waters: definitions.waters || [],
           updatedAt: timestamp,
         }, { merge: true });

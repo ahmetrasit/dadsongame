@@ -84,6 +84,12 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
   const soils: SoilType[] = ['grass', 'fertile', 'sand', 'rock', 'swamp'];
   const subCategories: PlantSubCategory[] = ['tree', 'crop', 'flower', 'bush'];
 
+  // Sort resources alphabetically for dropdowns
+  const sortedResources = useMemo(() =>
+    [...resources].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+    [resources]
+  );
+
   // Check for duplicate name
   const isDuplicateName = plants.some(p => p.name.toLowerCase() === item.name.toLowerCase() && p.id !== item.id);
   const canSave = item.name.trim() !== '' && !isDuplicateName;
@@ -288,7 +294,7 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
                   width="150px"
                   options={[
                     { value: '', label: '-- Select --' },
-                    ...resources.map(res => ({ value: res.id, label: res.name }))
+                    ...sortedResources.map(res => ({ value: res.id, label: res.name }))
                   ]}
                 />
                 <span style={{ color: '#888', fontSize: '13px', marginLeft: '8px' }}>Every</span>

@@ -222,6 +222,16 @@ class MapService {
           }
         }
 
+        // Sanitize resources to ensure no undefined values (Firebase rejects undefined)
+        const sanitizedResources = (mapData.resources || []).map(r => ({
+          id: r.id,
+          definitionId: r.definitionId,
+          x: r.x,
+          y: r.y,
+          placedAtDay: r.placedAtDay ?? 1,  // Default to day 1 if missing
+          ...(r.sourceId ? { sourceId: r.sourceId } : {}),  // Only include if defined
+        }));
+
         const docData: FirestoreMapDoc = {
           name: name || 'Untitled Map',
           mapData: {
@@ -229,7 +239,7 @@ class MapService {
             plants: mapData.plants,
             animals: mapData.animals,
             waters: mapData.waters,
-            resources: mapData.resources,
+            resources: sanitizedResources,
             spawn: mapData.spawn,
           },
           createdAt,

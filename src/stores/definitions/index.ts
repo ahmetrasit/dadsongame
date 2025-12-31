@@ -234,6 +234,16 @@ export const useDefinitionsStore = create<DefinitionsState>()(
             definitionsService.subscribeToUpdates(
               (definitions, timestamp) => {
                 console.log('[DefinitionsStore] Applying remote update');
+                // Update lastSyncedData to prevent re-sync loop
+                const remoteData = JSON.stringify({
+                  plants: definitions.plants,
+                  animals: definitions.animals,
+                  resources: definitions.resources,
+                  waters: definitions.waters || get().waters,
+                });
+                // This is set in the module scope - we need to export a setter
+                updateLastSyncedData(remoteData);
+
                 // Directly set state - service already filters our own saves
                 set({
                   plants: definitions.plants,
@@ -323,6 +333,11 @@ export const useDefinitionsStore = create<DefinitionsState>()(
 // Using a debounced approach to avoid excessive writes
 let syncTimeout: ReturnType<typeof setTimeout> | null = null;
 let lastSyncedData: string | null = null;
+
+// Setter for lastSyncedData - used by remote update handler to prevent re-sync loop
+function updateLastSyncedData(data: string) {
+  lastSyncedData = data;
+}
 
 const debouncedSync = () => {
   if (syncTimeout) clearTimeout(syncTimeout);
