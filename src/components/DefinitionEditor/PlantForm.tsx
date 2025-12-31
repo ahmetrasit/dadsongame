@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useDefinitionsStore, Season, SoilType, DeadYield, AliveYield, PlantSubCategory, PlantInteractionType } from '@/stores/definitionsStore';
+import { useDefinitionsStore, Season, SoilType, DeadYield, AliveYield, PlantSubCategory, PlantYieldInteraction, PlantNeedInteraction } from '@/stores/definitionsStore';
 import { useGameStateStore } from '@/stores/gameStateStore';
 import { Card, FieldRow, CompactInput, CompactSelect, TwoColumnRow, SliderField, CheckboxGroup } from './FormComponents';
 import { FaTrashAlt } from 'react-icons/fa';
@@ -39,15 +39,15 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
     handleChange('suitableSoils', soils);
   };
 
-  const handleInteractionToggle = (interaction: PlantInteractionType) => {
-    const interactions = item.interactionTypes.includes(interaction)
-      ? item.interactionTypes.filter((i: PlantInteractionType) => i !== interaction)
-      : [...item.interactionTypes, interaction];
-    handleChange('interactionTypes', interactions);
+  const handleNeedInteractionToggle = (interaction: PlantNeedInteraction) => {
+    const interactions = (item.needInteractions || []).includes(interaction)
+      ? item.needInteractions.filter((i: PlantNeedInteraction) => i !== interaction)
+      : [...(item.needInteractions || []), interaction];
+    handleChange('needInteractions', interactions);
   };
 
   const handleAddAliveYield = () => {
-    handleChange('aliveYields', [...item.aliveYields, { resourceId: '', amount: 1, interval: 7, seasons: ['spring', 'summer', 'autumn', 'winter'], shedding: true }]);
+    handleChange('aliveYields', [...item.aliveYields, { resourceId: '', amount: 1, interval: 7, seasons: ['spring', 'summer', 'autumn', 'winter'], shedding: true, interactionType: 'harvest' }]);
   };
 
   const handleRemoveAliveYield = (index: number) => {
@@ -90,7 +90,8 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
   const seasons: Season[] = ['spring', 'summer', 'autumn', 'winter'];
   const soils: SoilType[] = ['grass', 'fertile', 'sand', 'rock', 'swamp'];
   const subCategories: PlantSubCategory[] = ['tree', 'crop', 'flower', 'bush'];
-  const plantInteractions: PlantInteractionType[] = ['collect', 'pick', 'harvest', 'chop', 'prune', 'uproot', 'water', 'fertilize'];
+  const plantYieldInteractions: PlantYieldInteraction[] = ['pick', 'harvest', 'collect'];
+  const plantNeedInteractions: PlantNeedInteraction[] = ['water', 'fertilize'];
 
   // Sort resources alphabetically for dropdowns
   const sortedResources = useMemo(() =>
@@ -257,12 +258,6 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
             selected={item.suitableSoils}
             onChange={(soil: string) => handleSoilToggle(soil as SoilType)}
           />
-          <CheckboxGroup
-            label="Interactions"
-            options={plantInteractions}
-            selected={item.interactionTypes}
-            onChange={(interaction: string) => handleInteractionToggle(interaction as PlantInteractionType)}
-          />
         </Card>
 
         <Card title="Needs" style={{ flex: '0 0 calc(45% - 16px)' }}>
@@ -275,6 +270,12 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
             label="Sun"
             value={item.sunNeed}
             onChange={(e) => handleChange('sunNeed', Number(e.target.value))}
+          />
+          <CheckboxGroup
+            label="Interactions"
+            options={plantNeedInteractions}
+            selected={item.needInteractions || []}
+            onChange={(interaction: string) => handleNeedInteractionToggle(interaction as PlantNeedInteraction)}
           />
         </Card>
       </TwoColumnRow>
@@ -294,30 +295,37 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
               }}
             >
               <FieldRow style={{ marginBottom: '4px' }}>
+                <CompactSelect
+                  label=""
+                  value={ay.interactionType || 'harvest'}
+                  onChange={(e) => handleAliveYieldChange(i, { ...ay, interactionType: e.target.value as PlantYieldInteraction })}
+                  width="90px"
+                  options={plantYieldInteractions.map(int => ({ value: int, label: int.charAt(0).toUpperCase() + int.slice(1) }))}
+                />
                 <CompactInput
                   label=""
                   type="number"
                   value={ay.amount}
                   onChange={(e) => handleAliveYieldChange(i, { ...ay, amount: Number(e.target.value) })}
-                  width="60px"
+                  width="50px"
                 />
                 <CompactSelect
                   label=""
                   value={ay.resourceId}
                   onChange={(e) => handleAliveYieldChange(i, { ...ay, resourceId: e.target.value })}
-                  width="150px"
+                  width="130px"
                   options={[
                     { value: '', label: '-- Select --' },
                     ...sortedResources.map(res => ({ value: res.id, label: res.name }))
                   ]}
                 />
-                <span style={{ color: '#888', fontSize: '13px', marginLeft: '8px' }}>Every</span>
+                <span style={{ color: '#888', fontSize: '13px', marginLeft: '4px' }}>Every</span>
                 <CompactInput
                   label=""
                   type="number"
                   value={ay.interval}
                   onChange={(e) => handleAliveYieldChange(i, { ...ay, interval: Number(e.target.value) })}
-                  width="60px"
+                  width="50px"
                 />
                 <span style={{ color: '#888', fontSize: '13px' }}>days</span>
               </FieldRow>

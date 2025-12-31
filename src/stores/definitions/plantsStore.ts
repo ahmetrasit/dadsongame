@@ -1,11 +1,10 @@
 import { StateCreator } from 'zustand';
-import type { Season, AliveYield, DeadYield } from './index';
+import type { Season, AliveYield, DeadYield, PlantNeedInteraction } from './index';
 
 // Plant-specific types
 export type PlantStage = 'seed' | 'sprout' | 'mature' | 'withered';
 export type SoilType = 'grass' | 'sand' | 'rock' | 'fertile' | 'swamp';
 export type PlantSubCategory = 'tree' | 'crop' | 'flower' | 'bush';
-export type PlantInteractionType = 'collect' | 'pick' | 'harvest' | 'chop' | 'prune' | 'uproot' | 'water' | 'fertilize' | 'inspect';
 
 export interface SpriteVersion {
   imageUrl: string;
@@ -30,7 +29,7 @@ export interface PlantDefinition {
   spriteVersions?: SpriteVersion[];
   // Interaction properties
   interactionRadius: number;
-  interactionTypes: PlantInteractionType[];
+  needInteractions: PlantNeedInteraction[];  // Care interactions (water, fertilize)
   isBlocking: boolean;
 }
 
@@ -78,7 +77,7 @@ export const defaultPlant = (existingPlants: PlantDefinition[] = []): PlantDefin
   deadYields: [],
   spriteKey: 'plant-default',
   interactionRadius: 40,
-  interactionTypes: ['harvest', 'inspect'],
+  needInteractions: ['water'],
   isBlocking: false,
 });
 
@@ -93,11 +92,11 @@ export const initialPlants: PlantDefinition[] = [
     suitableSoils: ['grass', 'fertile'],
     waterNeed: 40,
     sunNeed: 60,
-    aliveYields: [{ resourceId: 'res-apple', amount: 5, interval: 1, seasons: ['spring', 'summer', 'autumn'], shedding: true }],
+    aliveYields: [{ resourceId: 'res-apple', amount: 5, interval: 1, seasons: ['spring', 'summer', 'autumn'], shedding: true, interactionType: 'pick' }],
     deadYields: [{ resourceId: 'res-wood', quantity: 10 }],
     spriteKey: 'plant-apple-tree',
     interactionRadius: 50,
-    interactionTypes: ['harvest', 'chop', 'inspect'],
+    needInteractions: ['water'],
     isBlocking: true,
   },
   {
@@ -110,11 +109,11 @@ export const initialPlants: PlantDefinition[] = [
     suitableSoils: ['grass', 'fertile'],
     waterNeed: 60,
     sunNeed: 70,
-    aliveYields: [],
-    deadYields: [{ resourceId: 'res-wheat', quantity: 3 }],
+    aliveYields: [{ resourceId: 'res-wheat', amount: 3, interval: 1, seasons: ['spring', 'summer'], shedding: false, interactionType: 'harvest' }],
+    deadYields: [],
     spriteKey: 'plant-wheat',
     interactionRadius: 30,
-    interactionTypes: ['harvest', 'water', 'inspect'],
+    needInteractions: ['water', 'fertilize'],
     isBlocking: false,
   },
 ];
