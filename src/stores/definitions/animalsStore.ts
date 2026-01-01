@@ -1,10 +1,9 @@
 import { StateCreator } from 'zustand';
-import type { AliveYield, DeadYield } from './index';
+import type { AliveYield, DeadYield, AnimalNeedInteraction } from './index';
 
 // Animal-specific types
 export type AnimalCapability = 'eat' | 'carry' | 'transport' | 'produce';
 export type AnimalSubCategory = 'livestock' | 'poultry' | 'wild' | 'pet';
-export type AnimalInteractionType = 'pet' | 'feed' | 'milk' | 'shear' | 'ride' | 'collect' | 'tame' | 'inspect';
 
 export interface SpriteVersion {
   imageUrl: string;
@@ -29,7 +28,7 @@ export interface AnimalDefinition {
   spriteVersions?: SpriteVersion[];
   // Interaction properties
   interactionRadius: number;
-  interactionTypes: AnimalInteractionType[];
+  needInteractions: AnimalNeedInteraction[];  // Care interactions (feed, water, pet, lead, tame)
   isBlocking: boolean;
 }
 
@@ -77,7 +76,7 @@ export const defaultAnimal = (existingAnimals: AnimalDefinition[] = []): AnimalD
   deadYields: [],
   spriteKey: 'animal-default',
   interactionRadius: 40,
-  interactionTypes: ['inspect', 'tame'],
+  needInteractions: ['feed', 'water', 'tame'],
   isBlocking: false,
 });
 
@@ -92,14 +91,14 @@ export const initialAnimals: AnimalDefinition[] = [
     canPull: true,
     foodNeeds: 8,
     waterNeeds: 10,
-    aliveYields: [{ resourceId: 'res-milk', amount: 2, interval: 1, seasons: ['spring', 'summer', 'autumn', 'winter'], shedding: false }],
+    aliveYields: [{ resourceId: 'res-milk', amount: 2, interval: 1, seasons: ['spring', 'summer', 'autumn', 'winter'], shedding: false, interactionType: 'milk' }],
     deadYields: [
       { resourceId: 'res-meat', quantity: 8 },
       { resourceId: 'res-leather', quantity: 2 },
     ],
     spriteKey: 'animal-cow',
     interactionRadius: 50,
-    interactionTypes: ['pet', 'feed', 'milk', 'inspect'],
+    needInteractions: ['feed', 'water', 'pet'],
     isBlocking: true,
   },
   {
@@ -112,11 +111,11 @@ export const initialAnimals: AnimalDefinition[] = [
     canPull: false,
     foodNeeds: 2,
     waterNeeds: 2,
-    aliveYields: [{ resourceId: 'res-egg', amount: 3, interval: 1, seasons: ['spring', 'summer', 'autumn', 'winter'], shedding: false }],
+    aliveYields: [{ resourceId: 'res-egg', amount: 3, interval: 1, seasons: ['spring', 'summer', 'autumn', 'winter'], shedding: false, interactionType: 'gather' }],
     deadYields: [{ resourceId: 'res-meat', quantity: 2 }],
     spriteKey: 'animal-chicken',
     interactionRadius: 30,
-    interactionTypes: ['pet', 'feed', 'collect', 'inspect'],
+    needInteractions: ['feed', 'water', 'pet'],
     isBlocking: false,
   },
 ];

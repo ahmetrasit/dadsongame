@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useDefinitionsStore, Season, DeadYield, AliveYield, AnimalSubCategory } from '@/stores/definitionsStore';
+import { useDefinitionsStore, Season, DeadYield, AliveYield, AnimalSubCategory, AnimalYieldInteraction, AnimalNeedInteraction } from '@/stores/definitionsStore';
 import { useGameStateStore } from '@/stores/gameStateStore';
 import { Card, FieldRow, CompactInput, CompactSelect, TwoColumnRow, SliderField, CheckboxGroup } from './FormComponents';
 import { FaTrashAlt } from 'react-icons/fa';
@@ -26,7 +26,7 @@ export function AnimalForm({ item, isDraft, onSave, onCancel }: AnimalFormProps)
   };
 
   const handleAddAliveYield = () => {
-    handleChange('aliveYields', [...item.aliveYields, { resourceId: '', amount: 1, interval: 7, seasons: ['spring', 'summer', 'autumn', 'winter'], shedding: true }]);
+    handleChange('aliveYields', [...item.aliveYields, { resourceId: '', amount: 1, interval: 7, seasons: ['spring', 'summer', 'autumn', 'winter'], shedding: true, interactionType: 'collect' }]);
   };
 
   const handleRemoveAliveYield = (index: number) => {
@@ -68,6 +68,15 @@ export function AnimalForm({ item, isDraft, onSave, onCancel }: AnimalFormProps)
 
   const subCategories: AnimalSubCategory[] = ['livestock', 'poultry', 'wild', 'pet'];
   const seasons: Season[] = ['spring', 'summer', 'autumn', 'winter'];
+  const animalYieldInteractions: AnimalYieldInteraction[] = ['milk', 'shear', 'gather', 'collect'];
+  const animalNeedInteractions: AnimalNeedInteraction[] = ['feed', 'water', 'pet', 'lead', 'tame'];
+
+  const handleNeedInteractionToggle = (interaction: AnimalNeedInteraction) => {
+    const interactions = (item.needInteractions || []).includes(interaction)
+      ? item.needInteractions.filter((i: AnimalNeedInteraction) => i !== interaction)
+      : [...(item.needInteractions || []), interaction];
+    handleChange('needInteractions', interactions);
+  };
 
   // Sort resources alphabetically for dropdowns
   const sortedResources = useMemo(() =>
@@ -231,7 +240,7 @@ export function AnimalForm({ item, isDraft, onSave, onCancel }: AnimalFormProps)
           />
         </Card>
 
-        <Card title="Animal Needs" style={{ flex: '0 0 calc(45% - 16px)' }}>
+        <Card title="Needs" style={{ flex: '0 0 calc(45% - 16px)' }}>
           <FieldRow>
             <CompactInput
               label="Food"
@@ -252,6 +261,12 @@ export function AnimalForm({ item, isDraft, onSave, onCancel }: AnimalFormProps)
             />
             <span style={{ color: '#888', fontSize: '13px' }}>per day</span>
           </FieldRow>
+          <CheckboxGroup
+            label="Interactions"
+            options={animalNeedInteractions}
+            selected={item.needInteractions || []}
+            onChange={(interaction: string) => handleNeedInteractionToggle(interaction as AnimalNeedInteraction)}
+          />
         </Card>
       </TwoColumnRow>
 
@@ -270,30 +285,37 @@ export function AnimalForm({ item, isDraft, onSave, onCancel }: AnimalFormProps)
               }}
             >
               <FieldRow style={{ marginBottom: '4px' }}>
+                <CompactSelect
+                  label=""
+                  value={ay.interactionType || 'collect'}
+                  onChange={(e) => handleAliveYieldChange(i, { ...ay, interactionType: e.target.value as AnimalYieldInteraction })}
+                  width="80px"
+                  options={animalYieldInteractions.map(int => ({ value: int, label: int.charAt(0).toUpperCase() + int.slice(1) }))}
+                />
                 <CompactInput
                   label=""
                   type="number"
                   value={ay.amount}
                   onChange={(e) => handleAliveYieldChange(i, { ...ay, amount: Number(e.target.value) })}
-                  width="60px"
+                  width="50px"
                 />
                 <CompactSelect
                   label=""
                   value={ay.resourceId}
                   onChange={(e) => handleAliveYieldChange(i, { ...ay, resourceId: e.target.value })}
-                  width="150px"
+                  width="130px"
                   options={[
                     { value: '', label: '-- Select --' },
                     ...sortedResources.map(res => ({ value: res.id, label: res.name }))
                   ]}
                 />
-                <span style={{ color: '#888', fontSize: '13px', marginLeft: '8px' }}>Every</span>
+                <span style={{ color: '#888', fontSize: '13px', marginLeft: '4px' }}>Every</span>
                 <CompactInput
                   label=""
                   type="number"
                   value={ay.interval}
                   onChange={(e) => handleAliveYieldChange(i, { ...ay, interval: Number(e.target.value) })}
-                  width="60px"
+                  width="50px"
                 />
                 <span style={{ color: '#888', fontSize: '13px' }}>days</span>
               </FieldRow>

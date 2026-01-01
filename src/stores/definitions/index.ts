@@ -3,8 +3,8 @@ import { persist, subscribeWithSelector } from 'zustand/middleware';
 import { definitionsService, type GameDefinitions } from '@/services/DefinitionsService';
 
 // Re-export types from entity stores
-export type { PlantDefinition, PlantStage, SoilType, PlantSubCategory, PlantInteractionType } from './plantsStore';
-export type { AnimalDefinition, AnimalCapability, AnimalSubCategory, AnimalInteractionType } from './animalsStore';
+export type { PlantDefinition, PlantStage, SoilType, PlantSubCategory } from './plantsStore';
+export type { AnimalDefinition, AnimalCapability, AnimalSubCategory } from './animalsStore';
 export type { ResourceDefinition, ResourceInteractionType } from './resourcesStore';
 export type { WaterDefinition, WaterType, WaterInteractionType, FishType } from './waterStore';
 
@@ -14,12 +14,21 @@ export type { GameDefinitions } from '@/services/DefinitionsService';
 // Shared types
 export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 
+// Yield interaction types - how player collects the yield
+export type PlantYieldInteraction = 'pick' | 'harvest' | 'collect';
+export type AnimalYieldInteraction = 'milk' | 'shear' | 'gather' | 'collect';
+
+// Need interaction types - how player cares for the creature
+export type PlantNeedInteraction = 'water' | 'fertilize';
+export type AnimalNeedInteraction = 'feed' | 'water' | 'pet' | 'lead' | 'tame';
+
 export interface AliveYield {
   resourceId: string;
   amount: number;
   interval: number;              // Days (not used for timing, just for reference)
   seasons: Season[];
   shedding: boolean;             // true = auto-drops at season end, false = must collect or lose
+  interactionType?: PlantYieldInteraction | AnimalYieldInteraction;  // How to collect this yield
   yieldLayerImageUrl?: string;   // Overlay sprite shown when yield is available
 }
 

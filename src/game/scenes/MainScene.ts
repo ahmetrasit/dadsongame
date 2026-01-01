@@ -587,18 +587,22 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
-  private updatePlantLabel(
+  /**
+   * Generic method to update entity labels for any placement type
+   */
+  private updateEntityLabel(
     container: Phaser.GameObjects.Container,
-    placement: PlantPlacement,
-    definitions: { id: string; name: string; subCategory: string; imageUrl?: string }[],
-    isEditing: boolean
+    definitionId: string,
+    definitions: { id: string; name: string }[],
+    isEditing: boolean,
+    yOffset: number = 20
   ): void {
     const existingLabel = container.getByName('label') as Phaser.GameObjects.Text | null;
-    const definition = definitions.find(p => p.id === placement.definitionId);
+    const definition = definitions.find(d => d.id === definitionId);
 
     if (isEditing && definition) {
       if (!existingLabel) {
-        const label = this.add.text(0, 20, definition.name, {
+        const label = this.add.text(0, yOffset, definition.name, {
           fontFamily: 'Avenir, system-ui, sans-serif',
           fontSize: '10px',
           color: '#ffffff',
@@ -612,6 +616,15 @@ export class MainScene extends Phaser.Scene {
     } else if (existingLabel) {
       existingLabel.destroy();
     }
+  }
+
+  private updatePlantLabel(
+    container: Phaser.GameObjects.Container,
+    placement: PlantPlacement,
+    definitions: { id: string; name: string; subCategory: string; imageUrl?: string }[],
+    isEditing: boolean
+  ): void {
+    this.updateEntityLabel(container, placement.definitionId, definitions, isEditing, 20);
   }
 
   private updateAnimals(
@@ -736,25 +749,7 @@ export class MainScene extends Phaser.Scene {
     definitions: { id: string; name: string; subCategory: string; imageUrl?: string }[],
     isEditing: boolean
   ): void {
-    const existingLabel = container.getByName('label') as Phaser.GameObjects.Text | null;
-    const definition = definitions.find(a => a.id === placement.definitionId);
-
-    if (isEditing && definition) {
-      if (!existingLabel) {
-        const label = this.add.text(0, 18, definition.name, {
-          fontFamily: 'Avenir, system-ui, sans-serif',
-          fontSize: '10px',
-          color: '#ffffff',
-          backgroundColor: '#000000aa',
-          padding: { x: 2, y: 1 },
-        });
-        label.setOrigin(0.5, 0);
-        label.setName('label');
-        container.add(label);
-      }
-    } else if (existingLabel) {
-      existingLabel.destroy();
-    }
+    this.updateEntityLabel(container, placement.definitionId, definitions, isEditing, 18);
   }
 
   private updateWaters(
@@ -867,25 +862,7 @@ export class MainScene extends Phaser.Scene {
     definitions: { id: string; name: string; waterType: string; imageUrl?: string }[],
     isEditing: boolean
   ): void {
-    const existingLabel = container.getByName('label') as Phaser.GameObjects.Text | null;
-    const definition = definitions.find(w => w.id === placement.definitionId);
-
-    if (isEditing && definition) {
-      if (!existingLabel) {
-        const label = this.add.text(0, 20, definition.name, {
-          fontFamily: 'Avenir, system-ui, sans-serif',
-          fontSize: '10px',
-          color: '#ffffff',
-          backgroundColor: '#000000aa',
-          padding: { x: 2, y: 1 },
-        });
-        label.setOrigin(0.5, 0);
-        label.setName('label');
-        container.add(label);
-      }
-    } else if (existingLabel) {
-      existingLabel.destroy();
-    }
+    this.updateEntityLabel(container, placement.definitionId, definitions, isEditing, 20);
   }
 
   private updateResources(
@@ -963,25 +940,7 @@ export class MainScene extends Phaser.Scene {
     definitions: { id: string; name: string; category: string; imageUrl?: string }[],
     isEditing: boolean
   ): void {
-    const existingLabel = container.getByName('label') as Phaser.GameObjects.Text | null;
-    const definition = definitions.find(r => r.id === placement.definitionId);
-
-    if (isEditing && definition) {
-      if (!existingLabel) {
-        const label = this.add.text(0, 20, definition.name, {
-          fontFamily: 'Avenir, system-ui, sans-serif',
-          fontSize: '10px',
-          color: '#ffffff',
-          backgroundColor: '#000000aa',
-          padding: { x: 2, y: 1 },
-        });
-        label.setOrigin(0.5, 0);
-        label.setName('label');
-        container.add(label);
-      }
-    } else if (existingLabel) {
-      existingLabel.destroy();
-    }
+    this.updateEntityLabel(container, placement.definitionId, definitions, isEditing, 20);
   }
 
   private renderSpawnMarker(spawn: { x: number; y: number }, isEditing: boolean): void {

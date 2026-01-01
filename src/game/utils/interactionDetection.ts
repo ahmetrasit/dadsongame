@@ -48,6 +48,12 @@ export function findNearestInteractable(
 
     const dist = distance(playerX, playerY, plant.x, plant.y);
     if (dist <= def.interactionRadius && dist < nearestDistance) {
+      // Combine yield interactions and need interactions
+      const yieldInteractions = def.aliveYields
+        .map(y => y.interactionType)
+        .filter(Boolean) as string[];
+      const allInteractions = [...new Set([...yieldInteractions, ...(def.needInteractions || [])])] as string[];
+
       nearestDistance = dist;
       nearest = {
         object: {
@@ -59,7 +65,7 @@ export function findNearestInteractable(
         },
         definition: def,
         distance: dist,
-        interactionTypes: def.interactionTypes,
+        interactionTypes: allInteractions,
       };
     }
   }
@@ -71,6 +77,12 @@ export function findNearestInteractable(
 
     const dist = distance(playerX, playerY, animal.x, animal.y);
     if (dist <= def.interactionRadius && dist < nearestDistance) {
+      // Combine yield interactions and need interactions
+      const yieldInteractions = def.aliveYields
+        .map(y => y.interactionType)
+        .filter(Boolean) as string[];
+      const allInteractions = [...new Set([...yieldInteractions, ...(def.needInteractions || [])])] as string[];
+
       nearestDistance = dist;
       nearest = {
         object: {
@@ -82,7 +94,7 @@ export function findNearestInteractable(
         },
         definition: def,
         distance: dist,
-        interactionTypes: def.interactionTypes,
+        interactionTypes: allInteractions,
       };
     }
   }

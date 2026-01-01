@@ -44,6 +44,11 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
     }
   }, [initialTab, isEditorOpen, setActiveTab]);
 
+  // Tree state (must be before early return to satisfy hooks rules)
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    new Set(['food', 'tree', 'crop', 'livestock', 'poultry'])
+  );
+
   // ESC key to close
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -82,11 +87,6 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
       alert('Definitions imported!');
     }
   };
-
-  // Tree state
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set(['food', 'tree', 'crop', 'livestock', 'poultry'])
-  );
 
   const toggleCategory = (category: string) => {
     const newExpanded = new Set(expandedCategories);
