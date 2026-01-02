@@ -1,5 +1,7 @@
 # Island Survival Game - Complete Phase Guide
 
+> **NOTE (2026-01-01):** This 10-phase system is deprecated. See `/design/storyline.md` for the new emergent progression vision based on historical tech/society development. Keeping this document for reference only.
+
 **Game Start:** You wake up on an island.
 
 ---

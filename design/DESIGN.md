@@ -10,7 +10,9 @@
 - **Increment version** with each change (src/version.ts)
 
 ## Overview
-2D open-world peaceful survival/management. Player wakes on island, gathers resources, crafts, recruits villagers, trades. No combat. Inspirations: Terraria, Sneaky Sasquatch, RDR.
+2D open-world peaceful survival/management. Player wakes on island, gathers resources, crafts, recruits villagers, trades. **No human combat.** Animal slaughtering for sustenance is under consideration. Inspirations: Terraria, Sneaky Sasquatch, RDR.
+
+**Project name:** "Dad & Son Game" - father and son developing together. Final game name TBD.
 
 ## Time
 **Day length by season:** Summer=75%, Spring=50%, Fall=40%, Winter=30%
