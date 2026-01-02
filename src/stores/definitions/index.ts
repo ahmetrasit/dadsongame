@@ -7,6 +7,8 @@ export type { PlantDefinition, PlantStage, SoilType, PlantSubCategory } from './
 export type { AnimalDefinition, AnimalCapability, AnimalSubCategory } from './animalsStore';
 export type { ResourceDefinition, ResourceInteractionType } from './resourcesStore';
 export type { WaterDefinition, WaterType, WaterInteractionType, FishType } from './waterStore';
+export type { ProductSlice } from './productsStore';
+// ProductDefinition is exported from @/types/ontology
 
 // Re-export GameDefinitions from service (single source of truth)
 export type { GameDefinitions } from '@/services/DefinitionsService';
@@ -42,9 +44,10 @@ import { PlantSlice, createPlantSlice, initialPlants } from './plantsStore';
 import { AnimalSlice, createAnimalSlice, initialAnimals } from './animalsStore';
 import { ResourceSlice, createResourceSlice, initialResources } from './resourcesStore';
 import { WaterSlice, createWaterSlice, initialWaters } from './waterStore';
+import { ProductSlice, createProductSlice, initialProducts } from './productsStore';
 
 // Shared UI state
-type EditorTab = 'plants' | 'animals' | 'resources' | 'waters';
+type EditorTab = 'plants' | 'animals' | 'resources' | 'waters' | 'products';
 
 interface SharedSlice {
   isEditorOpen: boolean;
@@ -77,7 +80,7 @@ interface SharedSlice {
 }
 
 // Combined state type
-type DefinitionsState = SharedSlice & PlantSlice & AnimalSlice & ResourceSlice & WaterSlice;
+type DefinitionsState = SharedSlice & PlantSlice & AnimalSlice & ResourceSlice & WaterSlice & ProductSlice;
 
 // Initial definitions for backward compatibility reference (used in tests)
 export const initialDefinitions = {
@@ -85,6 +88,7 @@ export const initialDefinitions = {
   animals: initialAnimals,
   resources: initialResources,
   waters: initialWaters,
+  products: initialProducts,
 };
 
 // Debounce constants
@@ -112,6 +116,7 @@ export const useDefinitionsStore = create<DefinitionsState>()(
           draftAnimal: null,
           draftResource: null,
           draftWater: null,
+          draftProduct: null,
         }),
 
         closeEditor: () => set({
@@ -121,6 +126,7 @@ export const useDefinitionsStore = create<DefinitionsState>()(
           draftAnimal: null,
           draftResource: null,
           draftWater: null,
+          draftProduct: null,
         }),
 
         toggleEditor: () => set((s) => ({
@@ -130,6 +136,7 @@ export const useDefinitionsStore = create<DefinitionsState>()(
           draftAnimal: null,
           draftResource: null,
           draftWater: null,
+          draftProduct: null,
         })),
 
         setActiveTab: (tab) => set({
@@ -139,6 +146,7 @@ export const useDefinitionsStore = create<DefinitionsState>()(
           draftAnimal: null,
           draftResource: null,
           draftWater: null,
+          draftProduct: null,
         }),
 
         selectItem: (id) => set({
@@ -147,6 +155,7 @@ export const useDefinitionsStore = create<DefinitionsState>()(
           draftAnimal: null,
           draftResource: null,
           draftWater: null,
+          draftProduct: null,
         }),
 
         // Computed getter for definitions
@@ -157,6 +166,7 @@ export const useDefinitionsStore = create<DefinitionsState>()(
             animals: state.animals,
             resources: state.resources,
             waters: state.waters,
+            products: state.products,
           };
         },
 
@@ -168,6 +178,7 @@ export const useDefinitionsStore = create<DefinitionsState>()(
             animals: state.animals,
             resources: state.resources,
             waters: state.waters,
+            products: state.products,
           }, null, 2);
         },
 
@@ -187,6 +198,7 @@ export const useDefinitionsStore = create<DefinitionsState>()(
               animals: data.animals,
               resources: data.resources,
               waters: data.waters || get().waters, // Optional for backwards compatibility
+              products: data.products || get().products, // Optional for backwards compatibility
               syncError: null,
             });
 
@@ -219,6 +231,7 @@ export const useDefinitionsStore = create<DefinitionsState>()(
                 animals: result.definitions.animals,
                 resources: result.definitions.resources,
                 waters: result.definitions.waters || get().waters, // Optional for backwards compatibility
+                products: result.definitions.products || get().products, // Optional for backwards compatibility
                 firebaseSyncEnabled: true,
                 lastSyncTime: result.timestamp,
               });
@@ -231,6 +244,7 @@ export const useDefinitionsStore = create<DefinitionsState>()(
                 animals: state.animals,
                 resources: state.resources,
                 waters: state.waters,
+                products: state.products,
               });
               set({
                 firebaseSyncEnabled: true,
@@ -249,6 +263,7 @@ export const useDefinitionsStore = create<DefinitionsState>()(
                   animals: definitions.animals,
                   resources: definitions.resources,
                   waters: definitions.waters || get().waters,
+                  products: definitions.products || get().products,
                 });
                 // This is set in the module scope - we need to export a setter
                 updateLastSyncedData(remoteData);
@@ -259,6 +274,7 @@ export const useDefinitionsStore = create<DefinitionsState>()(
                   animals: definitions.animals,
                   resources: definitions.resources,
                   waters: definitions.waters || get().waters,
+                  products: definitions.products || get().products,
                   lastSyncTime: timestamp,
                 });
               },
@@ -287,6 +303,7 @@ export const useDefinitionsStore = create<DefinitionsState>()(
               animals: state.animals,
               resources: state.resources,
               waters: state.waters,
+              products: state.products,
             });
             if (timestamp) {
               set({ lastSyncTime: timestamp });
@@ -312,6 +329,7 @@ export const useDefinitionsStore = create<DefinitionsState>()(
         ...createAnimalSlice(set, get, api),
         ...createResourceSlice(set, get, api),
         ...createWaterSlice(set, get, api),
+        ...createProductSlice(set, get, api),
       }),
       {
         name: 'game-definitions',
@@ -321,6 +339,7 @@ export const useDefinitionsStore = create<DefinitionsState>()(
           animals: state.animals,
           resources: state.resources,
           waters: state.waters,
+          products: state.products,
         }),
         // Merge persisted state with initial state
         merge: (persistedState, currentState) => {
@@ -331,6 +350,7 @@ export const useDefinitionsStore = create<DefinitionsState>()(
             animals: persisted?.animals ?? currentState.animals,
             resources: persisted?.resources ?? currentState.resources,
             waters: persisted?.waters ?? currentState.waters,
+            products: persisted?.products ?? currentState.products,
           };
         },
       }
@@ -357,6 +377,7 @@ const debouncedSync = () => {
       animals: state.animals,
       resources: state.resources,
       waters: state.waters,
+      products: state.products,
     });
 
     // Only sync if data actually changed (prevents loop from remote updates)
@@ -368,7 +389,7 @@ const debouncedSync = () => {
 };
 
 useDefinitionsStore.subscribe(
-  (state) => ({ plants: state.plants, animals: state.animals, resources: state.resources, waters: state.waters }),
+  (state) => ({ plants: state.plants, animals: state.animals, resources: state.resources, waters: state.waters, products: state.products }),
   (current) => {
     const state = useDefinitionsStore.getState();
     if (state.firebaseSyncEnabled) {
