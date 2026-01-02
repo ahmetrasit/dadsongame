@@ -58,6 +58,7 @@ interface InventoryState {
   // Actions
   initInventory: (maxSlots?: number) => void;
   addItem: (itemId: string, quantity?: number) => boolean;
+  canAddItem: (itemId: string, quantity?: number) => boolean;
   removeItem: (slotIndex: number, quantity?: number) => boolean;
   removeItems: (items: { itemId: string; quantity: number }[]) => boolean;
   moveItem: (fromSlot: number, toSlot: number) => void;
@@ -164,6 +165,53 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 
     console.log(`[Inventory] Failed to add ${itemId} - inventory full`);
     return false; // Inventory full
+  },
+
+  canAddItem: (itemId, quantity = 1) => {
+    const state = get();
+
+    // Try ITEM_DEFINITIONS first (for tools, weapons)
+    let definition = ITEM_DEFINITIONS[itemId];
+
+    // If not found, try resource definitions
+    if (!definition) {
+      const defStore = useDefinitionsStore.getState();
+      const resource = defStore.resources.find(r => r.id === itemId);
+      if (resource) {
+        definition = {
+          id: resource.id,
+          name: resource.name,
+          description: `${resource.category} material`,
+          category: 'material',
+          stackable: true,
+          maxStack: 99,
+          spriteKey: resource.imageUrl || `item-${resource.category}`
+        };
+      }
+    }
+
+    if (!definition) return false;
+
+    const slots = state.inventory.slots;
+    let canFit = 0;
+
+    // Count space in existing stacks
+    if (definition.stackable) {
+      for (const slot of slots) {
+        if (slot.itemId === itemId && slot.quantity < definition.maxStack) {
+          canFit += definition.maxStack - slot.quantity;
+        }
+      }
+    }
+
+    // Count empty slots
+    for (const slot of slots) {
+      if (slot.itemId === null) {
+        canFit += definition.stackable ? definition.maxStack : 1;
+      }
+    }
+
+    return canFit >= quantity;
   },
 
   removeItem: (slotIndex, quantity = 1) => {

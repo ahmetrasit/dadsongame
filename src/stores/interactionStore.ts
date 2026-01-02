@@ -7,6 +7,7 @@ import { getBootstrapRecipe } from '@/types/bootstrap';
 import { useInventoryStore } from './inventoryStore';
 import { useMapEditorStore } from './mapEditorStore';
 import { useDefinitionsStore } from './definitionsStore';
+import { harvestYield } from '@/services/YieldService';
 
 export type InteractableType = 'plant' | 'animal' | 'water' | 'resource';
 
@@ -61,17 +62,55 @@ export const useInteractionStore = create<InteractionState>()((set, get) => ({
     // TODO: Implement actual interaction effects based on type
     // For now, just log the interaction
     switch (interactionType) {
+      // Yield harvesting interactions (plants and animals)
+      case 'pick':
       case 'harvest':
-        console.log(`  → Would harvest from ${target.definition.name}`);
+      case 'gather':
+      case 'milk':
+      case 'shear': {
+        if (target.object.type !== 'plant' && target.object.type !== 'animal') break;
+
+        const defStore = useDefinitionsStore.getState();
+        const inventoryStore = useInventoryStore.getState();
+
+        // Get the definition to find which yield matches this interaction
+        const def = target.object.type === 'plant'
+          ? defStore.plants.find(p => p.id === target.object.definitionId)
+          : defStore.animals.find(a => a.id === target.object.definitionId);
+
+        if (!def || !('aliveYields' in def)) break;
+
+        // Find the yield that has this interaction type
+        const yieldIndex = def.aliveYields.findIndex(y => y.interactionType === interactionType);
+        if (yieldIndex === -1) {
+          console.log(`  → No yield found for ${interactionType} on ${target.definition.name}`);
+          break;
+        }
+
+        // Get yield info to check what resource we'd get
+        const yieldDef = def.aliveYields[yieldIndex];
+
+        // Check if inventory has space before harvesting
+        if (!inventoryStore.canAddItem(yieldDef.resourceId, 1)) {
+          console.log(`  → Inventory full! Cannot ${interactionType} ${target.definition.name}`);
+          break;
+        }
+
+        // Harvest the yield
+        const result = harvestYield(target.object.id, yieldIndex, 1);
+        if (result) {
+          inventoryStore.addItem(result.resourceId, result.amount);
+          console.log(`  → ${interactionType} ${result.amount} ${result.resourceId} from ${target.definition.name}`);
+        } else {
+          console.log(`  → No yield available to ${interactionType} from ${target.definition.name}`);
+        }
         break;
+      }
       case 'water':
         console.log(`  → Would water ${target.definition.name}`);
         break;
       case 'inspect':
         console.log(`  → Inspecting ${target.definition.name}`);
-        break;
-      case 'pick':
-        console.log(`  → Would pick ${target.definition.name}`);
         break;
       case 'pet':
         console.log(`  → Petting ${target.definition.name}`);
@@ -79,29 +118,55 @@ export const useInteractionStore = create<InteractionState>()((set, get) => ({
       case 'feed':
         console.log(`  → Would feed ${target.definition.name}`);
         break;
-      case 'milk':
-        console.log(`  → Would milk ${target.definition.name}`);
-        break;
-      case 'shear':
-        console.log(`  → Would shear ${target.definition.name}`);
-        break;
       case 'ride':
         console.log(`  → Would ride ${target.definition.name}`);
         break;
       case 'collect': {
-        const inventoryStore = useInventoryStore.getState();
-        const mapEditorStore = useMapEditorStore.getState();
+        // For ground resources
+        if (target.object.type === 'resource') {
+          const inventoryStore = useInventoryStore.getState();
+          const mapEditorStore = useMapEditorStore.getState();
 
-        // Add to inventory using definitionId
-        const added = inventoryStore.addItem(target.object.definitionId, 1);
-        if (added) {
-          console.log(`  → Collected ${target.definition.name} to inventory`);
-          // Remove from world
-          mapEditorStore.removeResource(target.object.id);
-          // Clear target since resource is gone
-          set({ currentTarget: null });
-        } else {
-          console.log(`  → Inventory full! Cannot collect ${target.definition.name}`);
+          const added = inventoryStore.addItem(target.object.definitionId, 1);
+          if (added) {
+            console.log(`  → Collected ${target.definition.name} to inventory`);
+            mapEditorStore.removeResource(target.object.id);
+            set({ currentTarget: null });
+          } else {
+            console.log(`  → Inventory full! Cannot collect ${target.definition.name}`);
+          }
+          break;
+        }
+
+        // For plants/animals with 'collect' as yield interaction
+        if (target.object.type === 'plant' || target.object.type === 'animal') {
+          const defStore = useDefinitionsStore.getState();
+          const inventoryStore = useInventoryStore.getState();
+
+          const def = target.object.type === 'plant'
+            ? defStore.plants.find(p => p.id === target.object.definitionId)
+            : defStore.animals.find(a => a.id === target.object.definitionId);
+
+          if (!def || !('aliveYields' in def)) break;
+
+          const yieldIndex = def.aliveYields.findIndex(y => y.interactionType === 'collect');
+          if (yieldIndex === -1) break;
+
+          const yieldDef = def.aliveYields[yieldIndex];
+
+          // Check inventory space before harvesting
+          if (!inventoryStore.canAddItem(yieldDef.resourceId, 1)) {
+            console.log(`  → Inventory full! Cannot collect from ${target.definition.name}`);
+            break;
+          }
+
+          const result = harvestYield(target.object.id, yieldIndex, 1);
+          if (result) {
+            inventoryStore.addItem(result.resourceId, result.amount);
+            console.log(`  → Collected ${result.amount} ${result.resourceId} from ${target.definition.name}`);
+          } else {
+            console.log(`  → No yield available to collect from ${target.definition.name}`);
+          }
         }
         break;
       }
