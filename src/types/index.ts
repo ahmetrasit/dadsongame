@@ -95,42 +95,6 @@ export { ROOF_TIERS } from './buildings';
 // Crafting System
 export type { CraftingSession } from './crafting';
 
-// Ontology System (3-hierarchy crafting)
-export type {
-  Purity,
-  MaterialState,
-  Tier,
-  HumanNeed,
-  Form,
-  Capability,
-  FunctionalProperty,
-  FunctionalCategory,
-  NourishmentSubcategory,
-  RecoverySubcategory,
-  MobilitySubcategory,
-  HaulingSubcategory,
-  CraftingSubcategory,
-  SignalingSubcategory,
-  Subcategory,
-  Verb,
-  RawMaterial,
-  ComponentRef,
-  MadeOf,
-  VerbCapacity,
-  CanDo,
-  CategorySatisfaction,
-  CanBeUsedFor,
-  ProductDefinition,
-  ComponentRequirement,
-  CategoryRequirements,
-  CraftingMethod,
-  MethodRequirement,
-  CraftingRecipe,
-  MaterialProperties,
-  AssemblyPattern,
-} from './ontology';
-export { PURITY_MULTIPLIER, FRICTION, PULLING_POWER } from './ontology';
-
 // Marketplace System
 export type { MarketItem, MarketListing, Marketplace } from './marketplace';
 

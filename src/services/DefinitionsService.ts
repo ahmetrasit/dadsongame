@@ -13,7 +13,6 @@ import type { PlantDefinition } from '@/stores/definitions/plantsStore';
 import type { AnimalDefinition } from '@/stores/definitions/animalsStore';
 import type { ResourceDefinition } from '@/stores/definitions/resourcesStore';
 import type { WaterDefinition } from '@/stores/definitions/waterStore';
-import type { ProductDefinition } from '@/types/ontology';
 
 // Constants
 const RETRY_ATTEMPTS = 3;
@@ -25,7 +24,6 @@ export interface GameDefinitions {
   animals: AnimalDefinition[];
   resources: ResourceDefinition[];
   waters?: WaterDefinition[]; // Optional for backwards compatibility
-  products?: ProductDefinition[]; // Optional for backwards compatibility
 }
 
 interface FirestoreDefinitionsDoc extends GameDefinitions {
@@ -135,7 +133,6 @@ class DefinitionsService {
             animals: data.animals || [],
             resources: data.resources || [],
             waters: data.waters || [],
-            products: data.products || [],
           },
           timestamp: this.lastSavedTimestamp,
         };
@@ -195,7 +192,6 @@ class DefinitionsService {
           animals: definitions.animals,
           resources: sanitizedResources,
           waters: definitions.waters || [],
-          products: definitions.products || [],
           updatedAt: timestamp,
         }, { merge: true });
 
@@ -290,7 +286,6 @@ class DefinitionsService {
               animals: data.animals || [],
               resources: data.resources || [],
               waters: data.waters || [],
-              products: data.products || [],
             }, remoteTimestamp);
           }
         }

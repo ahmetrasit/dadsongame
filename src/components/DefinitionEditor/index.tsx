@@ -4,10 +4,9 @@ import { TreeSidebar } from './TreeSidebar';
 import { PlantForm } from './PlantForm';
 import { AnimalForm } from './AnimalForm';
 import { ResourceForm } from './ResourceForm';
-import { ProductForm } from './ProductForm';
 
 interface DefinitionEditorProps {
-  initialTab?: 'plants' | 'animals' | 'resources' | 'products';
+  initialTab?: 'plants' | 'animals' | 'resources';
   onClose?: () => void;
 }
 
@@ -19,26 +18,21 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
     plants,
     animals,
     resources,
-    products,
     draftPlant,
     draftAnimal,
     draftResource,
-    draftProduct,
     closeEditor,
     setActiveTab,
     selectItem,
     addPlant,
     addAnimal,
     addResource,
-    addProduct,
     savePlant,
     saveAnimal,
     saveResource,
-    saveProduct,
     cancelPlant,
     cancelAnimal,
     cancelResource,
-    cancelProduct,
     exportDefinitions,
     importDefinitions,
   } = useDefinitionsStore();
@@ -109,9 +103,7 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
     ? plants
     : activeTab === 'animals'
     ? animals
-    : activeTab === 'resources'
-    ? resources
-    : products;
+    : resources;
 
   const selectedItem = currentItems.find((item) => item.id === selectedId);
 
@@ -119,8 +111,7 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
   const handleAddNew = () => {
     if (activeTab === 'plants') addPlant();
     else if (activeTab === 'animals') addAnimal();
-    else if (activeTab === 'resources') addResource();
-    else addProduct();
+    else addResource();
   };
 
   return (
@@ -164,7 +155,7 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
           </button>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
-          {(['plants', 'animals', 'resources', 'products'] as const).map((tab) => (
+          {(['plants', 'animals', 'resources'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -229,17 +220,6 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
               selectItem={selectItem}
             />
           )}
-          {activeTab === 'products' && (
-            <TreeSidebar
-              categories={['T1', 'T2', 'T3', 'T4', 'T5']}
-              items={products}
-              getCategory={(item: any) => `T${item.tier}`}
-              expandedCategories={expandedCategories}
-              toggleCategory={toggleCategory}
-              selectedId={selectedId}
-              selectItem={selectItem}
-            />
-          )}
 
           {/* Add New button at bottom */}
           <button
@@ -272,12 +252,9 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
           {activeTab === 'resources' && draftResource && (
             <ResourceForm item={draftResource} isDraft onSave={saveResource} onCancel={cancelResource} />
           )}
-          {activeTab === 'products' && draftProduct && (
-            <ProductForm item={draftProduct} isDraft onSave={saveProduct} onCancel={cancelProduct} />
-          )}
 
           {/* Show existing item forms */}
-          {!draftPlant && !draftAnimal && !draftResource && !draftProduct && !selectedItem && (
+          {!draftPlant && !draftAnimal && !draftResource && !selectedItem && (
             <div style={{ color: '#666', fontSize: '16px' }}>
               Select an item to edit or create a new one
             </div>
@@ -286,7 +263,6 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
           {!draftPlant && selectedItem && activeTab === 'plants' && <PlantForm item={selectedItem} />}
           {!draftAnimal && selectedItem && activeTab === 'animals' && <AnimalForm item={selectedItem} />}
           {!draftResource && selectedItem && activeTab === 'resources' && <ResourceForm item={selectedItem} />}
-          {!draftProduct && selectedItem && activeTab === 'products' && <ProductForm item={selectedItem} />}
         </div>
       </div>
 
