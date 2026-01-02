@@ -338,3 +338,66 @@ body {
   color: #666;
   font-style: italic;
 }
+
+/* ==========================================
+   Craft Section Styles
+   ========================================== */
+
+.inventory-craft {
+  margin-top: 16px;
+  border-top: 1px solid #444;
+  padding-top: 12px;
+}
+
+.craft-btn {
+  width: 100%;
+  padding: 10px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.craft-btn:hover {
+  background: #1d4ed8;
+}
+
+.craft-btn:disabled {
+  background: #4b5563;
+  cursor: not-allowed;
+}
+
+.craft-menu {
+  margin-top: 8px;
+  background: #1f2937;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.craft-option {
+  width: 100%;
+  padding: 10px;
+  background: transparent;
+  color: white;
+  border: none;
+  border-bottom: 1px solid #374151;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  text-align: left;
+}
+
+.craft-option:last-child {
+  border-bottom: none;
+}
+
+.craft-option:hover {
+  background: #374151;
+}
+
+.craft-cost {
+  color: #9ca3af;
+  font-size: 12px;
+}

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { LegacyInventory as Inventory, LegacyInventorySlot as InventorySlot, ItemDefinition } from '@/types';
+import { useDefinitionsStore } from './definitionsStore';
 
 // Item definitions - will be expanded later
 export const ITEM_DEFINITIONS: Record<string, ItemDefinition> = {
@@ -58,6 +59,7 @@ interface InventoryState {
   initInventory: (maxSlots?: number) => void;
   addItem: (itemId: string, quantity?: number) => boolean;
   removeItem: (slotIndex: number, quantity?: number) => boolean;
+  removeItems: (items: { itemId: string; quantity: number }[]) => boolean;
   moveItem: (fromSlot: number, toSlot: number) => void;
   selectSlot: (slotIndex: number) => void;
   selectNextSlot: () => void;
@@ -70,6 +72,21 @@ interface InventoryState {
 
 const createEmptySlots = (count: number): InventorySlot[] =>
   Array.from({ length: count }, () => ({ itemId: null, quantity: 0 }));
+
+// Log inventory contents to console
+const logInventory = (slots: InventorySlot[], action: string) => {
+  const items = slots
+    .filter(s => s.itemId !== null)
+    .map(s => `${s.itemId} x${s.quantity}`);
+
+  console.log(`[Inventory] ${action}`);
+  if (items.length === 0) {
+    console.log('  (empty)');
+  } else {
+    items.forEach(item => console.log(`  • ${item}`));
+  }
+  console.log(`  Total: ${items.length} item type(s)`);
+};
 
 export const useInventoryStore = create<InventoryState>((set, get) => ({
   inventory: {
@@ -91,7 +108,27 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 
   addItem: (itemId, quantity = 1) => {
     const state = get();
-    const definition = ITEM_DEFINITIONS[itemId];
+
+    // Try ITEM_DEFINITIONS first (for tools, weapons)
+    let definition = ITEM_DEFINITIONS[itemId];
+
+    // If not found, try resource definitions
+    if (!definition) {
+      const defStore = useDefinitionsStore.getState();
+      const resource = defStore.resources.find(r => r.id === itemId);
+      if (resource) {
+        definition = {
+          id: resource.id,
+          name: resource.name,
+          description: `${resource.category} material`,
+          category: 'material',
+          stackable: true,
+          maxStack: 99,
+          spriteKey: resource.imageUrl || `item-${resource.category}`
+        };
+      }
+    }
+
     if (!definition) return false;
 
     const slots = [...state.inventory.slots];
@@ -121,9 +158,11 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 
     if (remaining < quantity) {
       set({ inventory: { ...state.inventory, slots } });
+      logInventory(slots, `Added ${quantity - remaining}x ${itemId}`);
       return remaining === 0;
     }
 
+    console.log(`[Inventory] Failed to add ${itemId} - inventory full`);
     return false; // Inventory full
   },
 
@@ -134,6 +173,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 
     if (!slot || slot.itemId === null) return false;
 
+    const itemId = slot.itemId;
     const newQuantity = slot.quantity - quantity;
     if (newQuantity <= 0) {
       slots[slotIndex] = { itemId: null, quantity: 0 };
@@ -142,6 +182,43 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     }
 
     set({ inventory: { ...state.inventory, slots } });
+    logInventory(slots, `Removed ${quantity}x ${itemId}`);
+    return true;
+  },
+
+  removeItems: (items) => {
+    const state = get();
+    const slots = [...state.inventory.slots];
+
+    // First verify we have all items
+    for (const item of items) {
+      const total = slots
+        .filter(s => s.itemId === item.itemId)
+        .reduce((sum, s) => sum + s.quantity, 0);
+      if (total < item.quantity) {
+        console.log(`[Inventory] Failed to remove items - insufficient ${item.itemId}`);
+        return false;
+      }
+    }
+
+    // Remove items
+    for (const item of items) {
+      let remaining = item.quantity;
+      for (let i = 0; i < slots.length && remaining > 0; i++) {
+        if (slots[i].itemId === item.itemId) {
+          const toRemove = Math.min(remaining, slots[i].quantity);
+          slots[i] = {
+            itemId: slots[i].quantity - toRemove > 0 ? item.itemId : null,
+            quantity: slots[i].quantity - toRemove
+          };
+          remaining -= toRemove;
+        }
+      }
+    }
+
+    set({ inventory: { ...state.inventory, slots } });
+    const summary = items.map(i => `${i.quantity}x ${i.itemId}`).join(', ');
+    logInventory(slots, `Removed ${summary}`);
     return true;
   },
 
@@ -189,7 +266,29 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     set({ isOpen });
   },
 
-  getItemDefinition: (itemId) => ITEM_DEFINITIONS[itemId],
+  getItemDefinition: (itemId) => {
+    // Try ITEM_DEFINITIONS first
+    let definition = ITEM_DEFINITIONS[itemId];
+
+    // If not found, try resource definitions
+    if (!definition) {
+      const defStore = useDefinitionsStore.getState();
+      const resource = defStore.resources.find(r => r.id === itemId);
+      if (resource) {
+        definition = {
+          id: resource.id,
+          name: resource.name,
+          description: `${resource.category} material`,
+          category: 'material',
+          stackable: true,
+          maxStack: 99,
+          spriteKey: resource.imageUrl || `item-${resource.category}`
+        };
+      }
+    }
+
+    return definition;
+  },
 
   getSelectedItem: () => {
     const state = get();

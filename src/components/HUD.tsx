@@ -2,6 +2,7 @@ import { usePlayerStore } from '@/stores/playerStore';
 import { useGameTime, useWeather, formatGameTime } from '@/stores/worldStore';
 import { useConnectionState, useLatency } from '@/stores/multiplayerStore';
 import { Hotbar } from './Hotbar';
+import { PlacementPreview } from './PlacementPreview';
 
 export function HUD() {
   const player = usePlayerStore((s) => s.player);
@@ -38,6 +39,9 @@ export function HUD() {
 
       {/* Hotbar (bottom) */}
       <Hotbar />
+
+      {/* Placement preview */}
+      <PlacementPreview />
 
       {/* Controls hint */}
       <div className="hud-controls">

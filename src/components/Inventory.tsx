@@ -1,16 +1,23 @@
-import { useInventoryStore, useInventorySlots, useSelectedSlot, ITEM_DEFINITIONS } from '@/stores/inventoryStore';
+import { useInventoryStore, useInventorySlots, useSelectedSlot } from '@/stores/inventoryStore';
+import { useDefinitionsStore } from '@/stores/definitionsStore';
 import { FaTrashAlt } from 'react-icons/fa';
+import { getCraftableStackRecipes } from '@/types/bootstrap';
+import { usePlacementStore } from '@/stores/placementStore';
+import { useState } from 'react';
 
 export function Inventory() {
   const isOpen = useInventoryStore((s) => s.isOpen);
   const slots = useInventorySlots();
   const selectedSlot = useSelectedSlot();
-  const { selectSlot, setOpen } = useInventoryStore();
+  const { selectSlot, setOpen, getItemDefinition } = useInventoryStore();
+  const resources = useDefinitionsStore((s) => s.resources);
+  const [showCraftMenu, setShowCraftMenu] = useState(false);
 
   if (!isOpen) return null;
 
   const selectedItem = slots[selectedSlot];
-  const itemDef = selectedItem?.itemId ? ITEM_DEFINITIONS[selectedItem.itemId] : null;
+  const itemDef = selectedItem?.itemId ? getItemDefinition(selectedItem.itemId) : null;
+  const craftableRecipes = getCraftableStackRecipes(slots);
 
   return (
     <div className="inventory-overlay" onClick={() => setOpen(false)}>
@@ -24,7 +31,8 @@ export function Inventory() {
 
         <div className="inventory-grid">
           {slots.map((slot, index) => {
-            const item = slot.itemId ? ITEM_DEFINITIONS[slot.itemId] : null;
+            const item = slot.itemId ? getItemDefinition(slot.itemId) : null;
+            const resource = slot.itemId ? resources.find(r => r.id === slot.itemId) : null;
             const isSelected = index === selectedSlot;
 
             return (
@@ -33,12 +41,16 @@ export function Inventory() {
                 className={`inventory-slot ${isSelected ? 'selected' : ''}`}
                 onClick={() => selectSlot(index)}
               >
-                {item && (
+                {slot.itemId && (
                   <>
-                    <div
-                      className="slot-icon"
-                      style={{ backgroundColor: getItemColor(slot.itemId!) }}
-                    />
+                    {resource?.emoji ? (
+                      <span style={{ fontSize: '24px' }}>{resource.emoji}</span>
+                    ) : (
+                      <div
+                        className="slot-icon"
+                        style={{ backgroundColor: getItemColor(item?.category || 'material') }}
+                      />
+                    )}
                     {slot.quantity > 1 && (
                       <span className="slot-quantity">{slot.quantity}</span>
                     )}
@@ -64,18 +76,58 @@ export function Inventory() {
             <p className="no-item">Select an item to see details</p>
           )}
         </div>
+
+        {/* Craft section */}
+        <div className="inventory-craft">
+          <button
+            className="craft-btn"
+            disabled={craftableRecipes.length === 0}
+            onClick={() => setShowCraftMenu(!showCraftMenu)}
+          >
+            Craft ({craftableRecipes.length})
+          </button>
+
+          {showCraftMenu && craftableRecipes.length > 0 && (
+            <div className="craft-menu">
+              {craftableRecipes.map(recipe => (
+                <button
+                  key={recipe.id}
+                  className="craft-option"
+                  onClick={() => {
+                    usePlacementStore.getState().startPlacement(recipe);
+                    setOpen(false);
+                    setShowCraftMenu(false);
+                  }}
+                >
+                  <span>{recipe.name}</span>
+                  <span className="craft-cost">
+                    {recipe.inputs.map(i => `${i.quantity}x`).join(' + ')}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function getItemColor(itemId: string): string {
+function getItemColor(category: string): string {
   const colors: Record<string, string> = {
-    wood: '#d97706',
-    stone: '#6b7280',
-    sword: '#fbbf24',
-    pickaxe: '#78716c',
-    apple: '#ef4444'
+    // Material categories
+    food: '#ef4444',      // red
+    fiber: '#22c55e',     // green
+    hide: '#92400e',      // brown
+    wood: '#d97706',      // orange
+    clay: '#78716c',      // stone gray
+    ore: '#6b7280',       // gray
+    metal: '#60a5fa',     // blue
+    // Item categories
+    material: '#888888',
+    weapon: '#fbbf24',    // yellow
+    tool: '#78716c',      // gray
+    consumable: '#ef4444' // red
   };
-  return colors[itemId] || '#888';
+  return colors[category] || '#888';
 }

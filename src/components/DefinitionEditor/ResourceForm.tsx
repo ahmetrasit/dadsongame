@@ -4,7 +4,10 @@ import { useGameStateStore } from '@/stores/gameStateStore';
 import { Card, FieldRow, CompactInput, CompactSelect, CheckboxGroup } from './FormComponents';
 import { FaTrashAlt } from 'react-icons/fa';
 import { generateResourcePreview } from '@/utils/generatePreviewImage';
-import type { VitaminType, FoodNutrition, ResourceInteractionType } from '@/stores/definitions/resourcesStore';
+import type {
+  VitaminType, FoodNutrition, ResourceInteractionType, MaterialCategory,
+  MaterialTransformation, TransformationAction, TransformationProperty, TransformationRequirement
+} from '@/stores/definitions/resourcesStore';
 
 interface ResourceFormProps {
   item: any;
@@ -12,6 +15,14 @@ interface ResourceFormProps {
   onSave?: () => void;
   onCancel?: () => void;
 }
+
+const TRANSFORMATION_ACTIONS: TransformationAction[] = [
+  'chop', 'cook', 'dry', 'soak', 'grind', 'portion', 'mold', 'smelt', 'tan', 'weave', 'twist'
+];
+
+const TRANSFORMATION_PROPERTIES: TransformationProperty[] = [
+  'cutting', 'shaping', 'piercing', 'digging', 'grinding', 'scooping', 'heat', 'dry', 'soak'
+];
 
 export function ResourceForm({ item, isDraft, onSave, onCancel }: ResourceFormProps) {
   const { updateResource, updateDraftResource, deleteResource, resources } = useDefinitionsStore();
@@ -26,19 +37,20 @@ export function ResourceForm({ item, isDraft, onSave, onCancel }: ResourceFormPr
   };
 
   const handleCategoryChange = (newCategory: string) => {
-    const autoSpoilageCategories = ['metal', 'rock', 'wood', 'organics'];
+    // Non-food categories auto-set spoilage to 'never'
+    const autoSpoilageCategories = ['fiber', 'hide', 'wood', 'clay', 'ore', 'metal'];
     if (autoSpoilageCategories.includes(newCategory)) {
       if (isDraft) {
-        updateDraftResource({ category: newCategory as 'food' | 'water' | 'metal' | 'rock' | 'wood' | 'organics', spoilageRate: 'never' });
+        updateDraftResource({ category: newCategory as MaterialCategory, spoilageRate: 'never' });
       } else {
-        updateResource(item.id, { category: newCategory as 'food' | 'water' | 'metal' | 'rock' | 'wood' | 'organics', spoilageRate: 'never' });
+        updateResource(item.id, { category: newCategory as MaterialCategory, spoilageRate: 'never' });
       }
     } else {
       handleChange('category', newCategory);
     }
   };
 
-  const isSpoilageDisabled = ['metal', 'rock', 'wood', 'organics'].includes(item.category);
+  const isSpoilageDisabled = ['fiber', 'hide', 'wood', 'clay', 'ore', 'metal'].includes(item.category);
   const isFood = item.category === 'food';
   const resourceInteractions: ResourceInteractionType[] = ['collect', 'eat', 'drink'];
 
@@ -99,6 +111,55 @@ export function ResourceForm({ item, isDraft, onSave, onCancel }: ResourceFormPr
       : [...vitamins, vitamin as VitaminType];
     handleNutritionChange('vitamins', newVitamins);
   }, [nutrition.vitamins, handleNutritionChange]);
+
+  const handleAddTransformation = () => {
+    const newTransformation: MaterialTransformation = {
+      action: 'chop',
+      resultMaterialId: '',
+      resultQuantity: 1,
+      requirements: []
+    };
+    const transformations = [...(item.transformations || []), newTransformation];
+    handleChange('transformations', transformations);
+  };
+
+  const handleUpdateTransformation = (index: number, updates: Partial<MaterialTransformation>) => {
+    const transformations = [...(item.transformations || [])];
+    transformations[index] = { ...transformations[index], ...updates };
+    handleChange('transformations', transformations);
+  };
+
+  const handleDeleteTransformation = (index: number) => {
+    const transformations = (item.transformations || []).filter((_: MaterialTransformation, i: number) => i !== index);
+    handleChange('transformations', transformations);
+  };
+
+  const handleAddRequirement = (transformIndex: number) => {
+    const transformations = [...(item.transformations || [])];
+    const newReq: TransformationRequirement = { property: 'cutting', min: 1 };
+    transformations[transformIndex] = {
+      ...transformations[transformIndex],
+      requirements: [...transformations[transformIndex].requirements, newReq]
+    };
+    handleChange('transformations', transformations);
+  };
+
+  const handleUpdateRequirement = (transformIndex: number, reqIndex: number, updates: Partial<TransformationRequirement>) => {
+    const transformations = [...(item.transformations || [])];
+    const requirements = [...transformations[transformIndex].requirements];
+    requirements[reqIndex] = { ...requirements[reqIndex], ...updates };
+    transformations[transformIndex] = { ...transformations[transformIndex], requirements };
+    handleChange('transformations', transformations);
+  };
+
+  const handleDeleteRequirement = (transformIndex: number, reqIndex: number) => {
+    const transformations = [...(item.transformations || [])];
+    transformations[transformIndex] = {
+      ...transformations[transformIndex],
+      requirements: transformations[transformIndex].requirements.filter((_: TransformationRequirement, i: number) => i !== reqIndex)
+    };
+    handleChange('transformations', transformations);
+  };
 
   // Check for duplicate name
   const isDuplicateName = resources.some(r => r.name.toLowerCase() === item.name.toLowerCase() && r.id !== item.id);
@@ -165,11 +226,12 @@ export function ResourceForm({ item, isDraft, onSave, onCancel }: ResourceFormPr
             width="120px"
             options={[
               { value: 'food', label: 'Food' },
-              { value: 'water', label: 'Water' },
-              { value: 'metal', label: 'Metal' },
-              { value: 'rock', label: 'Rock' },
+              { value: 'fiber', label: 'Fiber' },
+              { value: 'hide', label: 'Hide' },
               { value: 'wood', label: 'Wood' },
-              { value: 'organics', label: 'Organics' },
+              { value: 'clay', label: 'Clay' },
+              { value: 'ore', label: 'Ore' },
+              { value: 'metal', label: 'Metal' },
             ]}
           />
           <CompactSelect
@@ -389,6 +451,134 @@ export function ResourceForm({ item, isDraft, onSave, onCancel }: ResourceFormPr
           </div>
         </Card>
       )}
+
+      {/* Transformations section */}
+      <Card title="Transformations">
+        {(item.transformations || []).map((transform: MaterialTransformation, tIndex: number) => (
+          <div key={tIndex} style={{
+            background: '#f5f5f5',
+            padding: '12px',
+            borderRadius: '8px',
+            marginBottom: '12px'
+          }}>
+            <FieldRow style={{ marginBottom: '8px' }}>
+              <CompactSelect
+                label="Action"
+                value={transform.action}
+                onChange={(e) => handleUpdateTransformation(tIndex, { action: e.target.value as TransformationAction })}
+                width="120px"
+                options={TRANSFORMATION_ACTIONS.map(a => ({ value: a, label: a.charAt(0).toUpperCase() + a.slice(1) }))}
+              />
+              <span style={{ margin: '0 8px', alignSelf: 'center' }}>→</span>
+              <CompactSelect
+                label="Result"
+                value={transform.resultMaterialId}
+                onChange={(e) => handleUpdateTransformation(tIndex, { resultMaterialId: e.target.value })}
+                width="180px"
+                options={[
+                  { value: '', label: 'Select material...' },
+                  ...resources.filter(r => r.id !== item.id).map(r => ({ value: r.id, label: r.name }))
+                ]}
+              />
+              <CompactInput
+                label="Qty"
+                type="number"
+                value={transform.resultQuantity}
+                onChange={(e) => handleUpdateTransformation(tIndex, { resultQuantity: Number(e.target.value) })}
+                width="60px"
+              />
+              <button
+                onClick={() => handleDeleteTransformation(tIndex)}
+                style={{
+                  padding: '4px 8px',
+                  background: '#ef4444',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  marginLeft: '8px'
+                }}
+              >
+                <FaTrashAlt />
+              </button>
+            </FieldRow>
+
+            {/* Requirements */}
+            <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>Requirements:</div>
+            {transform.requirements.map((req: TransformationRequirement, rIndex: number) => (
+              <FieldRow key={rIndex} style={{ marginBottom: '4px', marginLeft: '16px' }}>
+                <CompactSelect
+                  label=""
+                  value={req.property}
+                  onChange={(e) => handleUpdateRequirement(tIndex, rIndex, { property: e.target.value as TransformationProperty })}
+                  width="100px"
+                  options={TRANSFORMATION_PROPERTIES.map(p => ({ value: p, label: p }))}
+                />
+                <CompactInput
+                  label="min"
+                  type="number"
+                  value={req.min}
+                  onChange={(e) => handleUpdateRequirement(tIndex, rIndex, { min: Number(e.target.value) })}
+                  width="60px"
+                />
+                <CompactInput
+                  label="max"
+                  type="number"
+                  value={req.max ?? ''}
+                  onChange={(e) => handleUpdateRequirement(tIndex, rIndex, {
+                    max: e.target.value === '' ? undefined : Number(e.target.value)
+                  })}
+                  width="60px"
+                />
+                <button
+                  onClick={() => handleDeleteRequirement(tIndex, rIndex)}
+                  style={{
+                    padding: '2px 6px',
+                    background: '#ef4444',
+                    border: 'none',
+                    borderRadius: '4px',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: '10px'
+                  }}
+                >
+                  ×
+                </button>
+              </FieldRow>
+            ))}
+            <button
+              onClick={() => handleAddRequirement(tIndex)}
+              style={{
+                padding: '4px 8px',
+                background: '#3b82f6',
+                border: 'none',
+                borderRadius: '4px',
+                color: 'white',
+                cursor: 'pointer',
+                fontSize: '12px',
+                marginLeft: '16px',
+                marginTop: '4px'
+              }}
+            >
+              + Requirement
+            </button>
+          </div>
+        ))}
+        <button
+          onClick={handleAddTransformation}
+          style={{
+            padding: '8px 16px',
+            background: '#22c55e',
+            border: 'none',
+            borderRadius: '4px',
+            color: 'white',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          + Add Transformation
+        </button>
+      </Card>
     </div>
   );
 }

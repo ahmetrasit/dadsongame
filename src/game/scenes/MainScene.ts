@@ -11,6 +11,8 @@ import { generatePlantPreview, generateAnimalPreview } from '@/utils/generatePre
 import { initYieldSystem } from '@/services/YieldService';
 import { initSpoilageSystem } from '@/services/SpoilageService';
 import { useYieldStateStore } from '@/stores/yieldStateStore';
+import { getBootstrapRecipe } from '@/types/bootstrap';
+import { usePlacementStore } from '@/stores/placementStore';
 
 export class MainScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite;
@@ -24,6 +26,7 @@ export class MainScene extends Phaser.Scene {
   private animalSprites: Map<string, Phaser.GameObjects.Container> = new Map();
   private waterSprites: Map<string, Phaser.GameObjects.Container> = new Map();
   private resourceSprites: Map<string, Phaser.GameObjects.Container> = new Map();
+  private structureSprites: Map<string, Phaser.GameObjects.Container> = new Map();
   private spawnMarker!: Phaser.GameObjects.Graphics;
 
   // State tracking for diff-based rendering
@@ -33,6 +36,7 @@ export class MainScene extends Phaser.Scene {
   private lastAnimalsHash = '';
   private lastWatersHash = '';
   private lastResourcesHash = '';
+  private lastStructuresHash = '';
   private lastSpawnHash = '';
   private lastIsEditing = false;
 
@@ -52,6 +56,9 @@ export class MainScene extends Phaser.Scene {
     FOUR: Phaser.Input.Keyboard.Key;
     FIVE: Phaser.Input.Keyboard.Key;
     SIX: Phaser.Input.Keyboard.Key;
+    SEVEN: Phaser.Input.Keyboard.Key;
+    EIGHT: Phaser.Input.Keyboard.Key;
+    NINE: Phaser.Input.Keyboard.Key;
     ENTER: Phaser.Input.Keyboard.Key;
     ESC: Phaser.Input.Keyboard.Key;
   };
@@ -109,6 +116,9 @@ export class MainScene extends Phaser.Scene {
       FOUR: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR, false),
       FIVE: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE, false),
       SIX: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SIX, false),
+      SEVEN: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SEVEN, false),
+      EIGHT: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.EIGHT, false),
+      NINE: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.NINE, false),
       ENTER: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER, false),
       ESC: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC, false),
     };
@@ -250,14 +260,57 @@ export class MainScene extends Phaser.Scene {
       }
     }
 
+    // 1 key - Collect action (for resources)
+    if (Phaser.Input.Keyboard.JustDown(this.editorKeys.ONE)) {
+      if (!mapStore.isEditing && !defStore.isEditorOpen && interactionStore.currentTarget) {
+        const target = interactionStore.currentTarget;
+        // Only handle if this is a resource
+        if (target.object.type === 'resource') {
+          interactionStore.executeInteraction('collect');
+        }
+      }
+    }
+
+    // Handle number keys 2-9 for transformations
+    const numKeys = ['TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE'] as const;
+    numKeys.forEach((keyName, index) => {
+      const key = this.editorKeys[keyName];
+      if (key && Phaser.Input.Keyboard.JustDown(key)) {
+        if (!mapStore.isEditing && !defStore.isEditorOpen && interactionStore.currentTarget) {
+          const target = interactionStore.currentTarget;
+          if (target.object.type === 'resource') {
+            const resource = defStore.resources.find(r => r.id === target.object.definitionId);
+            if (resource?.transformations && resource.transformations[index]) {
+              const transformation = resource.transformations[index];
+              interactionStore.executeInteraction(transformation.action);
+            } else {
+              // Fallback to bootstrap recipe for key 2
+              if (index === 0) {
+                const recipe = getBootstrapRecipe(target.object.definitionId);
+                if (recipe) {
+                  interactionStore.executeInteraction(recipe.action);
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
     // Toggle Definition Editor with Shift+D
     if (Phaser.Input.Keyboard.JustDown(this.editorKeys.D_KEY) &&
         (this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT).isDown)) {
       defStore.toggleEditor();
     }
 
-    // ESC returns to main menu when neither editor is open
+    // ESC for placement mode or return to main menu
     if (Phaser.Input.Keyboard.JustDown(this.editorKeys.ESC)) {
+      const placementStore = usePlacementStore.getState();
+      if (placementStore.isPlacing) {
+        // Cancel placement mode
+        placementStore.cancelPlacement();
+        return;
+      }
       if (!mapStore.isEditing && !defStore.isEditorOpen) {
         gameStateStore.returnToMenu();
         return;
@@ -266,6 +319,24 @@ export class MainScene extends Phaser.Scene {
   }
 
   private handleEditorClick(pointer: Phaser.Input.Pointer): void {
+    // Handle placement mode first
+    const placementStore = usePlacementStore.getState();
+    if (placementStore.isPlacing) {
+      // Get world coordinates
+      const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+      const worldX = worldPoint.x;
+      const worldY = worldPoint.y;
+
+      // Update preview position
+      placementStore.updatePreview(worldX, worldY);
+
+      if (pointer.leftButtonDown()) {
+        // TODO: Consume items from inventory, place structure
+        placementStore.confirmPlacement();
+      }
+      return; // Don't process other clicks during placement
+    }
+
     const store = useMapEditorStore.getState();
     if (!store.isEditing) return;
 
@@ -359,6 +430,13 @@ export class MainScene extends Phaser.Scene {
     if (forceRender || resourcesHash !== this.lastResourcesHash || editingChanged) {
       this.lastResourcesHash = resourcesHash;
       this.updateResources(mapData.resources || [], defStore.resources, isEditing);
+    }
+
+    // Structures - only update if changed or editing mode changed
+    const structuresHash = this.hashData(defStore.structurePlacements || []);
+    if (forceRender || structuresHash !== this.lastStructuresHash || editingChanged) {
+      this.lastStructuresHash = structuresHash;
+      this.updateStructures(defStore.structurePlacements || [], defStore.structures || [], isEditing);
     }
 
     // Spawn marker - only update if changed or editing mode changed
@@ -941,6 +1019,84 @@ export class MainScene extends Phaser.Scene {
     isEditing: boolean
   ): void {
     this.updateEntityLabel(container, placement.definitionId, definitions, isEditing, 20);
+  }
+
+  private updateStructures(
+    placements: { id: string; definitionId: string; x: number; y: number }[],
+    definitions: { id: string; name: string; emoji: string; width: number; height: number }[],
+    isEditing: boolean
+  ): void {
+    const currentIds = new Set(placements.map(p => p.id));
+
+    // Remove sprites that no longer exist
+    for (const [id, container] of this.structureSprites) {
+      if (!currentIds.has(id)) {
+        container.destroy();
+        this.structureSprites.delete(id);
+      }
+    }
+
+    // Add or update sprites
+    for (const placement of placements) {
+      const existing = this.structureSprites.get(placement.id);
+
+      if (existing) {
+        // Update position if changed
+        if (existing.x !== placement.x || existing.y !== placement.y) {
+          existing.setPosition(placement.x, placement.y);
+        }
+        // Update label visibility based on editing mode
+        this.updateStructureLabel(existing, placement, definitions, isEditing);
+      } else {
+        // Create new sprite
+        const container = this.createStructureSprite(placement, definitions, isEditing);
+        this.structureSprites.set(placement.id, container);
+      }
+    }
+  }
+
+  private createStructureSprite(
+    placement: { id: string; definitionId: string; x: number; y: number },
+    definitions: { id: string; name: string; emoji: string; width: number; height: number }[],
+    isEditing: boolean
+  ): Phaser.GameObjects.Container {
+    const definition = definitions.find(s => s.id === placement.definitionId);
+    const container = this.add.container(placement.x, placement.y);
+
+    // Use emoji from definition
+    const emoji = definition?.emoji || '🏗️';
+    const emojiText = this.add.text(0, 0, emoji, {
+      fontSize: '32px',
+    });
+    emojiText.setOrigin(0.5, 0.5);
+    emojiText.setName('emoji');
+    container.add(emojiText);
+
+    // Add label if editing
+    if (isEditing && definition) {
+      const label = this.add.text(0, 24, definition.name, {
+        fontFamily: 'Avenir, system-ui, sans-serif',
+        fontSize: '10px',
+        color: '#ffffff',
+        backgroundColor: '#000000aa',
+        padding: { x: 2, y: 1 },
+      });
+      label.setOrigin(0.5, 0);
+      label.setName('label');
+      container.add(label);
+    }
+
+    container.setDepth(7); // Above animals
+    return container;
+  }
+
+  private updateStructureLabel(
+    container: Phaser.GameObjects.Container,
+    placement: { id: string; definitionId: string; x: number; y: number },
+    definitions: { id: string; name: string; emoji: string; width: number; height: number }[],
+    isEditing: boolean
+  ): void {
+    this.updateEntityLabel(container, placement.definitionId, definitions, isEditing, 24);
   }
 
   private renderSpawnMarker(spawn: { x: number; y: number }, isEditing: boolean): void {

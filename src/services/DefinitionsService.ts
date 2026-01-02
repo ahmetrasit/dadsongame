@@ -185,11 +185,75 @@ class DefinitionsService {
               badFat: r.nutrition.badFat ?? 25,
             }
           } : {}),
+          // Include transformations - sanitize to ensure no undefined values
+          ...(r.transformations && r.transformations.length > 0 ? {
+            transformations: r.transformations.map(t => ({
+              action: t.action,
+              resultMaterialId: t.resultMaterialId,
+              resultQuantity: t.resultQuantity ?? 1,
+              requirements: (t.requirements || []).map(req => ({
+                property: req.property,
+                min: req.min ?? 1,
+                ...(req.max !== undefined ? { max: req.max } : {}),
+              })),
+            }))
+          } : {}),
+        }));
+
+        // Helper to sanitize transformations array
+        const sanitizeTransformations = (transformations: any[] | undefined) => {
+          if (!transformations || transformations.length === 0) return undefined;
+          return transformations.map(t => ({
+            action: t.action,
+            resultMaterialId: t.resultMaterialId,
+            resultQuantity: t.resultQuantity ?? 1,
+            requirements: (t.requirements || []).map((req: any) => ({
+              property: req.property,
+              min: req.min ?? 1,
+              ...(req.max !== undefined ? { max: req.max } : {}),
+            })),
+          }));
+        };
+
+        // Sanitize plants to include aliveYields transformations
+        const sanitizedPlants = (definitions.plants || []).map(p => ({
+          ...p,
+          aliveYields: (p.aliveYields || []).map(y => {
+            const sanitizedTransforms = sanitizeTransformations(y.transformations);
+            return {
+              resourceId: y.resourceId,
+              amount: y.amount,
+              interval: y.interval,
+              seasons: y.seasons,
+              shedding: y.shedding,
+              ...(y.interactionType ? { interactionType: y.interactionType } : {}),
+              ...(y.yieldLayerImageUrl ? { yieldLayerImageUrl: y.yieldLayerImageUrl } : {}),
+              ...(sanitizedTransforms ? { transformations: sanitizedTransforms } : {}),
+            };
+          }),
+        }));
+
+        // Sanitize animals to include aliveYields transformations
+        const sanitizedAnimals = (definitions.animals || []).map(a => ({
+          ...a,
+          aliveYields: (a.aliveYields || []).map(y => {
+            const sanitizedTransforms = sanitizeTransformations(y.transformations);
+            return {
+              resourceId: y.resourceId,
+              amount: y.amount,
+              interval: y.interval,
+              seasons: y.seasons,
+              shedding: y.shedding,
+              ...(y.interactionType ? { interactionType: y.interactionType } : {}),
+              ...(y.yieldLayerImageUrl ? { yieldLayerImageUrl: y.yieldLayerImageUrl } : {}),
+              ...(sanitizedTransforms ? { transformations: sanitizedTransforms } : {}),
+            };
+          }),
         }));
 
         await setDoc(docRef, {
-          plants: definitions.plants,
-          animals: definitions.animals,
+          plants: sanitizedPlants,
+          animals: sanitizedAnimals,
           resources: sanitizedResources,
           waters: definitions.waters || [],
           updatedAt: timestamp,

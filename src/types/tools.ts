@@ -2,30 +2,27 @@
 // Tool System
 // ==========================================
 
-export type ToolProperty =
+// 6 Tool Functions (aligned with DESIGN.md)
+export type ToolFunction =
   | 'cutting'
-  | 'digging'
-  | 'smashing'
-  | 'hammering'
-  | 'reaching'
-  | 'damaging'
+  | 'shaping'
   | 'piercing'
+  | 'digging'
   | 'grinding'
-  | 'scooping'
-  | 'precision';
+  | 'scooping';
 
-export interface ToolStarAllocation {
+export interface ToolFunctionAllocation {
   cutting: number;
-  digging: number;
-  smashing: number;
-  hammering: number;
-  reaching: number;
-  damaging: number;
+  shaping: number;
   piercing: number;
+  digging: number;
   grinding: number;
   scooping: number;
-  precision: number;
 }
+
+// Legacy alias for backward compatibility
+export type ToolProperty = ToolFunction;
+export type ToolStarAllocation = ToolFunctionAllocation;
 
 export interface ToolRequirement {
   property: ToolProperty;

@@ -1,19 +1,22 @@
-# Progress (v0.090)
+# Progress (v0.093)
 
-## Latest Session (2026-01-01)
-- Reduced to 6 needs (removed Stay_Safe, Live_Together)
-- Created ontology.md - 3-hierarchy crafting system:
-  - Made Of: materials, amounts, purity, state
-  - Can Do: verbs with capacities
-  - Can Be Used For: 6 functional categories
-- Defined functional categories: Nourishment, Recovery, Mobility, Hauling, Crafting, Signaling
-- Added tool dependency chain (by_hand → with_cutting → with_shaping → with_heating)
-- Added bootstrap chain for T1 hand-craftable items
-- Reduced functional properties to 18 (from 24)
+## Latest Session (2026-01-02)
+- Redesigned crafting system (5 categories: Tools, Storage, Vehicles, Consumables, Knowledge)
+- Tool crafting: Handle + Working Part + Binder + Size (short/long) + Function Points
+- 6 tool functions: cutting, shaping, piercing, digging, grinding, scooping
+- 7 material categories: Food, Fiber, Hide, Wood, Clay, Ore, Metal
+- Processing methods: Environment (Heat/Dry/Soak), Manual (Twist/Mold/Weave), Additive (Preserve), Tool-based
+- Component crafting: Wheel, Frame, Hull, Handle, Sail, Sled runner
+- Vehicle crafting: Frame + Mobility + optional(Handles, Sail, Attachments)
+- Storage types: Personal, Carried, Stationary, Attached
+- Station crafting: Frame + Processing function (must be in building)
+- Knowledge: Auto-generated recipes, books for trading
+- Bootstrap: by-hand actions (break, twist, mold, stack, gather)
+- All crafting consolidated into DESIGN.md
 
-## Previous Session
-- Optimized design docs for AI context (81% reduction)
-- Added Recover need, 9 verbs (53 total), farming category
+## Previous Sessions
+- 2026-01-01: Reduced to 6 needs, defined functional categories
+- Earlier: Optimized design docs (81% reduction), added Recover need
 
 ## Status
 
@@ -36,6 +39,21 @@ Map Editor, Definition Editor, Firebase Integration, Interaction System, Yield S
 | Villagers | P1 |
 | Buildings | P2 |
 | Marketplace | P2 |
+
+## Crafting Implementation Order
+
+| Step | Feature               | Dependencies | Description                                    |
+|------|-----------------------|--------------|------------------------------------------------|
+| 1    | Bootstrap Actions     | None         | by-hand: gather, break, twist, mold, stack     |
+| 2    | Inventory Integration | Step 1       | E key → inventory, harvestYield()              |
+| 3    | Fire Pit              | Steps 1-2    | Stack stones+wood → heat source (150)          |
+| 4    | Tool Crafting         | Steps 1-3    | Handle + Working Part + Binder + Size + Points |
+| 5    | Processing System     | Steps 1-4    | Heat/Dry/Soak/Twist/Mold/Weave + tool-based    |
+| 6    | Consumables           | Steps 4-5    | Food processing, fuel creation                 |
+| 7    | Storage Crafting      | Steps 4-5    | Personal → Carried → Stationary → Attached     |
+| 8    | Station Crafting      | Steps 4-7    | Frame + Processing function (in buildings)     |
+| 9    | Vehicle Crafting      | Steps 4-8    | Frame + Mobility + attachments                 |
+| 10   | Knowledge System      | Steps 4-9    | Auto-generated recipes, books                  |
 
 ## Next Steps
 P0: E key → inventory, inventory HUD, harvestYield()
@@ -62,7 +80,7 @@ P2: marketplace expansion, random events, multiple islands
 
 ## Key Files
 ```
-design/ontology.md                 # 3-hierarchy crafting system
+design/DESIGN.md                   # Main design spec (includes crafting)
 design/property-hierarchy.md       # forms, capabilities, functional
 design/storyline.md                # needs, verbs, tiers
 stores/definitions/index.ts        # AliveYield, interactionType

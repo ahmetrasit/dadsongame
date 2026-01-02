@@ -1,12 +1,14 @@
 import { create } from 'zustand';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 import { definitionsService, type GameDefinitions } from '@/services/DefinitionsService';
+import type { MaterialTransformation } from './resourcesStore';
 
 // Re-export types from entity stores
 export type { PlantDefinition, PlantStage, SoilType, PlantSubCategory } from './plantsStore';
 export type { AnimalDefinition, AnimalCapability, AnimalSubCategory } from './animalsStore';
-export type { ResourceDefinition, ResourceInteractionType } from './resourcesStore';
+export type { ResourceDefinition, ResourceInteractionType, MaterialTransformation, TransformationAction, TransformationProperty, TransformationRequirement } from './resourcesStore';
 export type { WaterDefinition, WaterType, WaterInteractionType, FishType } from './waterStore';
+export type { StructureDefinition, StructurePlacement } from './structuresStore';
 
 // Re-export GameDefinitions from service (single source of truth)
 export type { GameDefinitions } from '@/services/DefinitionsService';
@@ -30,6 +32,7 @@ export interface AliveYield {
   shedding: boolean;             // true = auto-drops at season end, false = must collect or lose
   interactionType?: PlantYieldInteraction | AnimalYieldInteraction;  // How to collect this yield
   yieldLayerImageUrl?: string;   // Overlay sprite shown when yield is available
+  transformations?: MaterialTransformation[];  // Transformations available for this yield
 }
 
 export interface DeadYield {
@@ -42,6 +45,7 @@ import { PlantSlice, createPlantSlice, initialPlants } from './plantsStore';
 import { AnimalSlice, createAnimalSlice, initialAnimals } from './animalsStore';
 import { ResourceSlice, createResourceSlice, initialResources } from './resourcesStore';
 import { WaterSlice, createWaterSlice, initialWaters } from './waterStore';
+import { StructureSlice, createStructureSlice, initialStructures } from './structuresStore';
 
 // Shared UI state
 type EditorTab = 'plants' | 'animals' | 'resources' | 'waters';
@@ -77,7 +81,7 @@ interface SharedSlice {
 }
 
 // Combined state type
-type DefinitionsState = SharedSlice & PlantSlice & AnimalSlice & ResourceSlice & WaterSlice;
+type DefinitionsState = SharedSlice & PlantSlice & AnimalSlice & ResourceSlice & WaterSlice & StructureSlice;
 
 // Initial definitions for backward compatibility reference (used in tests)
 export const initialDefinitions = {
@@ -85,6 +89,7 @@ export const initialDefinitions = {
   animals: initialAnimals,
   resources: initialResources,
   waters: initialWaters,
+  structures: initialStructures,
 };
 
 // Debounce constants
@@ -242,7 +247,20 @@ export const useDefinitionsStore = create<DefinitionsState>()(
             // Subscribe to real-time updates from other users
             definitionsService.subscribeToUpdates(
               (definitions, timestamp) => {
-                console.log('[DefinitionsStore] Applying remote update');
+                // Debug: Check if remote update has fewer transformations than local
+                const localResources = get().resources;
+                const remoteResources = definitions.resources || [];
+                const localWithTransforms = localResources.filter(r => r.transformations && r.transformations.length > 0);
+                const remoteWithTransforms = remoteResources.filter((r: any) => r.transformations && r.transformations.length > 0);
+
+                console.log('[DefinitionsStore] Remote update received');
+                console.log('  Local resources with transformations:', localWithTransforms.length);
+                console.log('  Remote resources with transformations:', remoteWithTransforms.length);
+
+                if (localWithTransforms.length > remoteWithTransforms.length) {
+                  console.warn('[DefinitionsStore] WARNING: Remote update has fewer transformations than local! Local transformations may be lost.');
+                }
+
                 // Update lastSyncedData to prevent re-sync loop
                 const remoteData = JSON.stringify({
                   plants: definitions.plants,
@@ -312,31 +330,73 @@ export const useDefinitionsStore = create<DefinitionsState>()(
         ...createAnimalSlice(set, get, api),
         ...createResourceSlice(set, get, api),
         ...createWaterSlice(set, get, api),
+        ...createStructureSlice(set, get, api),
       }),
       {
         name: 'game-definitions',
         // Only persist the data, not UI state
-        partialize: (state) => ({
-          plants: state.plants,
-          animals: state.animals,
-          resources: state.resources,
-          waters: state.waters,
-        }),
+        partialize: (state) => {
+          const data = {
+            plants: state.plants,
+            animals: state.animals,
+            resources: state.resources,
+            waters: state.waters,
+            structurePlacements: state.structurePlacements,
+          };
+          // Debug: log resources with transformations when saving
+          const resourcesWithTransforms = state.resources.filter(r => r.transformations && r.transformations.length > 0);
+          if (resourcesWithTransforms.length > 0) {
+            console.log('[DefinitionsStore] Persisting resources with transformations:', resourcesWithTransforms.map(r => ({ id: r.id, name: r.name, transformCount: r.transformations?.length })));
+          }
+          return data;
+        },
         // Merge persisted state with initial state
         merge: (persistedState, currentState) => {
           const persisted = persistedState as Partial<DefinitionsState> | undefined;
+          // Debug: log what's being loaded
+          if (persisted?.resources) {
+            const resourcesWithTransforms = persisted.resources.filter((r: any) => r.transformations && r.transformations.length > 0);
+            console.log('[DefinitionsStore] Loading from storage - resources with transformations:', resourcesWithTransforms.map((r: any) => ({ id: r.id, name: r.name, transformCount: r.transformations?.length })));
+          }
           return {
             ...currentState,
             plants: persisted?.plants ?? currentState.plants,
             animals: persisted?.animals ?? currentState.animals,
             resources: persisted?.resources ?? currentState.resources,
             waters: persisted?.waters ?? currentState.waters,
+            structurePlacements: persisted?.structurePlacements ?? currentState.structurePlacements,
           };
         },
       }
     )
   )
 );
+
+// Debug helper to inspect localStorage directly
+if (typeof window !== 'undefined') {
+  (window as any).debugResourceTransformations = () => {
+    const stored = localStorage.getItem('game-definitions');
+    if (!stored) {
+      console.log('[Debug] No stored definitions found');
+      return;
+    }
+    try {
+      const parsed = JSON.parse(stored);
+      const resources = parsed.state?.resources || [];
+      console.log('[Debug] Total resources in localStorage:', resources.length);
+      resources.forEach((r: any) => {
+        if (r.transformations && r.transformations.length > 0) {
+          console.log(`[Debug] Resource "${r.name}" (${r.id}) has ${r.transformations.length} transformations:`, r.transformations);
+        }
+      });
+      const withTransforms = resources.filter((r: any) => r.transformations && r.transformations.length > 0);
+      console.log('[Debug] Resources with transformations:', withTransforms.length);
+    } catch (e) {
+      console.error('[Debug] Failed to parse localStorage:', e);
+    }
+  };
+  console.log('[DefinitionsStore] Debug helper available: window.debugResourceTransformations()');
+}
 
 // Subscribe to data changes and auto-sync to Firebase
 // Using a debounced approach to avoid excessive writes

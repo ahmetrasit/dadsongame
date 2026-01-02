@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
-import { useDefinitionsStore, Season, SoilType, DeadYield, AliveYield, PlantSubCategory, PlantYieldInteraction, PlantNeedInteraction } from '@/stores/definitionsStore';
+import { useDefinitionsStore, Season, SoilType, DeadYield, AliveYield, PlantSubCategory, PlantYieldInteraction, PlantNeedInteraction, MaterialTransformation } from '@/stores/definitionsStore';
 import { useGameStateStore } from '@/stores/gameStateStore';
 import { Card, FieldRow, CompactInput, CompactSelect, TwoColumnRow, SliderField, CheckboxGroup } from './FormComponents';
+import { TransformationsEditor } from './TransformationsEditor';
 import { FaTrashAlt } from 'react-icons/fa';
 import { generatePlantPreview } from '@/utils/generatePreviewImage';
 
@@ -377,6 +378,16 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
                   <FaTrashAlt />
                 </button>
               </FieldRow>
+              {/* Transformations for this yield */}
+              <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #D4C4B0' }}>
+                <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px', fontWeight: 'bold' }}>Transformations:</div>
+                <TransformationsEditor
+                  transformations={ay.transformations || []}
+                  resources={resources}
+                  onChange={(transformations: MaterialTransformation[]) => handleAliveYieldChange(i, { ...ay, transformations })}
+                  compact={true}
+                />
+              </div>
             </div>
           ))}
           <button

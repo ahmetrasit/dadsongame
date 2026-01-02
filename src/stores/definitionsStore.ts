@@ -24,6 +24,10 @@ export {
   // Resource types
   type ResourceDefinition,
   type ResourceInteractionType,
+  type MaterialTransformation,
+  type TransformationAction,
+  type TransformationProperty,
+  type TransformationRequirement,
   // Water types
   type WaterDefinition,
   type WaterType,

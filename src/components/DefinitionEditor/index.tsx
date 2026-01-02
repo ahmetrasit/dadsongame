@@ -33,8 +33,6 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
     cancelPlant,
     cancelAnimal,
     cancelResource,
-    exportDefinitions,
-    importDefinitions,
   } = useDefinitionsStore();
 
   // Set initial tab if provided
@@ -67,26 +65,6 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
   if (!isEditorOpen) return null;
 
   const stopProp = (e: React.MouseEvent) => e.stopPropagation();
-
-  const handleExport = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const json = exportDefinitions();
-    try {
-      await navigator.clipboard.writeText(json);
-      alert('Definitions copied to clipboard!');
-    } catch {
-      prompt('Copy definitions:', json);
-    }
-  };
-
-  const handleImport = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const json = prompt('Paste definitions JSON:');
-    if (json) {
-      importDefinitions(json);
-      alert('Definitions imported!');
-    }
-  };
 
   const toggleCategory = (category: string) => {
     const newExpanded = new Set(expandedCategories);
@@ -264,48 +242,6 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
           {!draftAnimal && selectedItem && activeTab === 'animals' && <AnimalForm item={selectedItem} />}
           {!draftResource && selectedItem && activeTab === 'resources' && <ResourceForm item={selectedItem} />}
         </div>
-      </div>
-
-      {/* Footer */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          padding: '20px',
-          borderTop: '1px solid #D4C4B0',
-          display: 'flex',
-          gap: '10px',
-          background: '#FFF1E5',
-        }}
-      >
-        <button
-          onClick={handleExport}
-          style={{
-            padding: '10px 20px',
-            background: '#0D7680',
-            border: 'none',
-            borderRadius: '4px',
-            color: 'white',
-            cursor: 'pointer',
-          }}
-        >
-          Export
-        </button>
-        <button
-          onClick={handleImport}
-          style={{
-            padding: '10px 20px',
-            background: '#0D0D0D',
-            border: 'none',
-            borderRadius: '4px',
-            color: '#FFF1E5',
-            cursor: 'pointer',
-          }}
-        >
-          Import
-        </button>
       </div>
     </div>
   );

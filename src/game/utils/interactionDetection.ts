@@ -48,11 +48,15 @@ export function findNearestInteractable(
 
     const dist = distance(playerX, playerY, plant.x, plant.y);
     if (dist <= def.interactionRadius && dist < nearestDistance) {
-      // Combine yield interactions and need interactions
+      // Combine yield interactions, yield transformation actions, and need interactions
       const yieldInteractions = def.aliveYields
         .map(y => y.interactionType)
         .filter(Boolean) as string[];
-      const allInteractions = [...new Set([...yieldInteractions, ...(def.needInteractions || [])])] as string[];
+      // Include transformation actions from yields
+      const yieldTransformActions = def.aliveYields
+        .flatMap(y => (y.transformations || []).map(t => t.action))
+        .filter(Boolean) as string[];
+      const allInteractions = [...new Set([...yieldInteractions, ...yieldTransformActions, ...(def.needInteractions || [])])] as string[];
 
       nearestDistance = dist;
       nearest = {
@@ -77,11 +81,15 @@ export function findNearestInteractable(
 
     const dist = distance(playerX, playerY, animal.x, animal.y);
     if (dist <= def.interactionRadius && dist < nearestDistance) {
-      // Combine yield interactions and need interactions
+      // Combine yield interactions, yield transformation actions, and need interactions
       const yieldInteractions = def.aliveYields
         .map(y => y.interactionType)
         .filter(Boolean) as string[];
-      const allInteractions = [...new Set([...yieldInteractions, ...(def.needInteractions || [])])] as string[];
+      // Include transformation actions from yields
+      const yieldTransformActions = def.aliveYields
+        .flatMap(y => (y.transformations || []).map(t => t.action))
+        .filter(Boolean) as string[];
+      const allInteractions = [...new Set([...yieldInteractions, ...yieldTransformActions, ...(def.needInteractions || [])])] as string[];
 
       nearestDistance = dist;
       nearest = {
@@ -171,6 +179,10 @@ export function getInteractionLabel(interactionType: string): string {
     fish: 'Fish',
     drink: 'Drink',
     swim: 'Swim',
+    // Bootstrap actions
+    break: 'Break',
+    twist: 'Twist',
+    mold: 'Mold',
   };
 
   return labels[interactionType] || interactionType;
