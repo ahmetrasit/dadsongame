@@ -1,6 +1,6 @@
 # Game Analysis & Playability Assessment
 
-> **Version**: v0.098 | **Date**: 2026-01-05 | **Implementation**: ~70% complete (post-TASK-001 through TASK-012)
+> **Version**: v0.099 | **Date**: 2026-01-05 | **Implementation**: ~78% complete (post-building placement system)
 
 ---
 
@@ -11,7 +11,8 @@
 - **State Machines**: ✅ COMPLETE - Plant states (TASK-004), animal taming (TASK-005/006), villager system
 - **Requirement Checking**: ✅ WIRED - checkTransformationRequirements() integrated (TASK-003)
 - **Station Processing**: ✅ IMPLEMENTED - Process at fire pit/workbench/furnace (TASK-008)
-- **Remaining Gaps**: Sleep mechanic, building placement UI, trading system, multiplayer slow-state sync
+- **Building System**: ✅ IMPLEMENTED - Full placement UI, construction progress, material assignment
+- **Remaining Gaps**: Sleep mechanic, trading system, multiplayer slow-state sync
 
 ---
 
@@ -46,7 +47,7 @@
 | Time System | 5 | 1 | 1 | 79% |
 | Inventory System | 5 | 0 | 1 | 83% |
 | Yield System | 5 | 0 | 0 | 100% |
-| Building System | 0 | 0 | 4 | 0% |
+| Building System | 4 | 0 | 0 | 100% |
 | Trading System | 0 | 0 | 4 | 0% |
 | Multiplayer | 2 | 0 | 2 | 50% |
 
@@ -83,7 +84,7 @@
 | P2-2 | Water interaction effect | ⚠️ Stub | Logs only, no plant hydration |
 | P2-3 | Pet interaction effect | ⚠️ Stub | Logs only, no happiness bonus |
 | P2-4 | Ride/mount system | ⚠️ Stub | Logs only, no movement change |
-| P2-5 | Building placement UI | ❌ Missing | Types exist, no UI |
+| P2-5 | Building placement UI | ✅ DONE | buildingStore, BuildingMenu, ConstructionPanel |
 | P2-6 | Trading system | ❌ Missing | Types exist, no logic |
 | P2-7 | Multiplayer slow-state | ❌ Missing | Fast state only |
 
@@ -103,6 +104,9 @@ worldStore ←→ YieldService             ✅ Connected (onDayChange)
 worldStore ←→ VillagerService          ✅ Connected (checkVillagerNeeds)
 worldStore ←→ PlantGrowthService       ✅ Connected (TASK-009: growth callback)
 MainScene ←→ interactionDetection      ✅ Connected (yieldStateAccessor passed)
+MainScene ←→ buildingStore             ✅ Connected (building rendering, click handling)
+buildingStore ←→ inventoryStore        ✅ Connected (material assignment)
+buildingStore ←→ villagerStore         ✅ Connected (worker assignment)
 ```
 
 ### Data Flow Verification
@@ -169,11 +173,13 @@ All P0 and P1 items have been implemented:
    - Water: increase plant growth speed
    - Fertilize: boost yield quantity
 
-### Phase 5: Building System (~6 hours)
+### Phase 5: Building System - COMPLETED ✅
 
-4. Building placement UI (React component)
-5. Construction progress tracking
-6. Feature activation on completion
+- ✅ buildingStore.ts (state management, validation)
+- ✅ BuildingMenu.tsx (building selection UI, B key toggle)
+- ✅ BuildingGhostPreview.ts (placement preview, R rotation)
+- ✅ ConstructionPanel.tsx (material/worker assignment, C key toggle)
+- ✅ MainScene integration (rendering, click handling)
 
 ### Phase 6: Economy & Polish
 
@@ -225,6 +231,10 @@ All P0 and P1 items have been implemented:
 | Plant growth | src/services/PlantGrowthService.ts | ~100 |
 | Bootstrap recipes | src/types/bootstrap.ts | ~100 |
 | Structures defs | src/types/structures.ts | ~200 |
+| Building state | src/stores/buildingStore.ts | ~550 |
+| Building menu UI | src/components/BuildingMenu.tsx | ~300 |
+| Construction panel | src/components/ConstructionPanel.tsx | ~450 |
+| Placement preview | src/game/components/BuildingGhostPreview.ts | ~310 |
 
 ---
 
@@ -246,6 +256,15 @@ All P0 and P1 items have been implemented:
 [x] All 8 villager task types
 ```
 
+### Building System (v0.099)
+```
+[x] buildingStore.ts (placement mode, validation, construction phases)
+[x] BuildingMenu.tsx (12 blueprints, categories, B key toggle)
+[x] BuildingGhostPreview.ts (Phaser preview, R rotation, grid snapping)
+[x] ConstructionPanel.tsx (materials, workers, progress, C key toggle)
+[x] MainScene building rendering (phase colors, click to select)
+```
+
 ### Remaining Work
 ```
 [ ] Sleep mechanic (shelter interaction)
@@ -255,12 +274,10 @@ All P0 and P1 items have been implemented:
 [ ] Workbench station (crafting bonus)
 [ ] Furnace station (heat=800)
 [ ] Kiln station (heat=500)
-[ ] Building placement UI
-[ ] Construction progress
 [ ] Trading system
 [ ] Multiplayer slow-state sync
 ```
 
 ---
 
-*Updated after TASK-001 through TASK-012 implementation (v0.098)*
+*Updated after building placement system implementation (v0.099)*
