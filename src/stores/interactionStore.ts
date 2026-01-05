@@ -7,9 +7,11 @@ import { getBootstrapRecipe } from '@/types/bootstrap';
 import { useInventoryStore } from './inventoryStore';
 import { useRuntimeMapStore } from './runtimeMapStore';
 import { useDefinitionsStore } from './definitionsStore';
+import { useVillagerStore } from './villagerStore';
 import { harvestYield } from '@/services/YieldService';
+import { triggerDeadYield } from '@/services/DeadYieldService';
 
-export type InteractableType = 'plant' | 'animal' | 'water' | 'resource';
+export type InteractableType = 'plant' | 'animal' | 'water' | 'resource' | 'villager';
 
 export interface InteractableObject {
   id: string;
@@ -238,6 +240,69 @@ export const useInteractionStore = create<InteractionState>()((set, get) => ({
           console.log(`[Interaction] Taming ${target.object.id}`);
           // TODO: Future enhancement - track taming progress
         }
+        break;
+      }
+      case 'chop_down': {
+        if (target.object.type !== 'plant') break;
+
+        const result = triggerDeadYield(target.object.id, target.object.type);
+        if (result) {
+          set({ currentTarget: null });
+        }
+        break;
+      }
+      case 'butcher': {
+        if (target.object.type !== 'animal') break;
+
+        const result = triggerDeadYield(target.object.id, target.object.type);
+        if (result) {
+          set({ currentTarget: null });
+        }
+        break;
+      }
+      case 'talk': {
+        if (target.object.type !== 'villager') break;
+        console.log(`[Interaction] Talking to villager ${target.object.id}`);
+        // TODO: Future enhancement - open dialogue UI
+        break;
+      }
+      case 'recruit': {
+        if (target.object.type !== 'villager') break;
+
+        const villagerStore = useVillagerStore.getState();
+        const villager = villagerStore.getVillager(target.object.id);
+
+        if (!villager) {
+          console.warn(`[Interaction] Cannot recruit: villager ${target.object.id} not found`);
+          break;
+        }
+
+        if (!villager.recruitmentQuest?.completed) {
+          console.warn(`[Interaction] Cannot recruit ${target.object.id}: quest not completed`);
+          break;
+        }
+
+        const success = villagerStore.recruitVillager(target.object.id);
+        if (success) {
+          console.log(`[Interaction] Successfully recruited villager ${target.object.id}`);
+        } else {
+          console.log(`[Interaction] Failed to recruit villager ${target.object.id}`);
+        }
+        break;
+      }
+      case 'assign': {
+        if (target.object.type !== 'villager') break;
+
+        const villagerStore = useVillagerStore.getState();
+        const villager = villagerStore.getVillager(target.object.id);
+
+        if (!villager?.isRecruited) {
+          console.warn(`[Interaction] Cannot assign task: villager ${target.object.id} not recruited`);
+          break;
+        }
+
+        // TODO: Future enhancement - open task assignment UI
+        console.log(`[Interaction] Opening task assignment for villager ${target.object.id}`);
         break;
       }
       // Handle ALL transformation actions (user-defined take priority, then bootstrap fallback)

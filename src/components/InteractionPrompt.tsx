@@ -109,6 +109,16 @@ export function InteractionPrompt() {
     });
   }
 
+  // Add dead yield action for plants
+  if (plantDef?.deadYields && plantDef.deadYields.length > 0) {
+    availableActions.push({
+      type: 'yield',
+      action: 'chop_down',
+      label: 'Chop Down',
+      resourceId: 'dead-yield',
+    });
+  }
+
   // For animals: collect yield actions and transformations (only if yield is available)
   if (animalDef?.aliveYields) {
     animalDef.aliveYields.forEach((yield_, index) => {
@@ -135,6 +145,16 @@ export function InteractionPrompt() {
           }
         }
       }
+    });
+  }
+
+  // Add dead yield action for animals
+  if (animalDef?.deadYields && animalDef.deadYields.length > 0) {
+    availableActions.push({
+      type: 'yield',
+      action: 'butcher',
+      label: 'Butcher',
+      resourceId: 'dead-yield',
     });
   }
 

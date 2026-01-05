@@ -176,6 +176,7 @@ class MapService {
             animals: data.mapData.animals || [],
             waters: data.mapData.waters || [],
             resources: data.mapData.resources || [],
+            villagers: data.mapData.villagers || [],
             spawn: data.mapData.spawn || { x: 160, y: 320 },
           },
           timestamp: this.lastSavedTimestamp,
@@ -240,6 +241,7 @@ class MapService {
             animals: mapData.animals,
             waters: mapData.waters,
             resources: sanitizedResources,
+            villagers: mapData.villagers || [],
             spawn: mapData.spawn,
           },
           createdAt,
@@ -407,6 +409,7 @@ class MapService {
               animals: data.mapData.animals || [],
               waters: data.mapData.waters || [],
               resources: data.mapData.resources || [],
+              villagers: data.mapData.villagers || [],
               spawn: data.mapData.spawn || { x: 160, y: 320 },
             }, remoteTimestamp);
           }

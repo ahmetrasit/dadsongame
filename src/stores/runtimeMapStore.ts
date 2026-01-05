@@ -40,6 +40,10 @@ interface RuntimeMapState {
   addResource: (definitionId: string, x: number, y: number, sourceId?: string) => void;
   removeResource: (id: string) => void;
 
+  // Villager actions (used during gameplay)
+  addVillager: (definitionId: string, x: number, y: number, recruitmentQuest?: object) => void;
+  removeVillager: (id: string) => void;
+
   // Plant/Animal removal (for harvesting trees, killing animals, etc.)
   removePlant: (id: string) => void;
   removeAnimal: (id: string) => void;
@@ -51,6 +55,7 @@ const emptyMapData: MapData = {
   animals: [],
   waters: [],
   resources: [],
+  villagers: [],
   spawn: { x: 160, y: 320 },
 };
 
@@ -70,6 +75,7 @@ export const useRuntimeMapStore = create<RuntimeMapState>()(
           animals: blueprint.animals.map(a => ({ ...a })),
           waters: blueprint.waters.map(w => ({ ...w })),
           resources: (blueprint.resources || []).map(r => ({ ...r })),
+          villagers: (blueprint.villagers || []).map(v => ({ ...v })),
           spawn: { ...blueprint.spawn },
         };
 
@@ -99,7 +105,7 @@ export const useRuntimeMapStore = create<RuntimeMapState>()(
 
       reset: () => {
         set({
-          mapData: { ...emptyMapData, resources: [] },
+          mapData: { ...emptyMapData, resources: [], villagers: [] },
           idCounters: { resource: 0 },
           isInitialized: false,
           sourceMapId: null,
@@ -133,6 +139,35 @@ export const useRuntimeMapStore = create<RuntimeMapState>()(
           mapData: {
             ...state.mapData,
             resources: state.mapData.resources.filter(r => r.id !== id),
+          },
+        }));
+      },
+
+      addVillager: (definitionId, x, y, recruitmentQuest) => {
+        set((state) => {
+          const newId = `runtime-villager-${state.mapData.villagers.length}`;
+          const newVillager = {
+            id: newId,
+            definitionId,
+            x,
+            y,
+            recruitmentQuest,
+          };
+
+          return {
+            mapData: {
+              ...state.mapData,
+              villagers: [...state.mapData.villagers, newVillager],
+            },
+          };
+        });
+      },
+
+      removeVillager: (id) => {
+        set((state) => ({
+          mapData: {
+            ...state.mapData,
+            villagers: state.mapData.villagers.filter(v => v.id !== id),
           },
         }));
       },

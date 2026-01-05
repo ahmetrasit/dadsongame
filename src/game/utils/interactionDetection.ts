@@ -1,15 +1,17 @@
-import type { PlantPlacement, AnimalPlacement, WaterPlacement, ResourcePlacement } from '@/stores/mapEditorStore';
+import type { PlantPlacement, AnimalPlacement, WaterPlacement, ResourcePlacement, VillagerPlacement } from '@/stores/mapEditorStore';
 import type { PlantDefinition } from '@/stores/definitions/plantsStore';
 import type { AnimalDefinition } from '@/stores/definitions/animalsStore';
 import type { WaterDefinition } from '@/stores/definitions/waterStore';
 import type { ResourceDefinition } from '@/stores/definitions/resourcesStore';
 import type { InteractionTarget, InteractableType } from '@/stores/interactionStore';
+import { useVillagerStore } from '@/stores/villagerStore';
 
 interface MapData {
   plants: PlantPlacement[];
   animals: AnimalPlacement[];
   waters: WaterPlacement[];
   resources: ResourcePlacement[];
+  villagers: VillagerPlacement[];
 }
 
 interface Definitions {
@@ -151,6 +153,47 @@ export function findNearestInteractable(
     }
   }
 
+  // Check villagers
+  for (const villager of mapData.villagers || []) {
+    const dist = distance(playerX, playerY, villager.x, villager.y);
+    const interactionRadius = 50;
+
+    if (dist <= interactionRadius && dist < nearestDistance) {
+      // Get villager from store to check recruitment status
+      const villagerData = useVillagerStore.getState().getVillager(villager.id);
+
+      // Determine interaction types based on recruitment status
+      let interactionTypes: string[];
+      if (villagerData?.isRecruited) {
+        interactionTypes = ['talk', 'assign'];
+      } else if (villagerData?.recruitmentQuest?.completed) {
+        interactionTypes = ['talk', 'recruit'];
+      } else {
+        interactionTypes = ['talk'];
+      }
+
+      nearestDistance = dist;
+      nearest = {
+        object: {
+          id: villager.id,
+          definitionId: villager.definitionId,
+          type: 'villager' as InteractableType,
+          x: villager.x,
+          y: villager.y,
+        },
+        // For villagers, we use a minimal definition object
+        // In the future, you might want to create a VillagerDefinition type
+        definition: {
+          id: villager.definitionId,
+          name: villagerData?.name || 'Villager',
+          interactionRadius,
+        } as any,
+        distance: dist,
+        interactionTypes,
+      };
+    }
+  }
+
   return nearest;
 }
 
@@ -177,6 +220,10 @@ export function getInteractionLabel(interactionType: string): string {
     fish: 'Fish',
     drink: 'Drink',
     swim: 'Swim',
+    // Villager interactions
+    talk: 'Talk',
+    recruit: 'Recruit',
+    assign: 'Assign',
     // Bootstrap actions
     break: 'Break',
     twist: 'Twist',

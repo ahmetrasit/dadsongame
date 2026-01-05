@@ -45,12 +45,21 @@ export interface ResourcePlacement {
   sourceId?: string;      // ID of plant/animal that produced this (if shed)
 }
 
+export interface VillagerPlacement {
+  id: string;
+  definitionId: string; // Reference to villager definition
+  x: number;
+  y: number;
+  recruitmentQuest?: object; // Optional recruitment quest data
+}
+
 export interface MapData {
   rivers: River[];
   plants: PlantPlacement[];
   animals: AnimalPlacement[];
   waters: WaterPlacement[];
   resources: ResourcePlacement[];
+  villagers: VillagerPlacement[];
   spawn: Point;
   // Legacy support
   trees?: { id: string; x: number; y: number }[];
@@ -264,6 +273,7 @@ export const useMapEditorStore = create<MapEditorState>()(
           animals: [],
           waters: [],
           resources: [],
+          villagers: [],
           spawn: { x: 160, y: 320 }
         },
 
@@ -592,7 +602,7 @@ export const useMapEditorStore = create<MapEditorState>()(
       },
 
       clearMap: () => set({
-        mapData: { rivers: [], plants: [], animals: [], waters: [], resources: [], spawn: { x: 160, y: 320 } },
+        mapData: { rivers: [], plants: [], animals: [], waters: [], resources: [], villagers: [], spawn: { x: 160, y: 320 } },
         activeRiver: [],
         currentMapId: null,
         currentMapName: 'Untitled Map',
@@ -694,7 +704,7 @@ export const useMapEditorStore = create<MapEditorState>()(
         set({
           currentMapId: null,
           currentMapName: 'Untitled Map',
-          mapData: { rivers: [], plants: [], animals: [], waters: [], resources: [], spawn: { x: 160, y: 320 } },
+          mapData: { rivers: [], plants: [], animals: [], waters: [], resources: [], villagers: [], spawn: { x: 160, y: 320 } },
           activeRiver: [],
           idCounters: { plant: 0, animal: 0, water: 0, resource: 0, river: 0 },
           firebaseSyncEnabled: false,

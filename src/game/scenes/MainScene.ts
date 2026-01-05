@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { TILE_SIZE, MAP_SIZE } from '@/game/config';
-import { useMapEditorStore, PlantPlacement, AnimalPlacement, WaterPlacement, ResourcePlacement, MapData } from '@/stores/mapEditorStore';
+import { useMapEditorStore, PlantPlacement, AnimalPlacement, WaterPlacement, ResourcePlacement, VillagerPlacement, MapData } from '@/stores/mapEditorStore';
 import { useRuntimeMapStore } from '@/stores/runtimeMapStore';
+import { useVillagerStore } from '@/stores/villagerStore';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
 import { useGameStateStore } from '@/stores/gameStateStore';
 import { useInteractionStore } from '@/stores/interactionStore';
@@ -11,6 +12,7 @@ import { findNearestInteractable } from '@/game/utils/interactionDetection';
 import { generatePlantPreview, generateAnimalPreview } from '@/utils/generatePreviewImage';
 import { initYieldSystem } from '@/services/YieldService';
 import { initSpoilageSystem } from '@/services/SpoilageService';
+import { initVillagerSystem } from '@/services/VillagerService';
 import { useYieldStateStore } from '@/stores/yieldStateStore';
 import { getBootstrapRecipe } from '@/types/bootstrap';
 import { usePlacementStore } from '@/stores/placementStore';
@@ -40,6 +42,7 @@ export class MainScene extends Phaser.Scene {
   private waterSprites: Map<string, Phaser.GameObjects.Container> = new Map();
   private resourceSprites: Map<string, Phaser.GameObjects.Container> = new Map();
   private structureSprites: Map<string, Phaser.GameObjects.Container> = new Map();
+  private villagerSprites: Map<string, Phaser.GameObjects.Container> = new Map();
   private spawnMarker!: Phaser.GameObjects.Graphics;
 
   // State tracking for diff-based rendering
@@ -50,6 +53,7 @@ export class MainScene extends Phaser.Scene {
   private lastWatersHash = '';
   private lastResourcesHash = '';
   private lastStructuresHash = '';
+  private lastVillagersHash = '';
   private lastSpawnHash = '';
   private lastYieldStateHash = '';
   private lastIsEditing = false;
@@ -80,6 +84,7 @@ export class MainScene extends Phaser.Scene {
   // System cleanup handlers
   private unsubscribeYieldSystem: (() => void) | null = null;
   private unsubscribeSpoilageSystem: (() => void) | null = null;
+  private unsubscribeVillagerSystem: (() => void) | null = null;
 
   // Event handler references for cleanup
   private wheelHandler: ((pointer: Phaser.Input.Pointer, gameObjects: Phaser.GameObjects.GameObject[], deltaX: number, deltaY: number) => void) | null = null;
@@ -181,7 +186,8 @@ export class MainScene extends Phaser.Scene {
     // Initialize game systems
     this.unsubscribeYieldSystem = initYieldSystem();
     this.unsubscribeSpoilageSystem = initSpoilageSystem();
-    console.log('[MainScene] Yield and spoilage systems initialized');
+    this.unsubscribeVillagerSystem = initVillagerSystem();
+    console.log('[MainScene] Yield, spoilage, and villager systems initialized');
 
     // Initial render (force full render)
     this.renderMapData(true);
@@ -216,6 +222,10 @@ export class MainScene extends Phaser.Scene {
     if (this.unsubscribeSpoilageSystem) {
       this.unsubscribeSpoilageSystem();
       this.unsubscribeSpoilageSystem = null;
+    }
+    if (this.unsubscribeVillagerSystem) {
+      this.unsubscribeVillagerSystem();
+      this.unsubscribeVillagerSystem = null;
     }
     console.log('[MainScene] Event listeners and systems cleaned up');
   }
@@ -493,6 +503,13 @@ export class MainScene extends Phaser.Scene {
     if (forceRender || structuresHash !== this.lastStructuresHash || editingChanged) {
       this.lastStructuresHash = structuresHash;
       this.updateStructures(defStore.structurePlacements || [], defStore.structures || [], isEditing);
+    }
+
+    // Villagers - only update if changed or editing mode changed
+    const villagersHash = this.hashData(mapData.villagers || []);
+    if (forceRender || villagersHash !== this.lastVillagersHash || editingChanged) {
+      this.lastVillagersHash = villagersHash;
+      this.updateVillagers(mapData.villagers || [], isEditing);
     }
 
     // Spawn marker - only update if changed or editing mode changed
@@ -1165,6 +1182,159 @@ export class MainScene extends Phaser.Scene {
     isEditing: boolean
   ): void {
     this.updateEntityLabel(container, placement.definitionId, definitions, isEditing, 24);
+  }
+
+  private updateVillagers(
+    placements: VillagerPlacement[],
+    isEditing: boolean
+  ): void {
+    const currentIds = new Set(placements.map(p => p.id));
+    const villagerStore = useVillagerStore.getState();
+
+    // Remove sprites that no longer exist
+    for (const [id, container] of this.villagerSprites) {
+      if (!currentIds.has(id)) {
+        container.destroy();
+        this.villagerSprites.delete(id);
+      }
+    }
+
+    // Add or update sprites
+    for (const placement of placements) {
+      const existing = this.villagerSprites.get(placement.id);
+      const villagerData = villagerStore.getVillager(placement.id);
+
+      if (existing) {
+        // Update position if changed
+        if (existing.x !== placement.x || existing.y !== placement.y) {
+          existing.setPosition(placement.x, placement.y);
+        }
+        // Update label visibility based on editing mode
+        this.updateVillagerLabel(existing, placement, villagerData, isEditing);
+        // Update recruitment status badge
+        this.updateVillagerBadge(existing, villagerData);
+      } else {
+        // Create new sprite
+        const container = this.createVillagerSprite(placement, villagerData, isEditing);
+        this.villagerSprites.set(placement.id, container);
+      }
+    }
+  }
+
+  private createVillagerSprite(
+    placement: VillagerPlacement,
+    villagerData: ReturnType<typeof useVillagerStore.getState.prototype.getVillager>,
+    isEditing: boolean
+  ): Phaser.GameObjects.Container {
+    const container = this.add.container(placement.x, placement.y);
+
+    // Create villager body (simple humanoid shape)
+    const graphics = this.add.graphics();
+
+    // Body color based on recruitment status
+    const isRecruited = villagerData?.isRecruited ?? false;
+    const bodyColor = isRecruited ? 0x22c55e : 0xfbbf24; // Green if recruited, yellow if not
+
+    // Head (circle)
+    graphics.fillStyle(0xfcd5b4, 1); // Skin color
+    graphics.fillCircle(0, -12, 8);
+
+    // Body (rectangle)
+    graphics.fillStyle(bodyColor, 1);
+    graphics.fillRect(-8, -4, 16, 20);
+
+    // Border
+    graphics.lineStyle(1, 0x000000, 0.5);
+    graphics.strokeCircle(0, -12, 8);
+    graphics.strokeRect(-8, -4, 16, 20);
+
+    container.add(graphics);
+
+    // Add recruitment quest indicator if not recruited
+    if (!isRecruited) {
+      const questIcon = this.add.text(12, -20, '❓', {
+        fontSize: '14px',
+      });
+      questIcon.setOrigin(0.5, 0.5);
+      questIcon.setName('questIcon');
+      container.add(questIcon);
+    }
+
+    // Add name label
+    const name = villagerData?.name || `Villager ${placement.id.split('-').pop()}`;
+    const label = this.add.text(0, 22, name, {
+      fontFamily: 'Avenir, system-ui, sans-serif',
+      fontSize: '10px',
+      color: '#ffffff',
+      backgroundColor: isEditing ? '#000000aa' : '#00000066',
+      padding: { x: 2, y: 1 },
+    });
+    label.setOrigin(0.5, 0);
+    label.setName('label');
+    container.add(label);
+
+    // Add loyalty indicator for recruited villagers
+    if (isRecruited && villagerData) {
+      this.addLoyaltyIndicator(container, villagerData.loyalty);
+    }
+
+    container.setDepth(9); // Just below player (10)
+    return container;
+  }
+
+  private addLoyaltyIndicator(container: Phaser.GameObjects.Container, loyalty: string): void {
+    const loyaltyColors: Record<string, number> = {
+      happy: 0x22c55e,
+      content: 0x3b82f6,
+      warning: 0xf59e0b,
+      leaving: 0xef4444,
+    };
+    const color = loyaltyColors[loyalty] || 0x6b7280;
+
+    const indicator = this.add.graphics();
+    indicator.fillStyle(color, 1);
+    indicator.fillCircle(-12, -20, 4);
+    indicator.lineStyle(1, 0xffffff, 1);
+    indicator.strokeCircle(-12, -20, 4);
+    indicator.setName('loyaltyIndicator');
+    container.add(indicator);
+  }
+
+  private updateVillagerLabel(
+    container: Phaser.GameObjects.Container,
+    placement: VillagerPlacement,
+    villagerData: ReturnType<typeof useVillagerStore.getState.prototype.getVillager>,
+    isEditing: boolean
+  ): void {
+    const existingLabel = container.getByName('label') as Phaser.GameObjects.Text | null;
+    const name = villagerData?.name || `Villager ${placement.id.split('-').pop()}`;
+
+    if (existingLabel) {
+      existingLabel.setText(name);
+      existingLabel.setBackgroundColor(isEditing ? '#000000aa' : '#00000066');
+    }
+  }
+
+  private updateVillagerBadge(
+    container: Phaser.GameObjects.Container,
+    villagerData: ReturnType<typeof useVillagerStore.getState.prototype.getVillager>
+  ): void {
+    const isRecruited = villagerData?.isRecruited ?? false;
+    const existingQuestIcon = container.getByName('questIcon') as Phaser.GameObjects.Text | null;
+    const existingLoyaltyIndicator = container.getByName('loyaltyIndicator') as Phaser.GameObjects.Graphics | null;
+
+    // Remove quest icon if recruited
+    if (isRecruited && existingQuestIcon) {
+      existingQuestIcon.destroy();
+    }
+
+    // Add/update loyalty indicator for recruited villagers
+    if (isRecruited && villagerData) {
+      if (existingLoyaltyIndicator) {
+        existingLoyaltyIndicator.destroy();
+      }
+      this.addLoyaltyIndicator(container, villagerData.loyalty);
+    }
   }
 
   private renderSpawnMarker(spawn: { x: number; y: number }, isEditing: boolean): void {
