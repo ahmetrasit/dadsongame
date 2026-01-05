@@ -3,6 +3,7 @@ import type { PlantDefinition } from '@/stores/definitions/plantsStore';
 import type { AnimalDefinition } from '@/stores/definitions/animalsStore';
 import type { WaterDefinition } from '@/stores/definitions/waterStore';
 import type { ResourceDefinition } from '@/stores/definitions/resourcesStore';
+import type { StructureDefinition, StructurePlacement } from '@/stores/definitions/structuresStore';
 import type { InteractionTarget, InteractableType } from '@/stores/interactionStore';
 import type { PlacementYieldState } from '@/stores/yieldStateStore';
 import { useVillagerStore } from '@/stores/villagerStore';
@@ -14,6 +15,7 @@ interface MapData {
   waters: WaterPlacement[];
   resources: ResourcePlacement[];
   villagers: VillagerPlacement[];
+  structures?: StructurePlacement[];
 }
 
 interface Definitions {
@@ -21,6 +23,7 @@ interface Definitions {
   animals: AnimalDefinition[];
   waters: WaterDefinition[];
   resources: ResourceDefinition[];
+  structures?: StructureDefinition[];
 }
 
 // Extended PlantPlacement with optional state properties (for future use)
@@ -420,6 +423,47 @@ export function findNearestInteractable(
     }
   }
 
+  // Check structures (fire pit, workbench, furnace)
+  for (const structure of mapData.structures || []) {
+    const def = definitions.structures?.find(s => s.id === structure.definitionId);
+    if (!def) continue;
+
+    // Calculate center of structure for distance check
+    const centerX = structure.x + def.width / 2;
+    const centerY = structure.y + def.height / 2;
+    const dist = distance(playerX, playerY, centerX, centerY);
+
+    // Use a reasonable interaction radius based on structure size
+    const interactionRadius = Math.max(def.width, def.height) + 32;
+
+    if (dist <= interactionRadius && dist < nearestDistance) {
+      // Determine interaction types based on structure category
+      const interactionTypes: string[] = [];
+
+      // Heat sources and crafting stations allow processing
+      if (def.category === 'heat-source' || def.category === 'crafting-station') {
+        interactionTypes.push('process');
+      }
+
+      // Skip if no interactions available
+      if (interactionTypes.length === 0) continue;
+
+      nearestDistance = dist;
+      nearest = {
+        object: {
+          id: structure.id,
+          definitionId: structure.definitionId,
+          type: 'structure' as InteractableType,
+          x: structure.x,
+          y: structure.y,
+        },
+        definition: def,
+        distance: dist,
+        interactionTypes,
+      };
+    }
+  }
+
   return nearest;
 }
 
@@ -465,6 +509,8 @@ export function getInteractionLabel(interactionType: string): string {
     break: 'Break',
     twist: 'Twist',
     mold: 'Mold',
+    // Structure interactions
+    process: 'Process',
   };
 
   return labels[interactionType] || interactionType;

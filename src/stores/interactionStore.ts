@@ -3,6 +3,7 @@ import type { PlantDefinition } from './definitions/plantsStore';
 import type { AnimalDefinition } from './definitions/animalsStore';
 import type { WaterDefinition } from './definitions/waterStore';
 import type { ResourceDefinition, MaterialTransformation } from './definitions/resourcesStore';
+import type { StructureDefinition } from './definitions/structuresStore';
 import { getBootstrapRecipe } from '@/types/bootstrap';
 import { useInventoryStore } from './inventoryStore';
 import { useRuntimeMapStore } from './runtimeMapStore';
@@ -98,7 +99,7 @@ function checkTransformationRequirements(
   return { canPerform: true };
 }
 
-export type InteractableType = 'plant' | 'animal' | 'water' | 'resource' | 'villager';
+export type InteractableType = 'plant' | 'animal' | 'water' | 'resource' | 'villager' | 'structure';
 
 export interface InteractableObject {
   id: string;
@@ -110,7 +111,7 @@ export interface InteractableObject {
 
 export interface InteractionTarget {
   object: InteractableObject;
-  definition: PlantDefinition | AnimalDefinition | WaterDefinition | ResourceDefinition;
+  definition: PlantDefinition | AnimalDefinition | WaterDefinition | ResourceDefinition | StructureDefinition;
   distance: number;
   interactionTypes: string[];
 }
@@ -622,6 +623,77 @@ export const useInteractionStore = create<InteractionState>()((set, get) => ({
             }
             break;
           }
+        }
+        break;
+      }
+      case 'process': {
+        // Station-based processing (fire pit, workbench, furnace)
+        if (target.object.type !== 'structure') {
+          console.log('[Process] Can only process at structures');
+          break;
+        }
+
+        const defStore = useDefinitionsStore.getState();
+        const inventoryStore = useInventoryStore.getState();
+
+        // Get structure definition to get heat level
+        const structDef = defStore.structures.find(s => s.id === target.object.definitionId);
+        const stationHeat = structDef?.heatLevel || 0;
+
+        // Get selected inventory item
+        const selectedSlot = inventoryStore.inventory.slots[inventoryStore.inventory.selectedSlot];
+
+        if (!selectedSlot || !selectedSlot.itemId) {
+          console.log('[Process] No item selected in inventory');
+          break;
+        }
+
+        // Get resource definition and transformations
+        const resource = defStore.resources.find(r => r.id === selectedSlot.itemId);
+        const transformations = resource?.transformations || [];
+
+        if (transformations.length === 0) {
+          console.log(`[Process] ${selectedSlot.itemId} has no transformations`);
+          break;
+        }
+
+        // Find valid transformation based on station's heat level
+        // For heat sources, filter by heat requirements
+        // For crafting stations, filter by tool requirements (handled by checkTransformationRequirements)
+        const validTransform = transformations.find(t => {
+          const heatReq = t.requirements?.find(r => r.property === 'heat');
+          // If transformation needs heat, check if station provides enough
+          if (heatReq) {
+            return stationHeat >= heatReq.min && (heatReq.max === undefined || stationHeat <= heatReq.max);
+          }
+          // If no heat requirement, it can be done here if we have heat source
+          // (or if it's a crafting station with no heat requirement)
+          return true;
+        });
+
+        if (!validTransform) {
+          console.log(`[Process] No valid transformations at heat level ${stationHeat}`);
+          break;
+        }
+
+        // Check all requirements (heat + tools) using TASK-003 infrastructure
+        const reqCheck = checkTransformationRequirements(validTransform);
+        if (!reqCheck.canPerform) {
+          console.log(`[Process] Requirements not met: ${reqCheck.reason}`);
+          break;
+        }
+
+        // Check if we can add the result to inventory before removing input
+        if (!inventoryStore.canAddItem(validTransform.resultMaterialId, validTransform.resultQuantity)) {
+          console.log('[Process] Inventory full - cannot add result');
+          break;
+        }
+
+        // Execute transformation - remove input, add output
+        const removed = inventoryStore.removeItem(inventoryStore.inventory.selectedSlot, 1);
+        if (removed) {
+          inventoryStore.addItem(validTransform.resultMaterialId, validTransform.resultQuantity);
+          console.log(`[Process] Transformed ${selectedSlot.itemId} into ${validTransform.resultMaterialId} x${validTransform.resultQuantity}`);
         }
         break;
       }

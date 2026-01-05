@@ -279,15 +279,22 @@ export class MainScene extends Phaser.Scene {
     };
 
     // Find nearest interactable object with state-aware filtering
+    // Include structures from definitions store (they're stored there, not in map data)
+    const mapDataWithStructures = {
+      ...mapData,
+      structures: defStore.structurePlacements,
+    };
+
     const target = findNearestInteractable(
       this.player.x,
       this.player.y,
-      mapData,
+      mapDataWithStructures,
       {
         plants: defStore.plants,
         animals: defStore.animals,
         waters: defStore.waters,
         resources: defStore.resources,
+        structures: defStore.structures,
       },
       yieldStateAccessor
     );
