@@ -18,7 +18,7 @@ interface VillagerStore {
   getVillager: (id: string) => Villager | undefined;
   recruitVillager: (id: string) => boolean;
   updateLoyalty: (id: string, loyalty: VillagerLoyalty) => void;
-  assignTask: (id: string, task: VillagerTask | undefined) => void;
+  assignTask: (id: string, task: VillagerTask | undefined) => boolean;
   completeQuestRequirement: (villagerId: string, requirementIndex: number) => void;
   selectVillager: (id: string | null) => void;
   clearAll: () => void;
@@ -125,15 +125,50 @@ export const useVillagerStore = create<VillagerStore>()(
 
         if (!villager) {
           console.warn(`[VillagerStore] Cannot assign task: villager ${id} not found`);
-          return;
+          return false;
         }
 
-        if (task) {
-          console.log(`[VillagerStore] Assigning task to ${id}: ${task.type}`);
-        } else {
+        // If clearing task, allow it
+        if (!task) {
           console.log(`[VillagerStore] Clearing task for ${id}`);
+          set((s) => {
+            const newMap = new Map(s.villagers);
+            const updatedVillager: Villager = {
+              ...villager,
+              currentTask: undefined,
+            };
+            newMap.set(id, updatedVillager);
+            return { villagers: newMap };
+          });
+          return true;
         }
 
+        // Calculate stars based on task type
+        let stars: number;
+        switch (task.type) {
+          case 'craft':
+            stars = (villager.stats.craftingSkill + villager.stats.intelligence) / 20;
+            break;
+          case 'farm':
+          case 'gather':
+            stars = (villager.stats.strength + villager.stats.speed) / 20;
+            break;
+          case 'build':
+            stars = (villager.stats.strength + villager.stats.craftingSkill) / 20;
+            break;
+          default:
+            stars = 10; // No restriction for unspecified tasks
+        }
+
+        // Check task complexity
+        const complexity = task.complexity || 0;
+        if (complexity > stars) {
+          console.log(`[Villager] ${villager.name} cannot do this task (${stars.toFixed(1)} stars < ${complexity} required)`);
+          return false;
+        }
+
+        // Assign task
+        console.log(`[VillagerStore] Assigning task to ${id}: ${task.type} (${stars.toFixed(1)} stars >= ${complexity} complexity)`);
         set((s) => {
           const newMap = new Map(s.villagers);
           const updatedVillager: Villager = {
@@ -143,6 +178,7 @@ export const useVillagerStore = create<VillagerStore>()(
           newMap.set(id, updatedVillager);
           return { villagers: newMap };
         });
+        return true;
       },
 
       // Complete a quest requirement (increment current progress)

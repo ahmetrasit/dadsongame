@@ -61,10 +61,11 @@ export interface VillagerQuest {
 }
 
 export interface VillagerTask {
-  type: 'gather' | 'craft' | 'tame' | 'carry' | 'build';
+  type: 'gather' | 'craft' | 'tame' | 'carry' | 'build' | 'farm';
   targetId?: string;
   targetPosition?: Vector2;
   progress: number;
+  complexity?: number;  // Star rating required to perform this task
 }
 
 export interface Villager extends Human {
