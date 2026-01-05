@@ -473,6 +473,79 @@ export const useInteractionStore = create<InteractionState>()((set, get) => ({
         console.log(`[Interaction] Opening task assignment for villager ${target.object.id}`);
         break;
       }
+      case 'give_item': {
+        if (target.object.type !== 'villager') break;
+
+        const villagerStore = useVillagerStore.getState();
+        const inventoryStore = useInventoryStore.getState();
+        const villager = villagerStore.getVillager(target.object.id);
+
+        if (!villager || villager.isRecruited) {
+          console.log('[Interaction] Villager already recruited or not found');
+          break;
+        }
+
+        const quest = villager.recruitmentQuest;
+        if (!quest) {
+          console.log('[Interaction] No active quest');
+          break;
+        }
+
+        // Find unfulfilled bring_material requirements
+        const itemReqs = quest.requirements
+          .map((req, index) => ({ req, index }))
+          .filter(({ req }) => req.type === 'bring_material' && req.current < req.quantity);
+
+        if (itemReqs.length === 0) {
+          console.log('[Interaction] No unfulfilled item requirements');
+          break;
+        }
+
+        // Helper to count items in inventory
+        const getItemCount = (itemId: string): number => {
+          return inventoryStore.inventory.slots
+            .filter(slot => slot.itemId === itemId)
+            .reduce((sum, slot) => sum + slot.quantity, 0);
+        };
+
+        // Check player inventory for matching items and give them
+        let itemsGiven = false;
+        for (const { req, index } of itemReqs) {
+          const playerHas = getItemCount(req.targetId);
+          const needed = req.quantity - req.current;
+
+          if (playerHas > 0) {
+            // Give as many as we can (up to what's needed)
+            const toGive = Math.min(playerHas, needed);
+
+            // Remove from player inventory
+            const removed = inventoryStore.removeItems([{ itemId: req.targetId, quantity: toGive }]);
+            if (removed) {
+              // Update quest progress (call once for each unit given)
+              for (let i = 0; i < toGive; i++) {
+                villagerStore.completeQuestRequirement(villager.id, index);
+              }
+              console.log(`[Interaction] Gave ${toGive}x ${req.targetId} to ${villager.name}`);
+              itemsGiven = true;
+            }
+          }
+        }
+
+        if (!itemsGiven) {
+          console.log('[Interaction] No matching items in inventory');
+          break;
+        }
+
+        // Check if quest is now complete and auto-recruit
+        const updatedVillager = villagerStore.getVillager(target.object.id);
+        if (updatedVillager?.recruitmentQuest?.completed) {
+          const success = villagerStore.recruitVillager(villager.id);
+          if (success) {
+            console.log(`[Interaction] ${villager.name} joined your settlement!`);
+          }
+        }
+        break;
+      }
       // Handle ALL transformation actions (user-defined take priority, then bootstrap fallback)
       case 'break':
       case 'twist':

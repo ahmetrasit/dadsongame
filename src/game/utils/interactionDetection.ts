@@ -385,7 +385,17 @@ export function findNearestInteractable(
       } else if (villagerData?.recruitmentQuest?.completed) {
         interactionTypes = ['talk', 'recruit'];
       } else {
-        interactionTypes = ['talk'];
+        // Unrecruited villager - check for active bring_material requirements
+        const quest = villagerData?.recruitmentQuest;
+        const hasItemRequirement = quest?.requirements.some(
+          req => req.type === 'bring_material' && req.current < req.quantity
+        );
+
+        if (hasItemRequirement) {
+          interactionTypes = ['talk', 'give_item'];
+        } else {
+          interactionTypes = ['talk'];
+        }
       }
 
       nearestDistance = dist;
@@ -450,6 +460,7 @@ export function getInteractionLabel(interactionType: string): string {
     talk: 'Talk',
     recruit: 'Recruit',
     assign: 'Assign',
+    give_item: 'Give Item',
     // Bootstrap actions
     break: 'Break',
     twist: 'Twist',
