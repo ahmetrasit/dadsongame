@@ -6,6 +6,7 @@ import type { ResourceDefinition } from '@/stores/definitions/resourcesStore';
 import type { InteractionTarget, InteractableType } from '@/stores/interactionStore';
 import type { PlacementYieldState } from '@/stores/yieldStateStore';
 import { useVillagerStore } from '@/stores/villagerStore';
+import { useAnimalStateStore, type TamingState } from '@/stores/animalStateStore';
 
 interface MapData {
   plants: PlantPlacement[];
@@ -147,6 +148,90 @@ export function getPlantInteractions(
 }
 
 /**
+ * Get filtered interactions for an animal based on its current taming state
+ *
+ * Design spec:
+ * - WILD: feed (to build trust), observe
+ * - TAME: yield actions (milk, shear, collect), care actions (pet), ride (if available), butcher
+ * - BABY: pet, feed only - NO butcher, NO yield
+ */
+export function getAnimalInteractions(
+  animalDef: AnimalDefinition,
+  tamingState: TamingState,
+  yieldStateAccessor: YieldStateAccessor | null,
+  placementId: string
+): string[] {
+  switch (tamingState) {
+    case 'WILD': {
+      // Wild animals - can only feed to build trust and observe
+      return ['feed', 'observe'];
+    }
+
+    case 'BABY': {
+      // Baby animals - can only pet and feed, NO butcher or yield
+      return ['pet', 'feed'];
+    }
+
+    case 'TAME': {
+      // Tamed animals - full interaction set
+      const interactions: string[] = [];
+
+      // Add yield interactions only for yields that have remaining amounts
+      const yieldInteractions: string[] = [];
+      const yieldTransformActions: string[] = [];
+
+      if (yieldStateAccessor) {
+        const yieldState = yieldStateAccessor.getPlacementYields(placementId);
+        animalDef.aliveYields.forEach((yield_, index) => {
+          const yieldInfo = yieldState?.yields[index];
+          const hasRemaining = yieldInfo?.isAvailable && yieldInfo.remaining > 0;
+
+          if (hasRemaining) {
+            yieldInteractions.push(yield_.interactionType || 'collect');
+            // Include transformation actions from yields
+            if (yield_.transformations) {
+              for (const t of yield_.transformations) {
+                if (t.action) yieldTransformActions.push(t.action);
+              }
+            }
+          }
+        });
+      } else {
+        // Fallback: include all yield interactions if no state accessor
+        animalDef.aliveYields.forEach(yield_ => {
+          yieldInteractions.push(yield_.interactionType || 'collect');
+          if (yield_.transformations) {
+            for (const t of yield_.transformations) {
+              if (t.action) yieldTransformActions.push(t.action);
+            }
+          }
+        });
+      }
+
+      interactions.push(...yieldInteractions, ...yieldTransformActions);
+
+      // Add care interactions (pet, feed)
+      interactions.push('pet', 'feed');
+
+      // Add ride if animal supports it
+      if (animalDef.needInteractions?.includes('ride')) {
+        interactions.push('ride');
+      }
+
+      // Add butcher (for dead yields)
+      if (animalDef.deadYields && animalDef.deadYields.length > 0) {
+        interactions.push('butcher');
+      }
+
+      return [...new Set(interactions)]; // Remove duplicates
+    }
+
+    default:
+      return [];
+  }
+}
+
+/**
  * Calculate Euclidean distance between two points
  */
 function distance(x1: number, y1: number, x2: number, y2: number): number {
@@ -205,21 +290,22 @@ export function findNearestInteractable(
     }
   }
 
-  // Check animals
+  // Check animals with state-aware interaction filtering
   for (const animal of mapData.animals) {
     const def = definitions.animals.find(a => a.id === animal.definitionId);
     if (!def) continue;
 
     const dist = distance(playerX, playerY, animal.x, animal.y);
     if (dist <= def.interactionRadius && dist < nearestDistance) {
-      // Combine yield interactions (with fallback for undefined), yield transformation actions, and need interactions
-      const yieldInteractions = def.aliveYields
-        .map(y => y.interactionType || 'collect');  // Default fallback for animals
-      // Include transformation actions from yields
-      const yieldTransformActions = def.aliveYields
-        .flatMap(y => (y.transformations || []).map(t => t.action))
-        .filter(Boolean) as string[];
-      const allInteractions = [...new Set([...yieldInteractions, ...yieldTransformActions, ...(def.needInteractions || [])])] as string[];
+      // Get taming state from animalStateStore
+      const animalStateStore = useAnimalStateStore.getState();
+      const tamingState = animalStateStore.getTamingState(animal.id);
+
+      // Get filtered interactions based on taming state
+      const filteredInteractions = getAnimalInteractions(def, tamingState, yieldStateAccessor || null, animal.id);
+
+      // Skip animals with no available interactions
+      if (filteredInteractions.length === 0) continue;
 
       nearestDistance = dist;
       nearest = {
@@ -232,7 +318,7 @@ export function findNearestInteractable(
         },
         definition: def,
         distance: dist,
-        interactionTypes: allInteractions,
+        interactionTypes: filteredInteractions,
       };
     }
   }
@@ -355,6 +441,7 @@ export function getInteractionLabel(interactionType: string): string {
     collect: 'Collect',
     tame: 'Tame',
     butcher: 'Butcher',
+    observe: 'Observe',
     // Water interactions
     fish: 'Fish',
     drink: 'Drink',

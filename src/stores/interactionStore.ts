@@ -10,6 +10,8 @@ import { useDefinitionsStore } from './definitionsStore';
 import { useVillagerStore } from './villagerStore';
 import { usePlayerStore } from './playerStore';
 import { useToolsStore } from './toolsStore';
+import { useAnimalStateStore } from './animalStateStore';
+import { useWorldStore } from './worldStore';
 import { harvestYield } from '@/services/YieldService';
 import { triggerDeadYield } from '@/services/DeadYieldService';
 import { checkRequirement } from '@/utils/transformationUtils';
@@ -222,6 +224,28 @@ export const useInteractionStore = create<InteractionState>()((set, get) => ({
         }
         break;
       }
+      case 'observe': {
+        if (target.object.type !== 'animal') break;
+
+        const animalState = useAnimalStateStore.getState();
+        const animalData = animalState.getAnimalState(target.object.id);
+        const tamingState = animalState.getTamingState(target.object.id);
+        const name = target.definition.name;
+
+        console.log(`[Interaction] Observing ${name} (${target.object.id})`);
+        console.log(`  State: ${tamingState}`);
+
+        if (animalData) {
+          console.log(`  Trust: ${animalData.trustLevel}/100`);
+          console.log(`  Happiness: ${animalData.happiness}/100`);
+          if (animalData.lastFedDay >= 0) {
+            console.log(`  Last fed: Day ${animalData.lastFedDay}`);
+          }
+        } else {
+          console.log(`  Trust: 0/100 (not yet interacted)`);
+        }
+        break;
+      }
       case 'pet': {
         if (target.object.type !== 'animal') break;
         console.log(`[Interaction] Pet ${target.object.id}`);
@@ -230,8 +254,36 @@ export const useInteractionStore = create<InteractionState>()((set, get) => ({
       }
       case 'feed': {
         if (target.object.type !== 'animal') break;
-        console.log(`[Interaction] Fed ${target.object.id}`);
-        // Future: Could check inventory for food items and affect animal health/yield
+
+        const animalState = useAnimalStateStore.getState();
+        const worldStore = useWorldStore.getState();
+        const currentDay = worldStore.day;
+
+        // Initialize animal state if needed
+        if (!animalState.getAnimalState(target.object.id)) {
+          animalState.initializeAnimal(target.object.id);
+        }
+
+        const currentState = animalState.getAnimalState(target.object.id)!;
+        const tamingState = animalState.getTamingState(target.object.id);
+
+        if (tamingState === 'TAME') {
+          // Already tamed - just feed for maintenance
+          animalState.feedAnimal(target.object.id, currentDay);
+          console.log(`[Interaction] Fed tamed animal ${target.object.id}`);
+        } else {
+          // Wild - build trust
+          const isFirstFeed = currentState.trustLevel === 0;
+          const trustGain = isFirstFeed ? 10 : 5;
+          animalState.addTrust(target.object.id, trustGain);
+
+          const newState = animalState.getAnimalState(target.object.id)!;
+          if (newState.isTamed) {
+            console.log(`[Interaction] ${target.object.id} is now tamed!`);
+          } else {
+            console.log(`[Interaction] Trust increased to ${newState.trustLevel}/100`);
+          }
+        }
         break;
       }
       case 'ride': {
