@@ -74,5 +74,6 @@ export interface Villager extends Human {
   recruitmentQuest?: VillagerQuest;  // Present if not yet recruited
   isRecruited: boolean;
   warningTimer: number;              // Time until leaving (when in warning state)
+  daysUnhappy: number;               // Consecutive days with unmet needs (warning/leaving)
   currentTask?: VillagerTask;
 }

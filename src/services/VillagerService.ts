@@ -170,6 +170,7 @@ export function spawnVillagerFromPlacement(placement: VillagerPlacement): void {
     recruitmentQuest,
     isRecruited: false,
     warningTimer: 0,
+    daysUnhappy: 0,
     currentTask: undefined,
   };
 
@@ -248,18 +249,37 @@ export function checkVillagerNeeds(): void {
       newLoyalty = 'leaving';
     }
 
+    // Track consecutive unhappy days and handle departure
+    let newDaysUnhappy = villager.daysUnhappy || 0;
+
+    if (newLoyalty === 'warning' || newLoyalty === 'leaving') {
+      // Increment unhappy days counter
+      newDaysUnhappy = newDaysUnhappy + 1;
+
+      // Check if villager should leave after 3 consecutive unhappy days
+      if (newDaysUnhappy >= 3) {
+        villagerStore.removeVillager(villager.id);
+        console.log(`[Villager] ${villager.name} has left due to neglect (${newDaysUnhappy} days unhappy)`);
+        continue; // Skip to next villager since this one is gone
+      }
+    } else {
+      // Reset counter when needs are met (happy/content)
+      newDaysUnhappy = 0;
+    }
+
     // Update villager in store
     villagerStore.villagers.set(villager.id, {
       ...villager,
       needs: newNeeds,
       loyalty: newLoyalty,
+      daysUnhappy: newDaysUnhappy,
     });
 
     // Log warnings for villagers in danger
     if (newLoyalty === 'warning') {
-      console.warn(`[VillagerService] ${villager.name} is unhappy! Food: ${newNeeds.food}, Water: ${newNeeds.water}, Happiness: ${newNeeds.happiness}`);
+      console.warn(`[VillagerService] ${villager.name} is unhappy! (Day ${newDaysUnhappy}/3) Food: ${newNeeds.food}, Water: ${newNeeds.water}, Happiness: ${newNeeds.happiness}`);
     } else if (newLoyalty === 'leaving') {
-      console.warn(`[VillagerService] ${villager.name} is about to leave! Provide food and water immediately!`);
+      console.warn(`[VillagerService] ${villager.name} is about to leave! (Day ${newDaysUnhappy}/3) Provide food and water immediately!`);
     }
 
     // Update loyalty in store if changed
