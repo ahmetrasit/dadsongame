@@ -2,14 +2,99 @@ import { create } from 'zustand';
 import type { PlantDefinition } from './definitions/plantsStore';
 import type { AnimalDefinition } from './definitions/animalsStore';
 import type { WaterDefinition } from './definitions/waterStore';
-import type { ResourceDefinition } from './definitions/resourcesStore';
+import type { ResourceDefinition, MaterialTransformation } from './definitions/resourcesStore';
 import { getBootstrapRecipe } from '@/types/bootstrap';
 import { useInventoryStore } from './inventoryStore';
 import { useRuntimeMapStore } from './runtimeMapStore';
 import { useDefinitionsStore } from './definitionsStore';
 import { useVillagerStore } from './villagerStore';
+import { usePlayerStore } from './playerStore';
+import { useToolsStore } from './toolsStore';
 import { harvestYield } from '@/services/YieldService';
 import { triggerDeadYield } from '@/services/DeadYieldService';
+import { checkRequirement } from '@/utils/transformationUtils';
+import type { ToolFunctionAllocation } from '@/types/tools';
+
+// Constants for heat detection
+const HEAT_DETECTION_RADIUS = 96; // 3 tiles (32px each) - must be near fire to cook
+
+/**
+ * Calculate the maximum heat level from nearby structures.
+ * Checks all placed structures within HEAT_DETECTION_RADIUS of the player.
+ */
+function getNearbyHeat(): number {
+  const playerPos = usePlayerStore.getState().player?.position;
+  if (!playerPos) return 0;
+
+  const defStore = useDefinitionsStore.getState();
+  const placements = defStore.structurePlacements;
+  const structures = defStore.structures;
+
+  let maxHeat = 0;
+
+  for (const placement of placements) {
+    // Calculate distance to structure
+    const dx = placement.x - playerPos.x;
+    const dy = placement.y - playerPos.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance <= HEAT_DETECTION_RADIUS) {
+      // Find the structure definition to get heat level
+      const structDef = structures.find(s => s.id === placement.definitionId);
+      if (structDef?.heatLevel && structDef.heatLevel > maxHeat) {
+        maxHeat = structDef.heatLevel;
+      }
+    }
+  }
+
+  return maxHeat;
+}
+
+/**
+ * Get the function allocation stats from the currently equipped tool.
+ * Returns null if no tool is equipped or the equipped item isn't a tool.
+ */
+function getEquippedToolStats(): Partial<ToolFunctionAllocation> | null {
+  const inventoryStore = useInventoryStore.getState();
+  const selectedSlot = inventoryStore.getSelectedItem();
+
+  if (!selectedSlot?.itemId) return null;
+
+  // Check if it's a crafted tool
+  if (selectedSlot.itemId.startsWith('tool-')) {
+    const tool = useToolsStore.getState().getTool(selectedSlot.itemId);
+    if (tool) {
+      return tool.functionPoints;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Check if all requirements for a transformation are met.
+ * Returns { canPerform: true } if all pass, or { canPerform: false, reason: string } if any fail.
+ */
+function checkTransformationRequirements(
+  transformation: MaterialTransformation
+): { canPerform: boolean; reason?: string } {
+  // No requirements = by hand, always available
+  if (!transformation.requirements || transformation.requirements.length === 0) {
+    return { canPerform: true };
+  }
+
+  const toolStats = getEquippedToolStats();
+  const nearbyHeat = getNearbyHeat();
+
+  for (const req of transformation.requirements) {
+    const result = checkRequirement(req, toolStats, nearbyHeat);
+    if (!result.met) {
+      return { canPerform: false, reason: result.reason };
+    }
+  }
+
+  return { canPerform: true };
+}
 
 export type InteractableType = 'plant' | 'animal' | 'water' | 'resource' | 'villager';
 
@@ -332,6 +417,13 @@ export const useInteractionStore = create<InteractionState>()((set, get) => ({
             for (const yield_ of def.aliveYields) {
               const transformation = yield_.transformations?.find(t => t.action === interactionType);
               if (transformation) {
+                // Check requirements before executing transformation
+                const reqCheck = checkTransformationRequirements(transformation);
+                if (!reqCheck.canPerform) {
+                  console.log(`[Interaction] Transformation failed: ${reqCheck.reason}`);
+                  break;
+                }
+
                 inventoryStore.addItem(transformation.resultMaterialId, transformation.resultQuantity);
                 // Note: plant/animal stays in the world, only the yield is consumed
                 // TODO: Track yield availability state (cooldown, seasons, etc.)
@@ -349,6 +441,13 @@ export const useInteractionStore = create<InteractionState>()((set, get) => ({
           // First, check for user-defined transformation
           const transformation = resource?.transformations?.find(t => t.action === interactionType);
           if (transformation) {
+            // Check requirements before executing transformation
+            const reqCheck = checkTransformationRequirements(transformation);
+            if (!reqCheck.canPerform) {
+              console.log(`[Interaction] Transformation failed: ${reqCheck.reason}`);
+              break;
+            }
+
             const added = inventoryStore.addItem(transformation.resultMaterialId, transformation.resultQuantity);
             if (added) {
               useRuntimeMapStore.getState().removeResource(target.object.id);
