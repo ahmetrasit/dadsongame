@@ -4,6 +4,7 @@ import type { AnimalDefinition } from '@/stores/definitions/animalsStore';
 import type { WaterDefinition } from '@/stores/definitions/waterStore';
 import type { ResourceDefinition } from '@/stores/definitions/resourcesStore';
 import type { InteractionTarget, InteractableType } from '@/stores/interactionStore';
+import type { PlacementYieldState } from '@/stores/yieldStateStore';
 import { useVillagerStore } from '@/stores/villagerStore';
 
 interface MapData {
@@ -21,6 +22,130 @@ interface Definitions {
   resources: ResourceDefinition[];
 }
 
+// Extended PlantPlacement with optional state properties (for future use)
+interface ExtendedPlantPlacement extends PlantPlacement {
+  isDead?: boolean;
+  stage?: 'seed' | 'sprout' | 'mature' | 'withered';
+}
+
+// Plant state enum for interaction filtering
+export type PlantState = 'HAS_YIELD' | 'NO_YIELD' | 'DEAD';
+
+// Yield state accessor interface
+interface YieldStateAccessor {
+  getPlacementYields: (placementId: string) => PlacementYieldState | undefined;
+  hasAvailableYield: (placementId: string) => boolean;
+}
+
+/**
+ * Determine the current state of a plant based on placement data and yield state
+ * State is DERIVED from existing data, not stored separately
+ */
+export function getPlantState(
+  plantPlacement: ExtendedPlantPlacement,
+  yieldStateAccessor: YieldStateAccessor | null
+): PlantState {
+  // Check if plant is dead/withered (future-proofing for when death mechanics are added)
+  if (plantPlacement.isDead || plantPlacement.stage === 'withered') {
+    return 'DEAD';
+  }
+
+  // If no yield state accessor provided, default to NO_YIELD (conservative)
+  if (!yieldStateAccessor) {
+    return 'NO_YIELD';
+  }
+
+  // Check yield availability from yieldStateStore
+  const hasYield = yieldStateAccessor.hasAvailableYield(plantPlacement.id);
+  return hasYield ? 'HAS_YIELD' : 'NO_YIELD';
+}
+
+/**
+ * Get filtered interactions for a plant based on its current state
+ *
+ * Design spec:
+ * - ALIVE + HAS_YIELD: yield actions (pick/harvest/gather), care actions (water, fertilize)
+ * - ALIVE + NO_YIELD: care actions (water), maintenance (prune, chop_down)
+ * - DEAD/WITHERED: removal only (uproot)
+ */
+export function getPlantInteractions(
+  plantDef: PlantDefinition,
+  state: PlantState,
+  yieldStateAccessor: YieldStateAccessor | null,
+  placementId: string
+): string[] {
+  switch (state) {
+    case 'HAS_YIELD': {
+      // Get yield interactions only for yields that have remaining amounts
+      const yieldInteractions: string[] = [];
+      const yieldTransformActions: string[] = [];
+
+      if (yieldStateAccessor) {
+        const yieldState = yieldStateAccessor.getPlacementYields(placementId);
+        plantDef.aliveYields.forEach((yield_, index) => {
+          const yieldInfo = yieldState?.yields[index];
+          const hasRemaining = yieldInfo?.isAvailable && yieldInfo.remaining > 0;
+
+          if (hasRemaining) {
+            yieldInteractions.push(yield_.interactionType || 'harvest');
+            // Include transformation actions from yields
+            if (yield_.transformations) {
+              for (const t of yield_.transformations) {
+                if (t.action) yieldTransformActions.push(t.action);
+              }
+            }
+          }
+        });
+      } else {
+        // Fallback: include all yield interactions if no state accessor
+        plantDef.aliveYields.forEach(yield_ => {
+          yieldInteractions.push(yield_.interactionType || 'harvest');
+          if (yield_.transformations) {
+            for (const t of yield_.transformations) {
+              if (t.action) yieldTransformActions.push(t.action);
+            }
+          }
+        });
+      }
+
+      // Add care interactions (water, fertilize)
+      const careInteractions = (plantDef.needInteractions || []).filter(
+        i => i === 'water' || i === 'fertilize'
+      );
+
+      return [...new Set([...yieldInteractions, ...yieldTransformActions, ...careInteractions])];
+    }
+
+    case 'NO_YIELD': {
+      // No yield available - show care and maintenance actions
+      const interactions: string[] = [];
+
+      // Always allow watering
+      if (plantDef.needInteractions?.includes('water')) {
+        interactions.push('water');
+      }
+
+      // Add maintenance actions
+      interactions.push('prune');
+
+      // Allow chop_down for trees/plants that have deadYields
+      if (plantDef.deadYields && plantDef.deadYields.length > 0) {
+        interactions.push('chop_down');
+      }
+
+      return interactions;
+    }
+
+    case 'DEAD': {
+      // Dead plants can only be uprooted
+      return ['uproot'];
+    }
+
+    default:
+      return [];
+  }
+}
+
 /**
  * Calculate Euclidean distance between two points
  */
@@ -33,31 +158,36 @@ function distance(x1: number, y1: number, x2: number, y2: number): number {
 /**
  * Find the nearest interactable object within interaction range
  * Returns null if no objects are within range
+ *
+ * @param playerX - Player X position
+ * @param playerY - Player Y position
+ * @param mapData - Current map data with placements
+ * @param definitions - Entity definitions
+ * @param yieldStateAccessor - Optional accessor for yield state (enables state-aware filtering)
  */
 export function findNearestInteractable(
   playerX: number,
   playerY: number,
   mapData: MapData,
-  definitions: Definitions
+  definitions: Definitions,
+  yieldStateAccessor?: YieldStateAccessor | null
 ): InteractionTarget | null {
   let nearest: InteractionTarget | null = null;
   let nearestDistance = Infinity;
 
-  // Check plants
+  // Check plants with state-aware interaction filtering
   for (const plant of mapData.plants) {
     const def = definitions.plants.find(p => p.id === plant.definitionId);
     if (!def) continue;
 
     const dist = distance(playerX, playerY, plant.x, plant.y);
     if (dist <= def.interactionRadius && dist < nearestDistance) {
-      // Combine yield interactions (with fallback for undefined), yield transformation actions, and need interactions
-      const yieldInteractions = def.aliveYields
-        .map(y => y.interactionType || 'harvest');  // Default fallback for plants
-      // Include transformation actions from yields
-      const yieldTransformActions = def.aliveYields
-        .flatMap(y => (y.transformations || []).map(t => t.action))
-        .filter(Boolean) as string[];
-      const allInteractions = [...new Set([...yieldInteractions, ...yieldTransformActions, ...(def.needInteractions || [])])] as string[];
+      // Determine plant state and get filtered interactions
+      const plantState = getPlantState(plant as ExtendedPlantPlacement, yieldStateAccessor || null);
+      const filteredInteractions = getPlantInteractions(def, plantState, yieldStateAccessor || null, plant.id);
+
+      // Skip plants with no available interactions
+      if (filteredInteractions.length === 0) continue;
 
       nearestDistance = dist;
       nearest = {
@@ -70,7 +200,7 @@ export function findNearestInteractable(
         },
         definition: def,
         distance: dist,
-        interactionTypes: allInteractions,
+        interactionTypes: filteredInteractions,
       };
     }
   }
@@ -202,12 +332,20 @@ export function findNearestInteractable(
  */
 export function getInteractionLabel(interactionType: string): string {
   const labels: Record<string, string> = {
-    // Plant interactions
+    // Plant interactions - yield actions
     harvest: 'Harvest',
-    chop: 'Chop',
-    water: 'Water',
-    inspect: 'Inspect',
     pick: 'Pick',
+    gather: 'Gather',
+    // Plant interactions - care actions
+    water: 'Water',
+    fertilize: 'Fertilize',
+    // Plant interactions - maintenance actions
+    prune: 'Prune',
+    chop_down: 'Chop Down',
+    uproot: 'Uproot',
+    // Legacy plant interactions
+    chop: 'Chop',
+    inspect: 'Inspect',
     // Animal interactions
     pet: 'Pet',
     feed: 'Feed',
@@ -216,6 +354,7 @@ export function getInteractionLabel(interactionType: string): string {
     ride: 'Ride',
     collect: 'Collect',
     tame: 'Tame',
+    butcher: 'Butcher',
     // Water interactions
     fish: 'Fish',
     drink: 'Drink',

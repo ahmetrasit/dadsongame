@@ -267,11 +267,18 @@ export class MainScene extends Phaser.Scene {
     defStore: ReturnType<typeof useDefinitionsStore.getState>
   ): void {
     const interactionStore = useInteractionStore.getState();
+    const yieldStateStore = useYieldStateStore.getState();
 
     // Use runtime map for gameplay, editor map for editing
     const mapData = getActiveMapData(isEditing);
 
-    // Find nearest interactable object
+    // Create yield state accessor for state-aware interaction filtering
+    const yieldStateAccessor = {
+      getPlacementYields: yieldStateStore.getPlacementYields,
+      hasAvailableYield: yieldStateStore.hasAvailableYield,
+    };
+
+    // Find nearest interactable object with state-aware filtering
     const target = findNearestInteractable(
       this.player.x,
       this.player.y,
@@ -281,7 +288,8 @@ export class MainScene extends Phaser.Scene {
         animals: defStore.animals,
         waters: defStore.waters,
         resources: defStore.resources,
-      }
+      },
+      yieldStateAccessor
     );
 
     // Update store

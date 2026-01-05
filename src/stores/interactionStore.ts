@@ -327,6 +327,28 @@ export const useInteractionStore = create<InteractionState>()((set, get) => ({
         }
         break;
       }
+      case 'prune': {
+        if (target.object.type !== 'plant') break;
+
+        console.log(`[Interaction] Pruning plant ${target.object.id}`);
+        // TODO: Future enhancement - improve plant health, encourage yield production
+        break;
+      }
+      case 'fertilize': {
+        if (target.object.type !== 'plant') break;
+
+        const defStore = useDefinitionsStore.getState();
+        const plantDef = defStore.plants.find(p => p.id === target.object.definitionId);
+
+        if (!plantDef) break;
+
+        // Check if plant accepts fertilizing
+        if (plantDef.needInteractions.includes('fertilize')) {
+          console.log(`[Interaction] Fertilized plant ${target.object.id}`);
+          // TODO: Future enhancement - boost growth or yield quality
+        }
+        break;
+      }
       case 'chop_down': {
         if (target.object.type !== 'plant') break;
 
@@ -334,6 +356,15 @@ export const useInteractionStore = create<InteractionState>()((set, get) => ({
         if (result) {
           set({ currentTarget: null });
         }
+        break;
+      }
+      case 'uproot': {
+        if (target.object.type !== 'plant') break;
+
+        // Remove dead plant from the map (no yield given)
+        console.log(`[Interaction] Uprooting dead plant ${target.object.id}`);
+        useRuntimeMapStore.getState().removePlant(target.object.id);
+        set({ currentTarget: null });
         break;
       }
       case 'butcher': {

@@ -2,40 +2,18 @@ import { useInteractionStore } from '@/stores/interactionStore';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
 import { useInventoryStore } from '@/stores/inventoryStore';
 import { useToolsStore } from '@/stores/toolsStore';
-import { useYieldStateStore } from '@/stores/yieldStateStore';
 import { getInteractionLabel } from '@/game/utils/interactionDetection';
 import { getBootstrapRecipe } from '@/types/bootstrap';
 import { getAvailableTransformations, type AvailableTransformation } from '@/utils/transformationUtils';
 import type { ResourceDefinition } from '@/stores/definitions/resourcesStore';
-import type { PlantDefinition } from '@/stores/definitions/plantsStore';
-import type { AnimalDefinition } from '@/stores/definitions/animalsStore';
 import type { ToolFunctionAllocation } from '@/types/tools';
-
-// Represents a yield action (milk, collect, harvest, etc.)
-interface YieldAction {
-  type: 'yield';
-  action: string;
-  label: string;
-  resourceId: string;
-}
-
-// Represents a transformation action (chop, cook, etc.)
-interface TransformationAction {
-  type: 'transformation';
-  transformation: AvailableTransformation;
-}
-
-type AvailableAction = YieldAction | TransformationAction;
 
 export function InteractionPrompt() {
   const currentTarget = useInteractionStore((s) => s.currentTarget);
   const resources = useDefinitionsStore((s) => s.resources);
-  const plants = useDefinitionsStore((s) => s.plants);
-  const animals = useDefinitionsStore((s) => s.animals);
   const selectedSlot = useInventoryStore((s) => s.inventory.selectedSlot);
   const slots = useInventoryStore((s) => s.inventory.slots);
   const getTool = useToolsStore((s) => s.getTool);
-  const getPlacementYields = useYieldStateStore((s) => s.getPlacementYields);
 
   // Get equipped tool stats
   const getToolStats = (): Partial<ToolFunctionAllocation> | null => {
@@ -63,100 +41,8 @@ export function InteractionPrompt() {
     ? resources.find(r => r.id === currentTarget.object.definitionId) as ResourceDefinition | undefined
     : undefined;
 
-  const plantDef = isPlant
-    ? plants.find(p => p.id === currentTarget.object.definitionId) as PlantDefinition | undefined
-    : undefined;
-
-  const animalDef = isAnimal
-    ? animals.find(a => a.id === currentTarget.object.definitionId) as AnimalDefinition | undefined
-    : undefined;
-
   // Get tool stats for transformation checks
   const toolStats = getToolStats();
-
-  // Collect all available actions for plants/animals
-  const availableActions: AvailableAction[] = [];
-
-  // Get yield state for the current target (if plant or animal)
-  const yieldState = (isPlant || isAnimal) ? getPlacementYields(currentTarget.object.id) : undefined;
-
-  // For plants: collect yield actions and transformations (only if yield is available)
-  if (plantDef?.aliveYields) {
-    plantDef.aliveYields.forEach((yield_, index) => {
-      // Check if this yield has remaining amount
-      const yieldInfo = yieldState?.yields[index];
-      const hasRemaining = yieldInfo?.isAvailable && yieldInfo.remaining > 0;
-
-      if (hasRemaining) {
-        // Add yield action (harvest, pick, collect)
-        const yieldAction = yield_.interactionType || 'harvest';
-        availableActions.push({
-          type: 'yield',
-          action: yieldAction,
-          label: yieldAction.charAt(0).toUpperCase() + yieldAction.slice(1),
-          resourceId: yield_.resourceId,
-        });
-
-        // Add any transformations on this yield (only if yield is available)
-        if (yield_.transformations && yield_.transformations.length > 0) {
-          const yieldAsResource = { transformations: yield_.transformations } as ResourceDefinition;
-          const yieldTransformations = getAvailableTransformations(yieldAsResource, toolStats, 0);
-          for (const t of yieldTransformations) {
-            availableActions.push({ type: 'transformation', transformation: t });
-          }
-        }
-      }
-    });
-  }
-
-  // Add dead yield action for plants
-  if (plantDef?.deadYields && plantDef.deadYields.length > 0) {
-    availableActions.push({
-      type: 'yield',
-      action: 'chop_down',
-      label: 'Chop Down',
-      resourceId: 'dead-yield',
-    });
-  }
-
-  // For animals: collect yield actions and transformations (only if yield is available)
-  if (animalDef?.aliveYields) {
-    animalDef.aliveYields.forEach((yield_, index) => {
-      // Check if this yield has remaining amount
-      const yieldInfo = yieldState?.yields[index];
-      const hasRemaining = yieldInfo?.isAvailable && yieldInfo.remaining > 0;
-
-      if (hasRemaining) {
-        // Add yield action (milk, shear, gather, collect)
-        const yieldAction = yield_.interactionType || 'collect';
-        availableActions.push({
-          type: 'yield',
-          action: yieldAction,
-          label: yieldAction.charAt(0).toUpperCase() + yieldAction.slice(1),
-          resourceId: yield_.resourceId,
-        });
-
-        // Add any transformations on this yield (only if yield is available)
-        if (yield_.transformations && yield_.transformations.length > 0) {
-          const yieldAsResource = { transformations: yield_.transformations } as ResourceDefinition;
-          const yieldTransformations = getAvailableTransformations(yieldAsResource, toolStats, 0);
-          for (const t of yieldTransformations) {
-            availableActions.push({ type: 'transformation', transformation: t });
-          }
-        }
-      }
-    });
-  }
-
-  // Add dead yield action for animals
-  if (animalDef?.deadYields && animalDef.deadYields.length > 0) {
-    availableActions.push({
-      type: 'yield',
-      action: 'butcher',
-      label: 'Butcher',
-      resourceId: 'dead-yield',
-    });
-  }
 
   // Get transformations from resource definition
   let availableTransformations: AvailableTransformation[] = [];
@@ -167,13 +53,9 @@ export function InteractionPrompt() {
   // Also check hardcoded bootstrap recipes as fallback
   const bootstrapRecipe = isResource ? getBootstrapRecipe(currentTarget.object.definitionId) : null;
 
-  // For plants/animals: hide prompt if no yield actions are available
-  if ((isPlant || isAnimal) && availableActions.length === 0) {
-    return null;
-  }
-
-  // For plants/animals with yield actions, show them
-  if ((isPlant || isAnimal) && availableActions.length > 0) {
+  // For plants/animals: use the pre-filtered interactionTypes from the detection system
+  // The filtering is now done in interactionDetection.ts based on plant state (HAS_YIELD, NO_YIELD, DEAD)
+  if ((isPlant || isAnimal) && currentTarget.interactionTypes.length > 0) {
     return (
       <div
         style={{
@@ -201,61 +83,28 @@ export function InteractionPrompt() {
           <strong>{currentTarget.definition.name}</strong>
         </div>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
-          {availableActions.map((action, index) => {
+          {currentTarget.interactionTypes.map((action, index) => {
             const keyNum = index + 1;
+            const label = getInteractionLabel(action);
 
-            if (action.type === 'yield') {
-              return (
-                <div
-                  key={`yield-${index}`}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <span
-                    style={{
-                      background: '#3b82f6',
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    {keyNum}
-                  </span>
-                  <span>{action.label}</span>
-                </div>
-              );
-            } else {
-              const at = action.transformation;
-              const actionName = at.transformation.action.charAt(0).toUpperCase() + at.transformation.action.slice(1);
-              return (
-                <div
-                  key={`transform-${index}`}
+            return (
+              <div
+                key={`action-${index}`}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <span
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    opacity: at.canPerform ? 1 : 0.5,
+                    background: '#3b82f6',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontWeight: 'bold',
                   }}
-                  title={at.canPerform ? '' : at.missingRequirements.join(', ')}
                 >
-                  <span
-                    style={{
-                      background: at.canPerform ? '#22c55e' : '#6b7280',
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    {keyNum}
-                  </span>
-                  <span>{actionName}</span>
-                  {!at.canPerform && (
-                    <span style={{ fontSize: '10px', color: '#ef4444' }}>
-                      ({at.missingRequirements[0]})
-                    </span>
-                  )}
-                </div>
-              );
-            }
+                  {keyNum}
+                </span>
+                <span>{label}</span>
+              </div>
+            );
           })}
         </div>
       </div>
