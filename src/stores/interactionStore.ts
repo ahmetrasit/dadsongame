@@ -5,7 +5,7 @@ import type { WaterDefinition } from './definitions/waterStore';
 import type { ResourceDefinition } from './definitions/resourcesStore';
 import { getBootstrapRecipe } from '@/types/bootstrap';
 import { useInventoryStore } from './inventoryStore';
-import { useMapEditorStore } from './mapEditorStore';
+import { useRuntimeMapStore } from './runtimeMapStore';
 import { useDefinitionsStore } from './definitionsStore';
 import { harvestYield } from '@/services/YieldService';
 
@@ -57,10 +57,7 @@ export const useInteractionStore = create<InteractionState>()((set, get) => ({
     const target = get().currentTarget;
     if (!target) return;
 
-    console.log(`[Interaction] Executing "${interactionType}" on ${target.definition.name} (${target.object.type})`);
-
     // TODO: Implement actual interaction effects based on type
-    // For now, just log the interaction
     switch (interactionType) {
       // Yield harvesting interactions (plants and animals)
       case 'pick':
@@ -80,60 +77,100 @@ export const useInteractionStore = create<InteractionState>()((set, get) => ({
 
         if (!def || !('aliveYields' in def)) break;
 
-        // Find the yield that has this interaction type
-        const yieldIndex = def.aliveYields.findIndex(y => y.interactionType === interactionType);
-        if (yieldIndex === -1) {
-          console.log(`  → No yield found for ${interactionType} on ${target.definition.name}`);
-          break;
-        }
+        // Default fallback for undefined interactionType
+        const defaultInteraction = target.object.type === 'plant' ? 'harvest' : 'collect';
+
+        // Find the yield that has this interaction type (with fallback for undefined)
+        const yieldIndex = def.aliveYields.findIndex(y =>
+          (y.interactionType || defaultInteraction) === interactionType
+        );
+        if (yieldIndex === -1) break;
 
         // Get yield info to check what resource we'd get
         const yieldDef = def.aliveYields[yieldIndex];
 
         // Check if inventory has space before harvesting
-        if (!inventoryStore.canAddItem(yieldDef.resourceId, 1)) {
-          console.log(`  → Inventory full! Cannot ${interactionType} ${target.definition.name}`);
-          break;
-        }
+        if (!inventoryStore.canAddItem(yieldDef.resourceId, 1)) break;
 
         // Harvest the yield
         const result = harvestYield(target.object.id, yieldIndex, 1);
         if (result) {
           inventoryStore.addItem(result.resourceId, result.amount);
-          console.log(`  → ${interactionType} ${result.amount} ${result.resourceId} from ${target.definition.name}`);
-        } else {
-          console.log(`  → No yield available to ${interactionType} from ${target.definition.name}`);
         }
         break;
       }
-      case 'water':
-        console.log(`  → Would water ${target.definition.name}`);
+      case 'water': {
+        if (target.object.type !== 'plant') break;
+
+        const defStore = useDefinitionsStore.getState();
+        const plantDef = defStore.plants.find(p => p.id === target.object.definitionId);
+
+        if (!plantDef) break;
+
+        // Check if plant accepts watering
+        if (plantDef.needInteractions.includes('water')) {
+          console.log(`[Interaction] Watered plant ${target.object.id}`);
+          // TODO: Future enhancement - affect growth rate or yield quality
+        }
         break;
-      case 'inspect':
-        console.log(`  → Inspecting ${target.definition.name}`);
+      }
+      case 'inspect': {
+        const type = target.object.type;
+        const name = target.definition.name;
+        const id = target.object.id;
+
+        console.log(`[Interaction] Inspecting ${type}: ${name} (id: ${id})`);
+
+        // Log additional details based on type
+        if (type === 'plant' || type === 'animal') {
+          const def = target.definition as PlantDefinition | AnimalDefinition;
+          if ('aliveYields' in def && def.aliveYields.length > 0) {
+            console.log(`  Yields: ${def.aliveYields.map(y => `${y.resourceId} (${y.interactionType || 'harvest'})`).join(', ')}`);
+          }
+        } else if (type === 'resource') {
+          const def = target.definition as ResourceDefinition;
+          if (def.category) {
+            console.log(`  Category: ${def.category}`);
+          }
+        }
         break;
-      case 'pet':
-        console.log(`  → Petting ${target.definition.name}`);
+      }
+      case 'pet': {
+        if (target.object.type !== 'animal') break;
+        console.log(`[Interaction] Pet ${target.object.id}`);
+        // Future: Could increase animal happiness/friendship
         break;
-      case 'feed':
-        console.log(`  → Would feed ${target.definition.name}`);
+      }
+      case 'feed': {
+        if (target.object.type !== 'animal') break;
+        console.log(`[Interaction] Fed ${target.object.id}`);
+        // Future: Could check inventory for food items and affect animal health/yield
         break;
-      case 'ride':
-        console.log(`  → Would ride ${target.definition.name}`);
+      }
+      case 'ride': {
+        if (target.object.type !== 'animal') break;
+
+        const defStore = useDefinitionsStore.getState();
+        const animalDef = defStore.animals.find(a => a.id === target.object.definitionId);
+
+        if (!animalDef) break;
+
+        // Check if animal allows riding
+        if (animalDef.needInteractions.includes('ride')) {
+          console.log(`[Interaction] Riding ${target.object.id}`);
+          // TODO: Future enhancement - change player movement mode
+        }
         break;
+      }
       case 'collect': {
         // For ground resources
         if (target.object.type === 'resource') {
           const inventoryStore = useInventoryStore.getState();
-          const mapEditorStore = useMapEditorStore.getState();
 
           const added = inventoryStore.addItem(target.object.definitionId, 1);
           if (added) {
-            console.log(`  → Collected ${target.definition.name} to inventory`);
-            mapEditorStore.removeResource(target.object.id);
+            useRuntimeMapStore.getState().removeResource(target.object.id);
             set({ currentTarget: null });
-          } else {
-            console.log(`  → Inventory full! Cannot collect ${target.definition.name}`);
           }
           break;
         }
@@ -149,39 +186,60 @@ export const useInteractionStore = create<InteractionState>()((set, get) => ({
 
           if (!def || !('aliveYields' in def)) break;
 
-          const yieldIndex = def.aliveYields.findIndex(y => y.interactionType === 'collect');
+          // Default fallback for undefined interactionType
+          const defaultInteraction = target.object.type === 'plant' ? 'harvest' : 'collect';
+
+          // Find the yield that has 'collect' as interaction type (with fallback for undefined)
+          const yieldIndex = def.aliveYields.findIndex(y =>
+            (y.interactionType || defaultInteraction) === 'collect'
+          );
           if (yieldIndex === -1) break;
 
           const yieldDef = def.aliveYields[yieldIndex];
 
           // Check inventory space before harvesting
-          if (!inventoryStore.canAddItem(yieldDef.resourceId, 1)) {
-            console.log(`  → Inventory full! Cannot collect from ${target.definition.name}`);
-            break;
-          }
+          if (!inventoryStore.canAddItem(yieldDef.resourceId, 1)) break;
 
           const result = harvestYield(target.object.id, yieldIndex, 1);
           if (result) {
             inventoryStore.addItem(result.resourceId, result.amount);
-            console.log(`  → Collected ${result.amount} ${result.resourceId} from ${target.definition.name}`);
-          } else {
-            console.log(`  → No yield available to collect from ${target.definition.name}`);
           }
         }
         break;
       }
-      case 'tame':
-        console.log(`  → Would tame ${target.definition.name}`);
+      case 'fish': {
+        if (target.object.type !== 'water') break;
+        console.log(`[Interaction] Fishing at ${target.object.id}`);
+        // TODO: Future enhancement - catch fish based on water type
         break;
-      case 'fish':
-        console.log(`  → Would fish in ${target.definition.name}`);
+      }
+      case 'drink': {
+        if (target.object.type !== 'water') break;
+        console.log(`[Interaction] Drank from ${target.object.id}`);
+        // TODO: Future enhancement - restore player thirst/stamina
         break;
-      case 'drink':
-        console.log(`  → Would drink from ${target.definition.name}`);
+      }
+      case 'swim': {
+        if (target.object.type !== 'water') break;
+        console.log(`[Interaction] Swimming in ${target.object.id}`);
+        // TODO: Future enhancement - affect player position/state
         break;
-      case 'swim':
-        console.log(`  → Would swim in ${target.definition.name}`);
+      }
+      case 'tame': {
+        if (target.object.type !== 'animal') break;
+
+        const defStore = useDefinitionsStore.getState();
+        const animalDef = defStore.animals.find(a => a.id === target.object.definitionId);
+
+        if (!animalDef) break;
+
+        // Check if animal allows taming
+        if (animalDef.needInteractions.includes('tame')) {
+          console.log(`[Interaction] Taming ${target.object.id}`);
+          // TODO: Future enhancement - track taming progress
+        }
         break;
+      }
       // Handle ALL transformation actions (user-defined take priority, then bootstrap fallback)
       case 'break':
       case 'twist':
@@ -197,7 +255,6 @@ export const useInteractionStore = create<InteractionState>()((set, get) => ({
       case 'weave': {
         const defStore = useDefinitionsStore.getState();
         const inventoryStore = useInventoryStore.getState();
-        const mapEditorStore = useMapEditorStore.getState();
 
         // Handle plants and animals - check yield transformations
         if (target.object.type === 'plant' || target.object.type === 'animal') {
@@ -210,14 +267,9 @@ export const useInteractionStore = create<InteractionState>()((set, get) => ({
             for (const yield_ of def.aliveYields) {
               const transformation = yield_.transformations?.find(t => t.action === interactionType);
               if (transformation) {
-                const added = inventoryStore.addItem(transformation.resultMaterialId, transformation.resultQuantity);
-                if (added) {
-                  console.log(`  → Transformed yield from ${target.definition.name} into ${transformation.resultMaterialId} x${transformation.resultQuantity}`);
-                  // Note: plant/animal stays in the world, only the yield is consumed
-                  // TODO: Track yield availability state (cooldown, seasons, etc.)
-                } else {
-                  console.log(`  → Inventory full, cannot add ${transformation.resultMaterialId}`);
-                }
+                inventoryStore.addItem(transformation.resultMaterialId, transformation.resultQuantity);
+                // Note: plant/animal stays in the world, only the yield is consumed
+                // TODO: Track yield availability state (cooldown, seasons, etc.)
                 break;
               }
             }
@@ -234,11 +286,8 @@ export const useInteractionStore = create<InteractionState>()((set, get) => ({
           if (transformation) {
             const added = inventoryStore.addItem(transformation.resultMaterialId, transformation.resultQuantity);
             if (added) {
-              mapEditorStore.removeResource(target.object.id);
+              useRuntimeMapStore.getState().removeResource(target.object.id);
               set({ currentTarget: null });
-              console.log(`  → Transformed ${target.definition.name} into ${transformation.resultMaterialId} x${transformation.resultQuantity}`);
-            } else {
-              console.log(`  → Inventory full, cannot add ${transformation.resultMaterialId}`);
             }
             break;
           }
@@ -248,21 +297,16 @@ export const useInteractionStore = create<InteractionState>()((set, get) => ({
           if (recipe && recipe.action === interactionType) {
             const added = inventoryStore.addItem(recipe.output, recipe.outputQuantity);
             if (added) {
-              console.log(`  → Bootstrap: ${interactionType} ${recipe.input} → ${recipe.output} x${recipe.outputQuantity}`);
-              mapEditorStore.removeResource(target.object.id);
+              useRuntimeMapStore.getState().removeResource(target.object.id);
               set({ currentTarget: null });
-            } else {
-              console.log(`  → Inventory full! Cannot transform ${target.definition.name}`);
             }
             break;
           }
-
-          console.log(`  → No transformation found for ${interactionType} on ${target.definition.name}`);
         }
         break;
       }
       default:
-        console.log(`  → Unknown interaction: ${interactionType}`);
+        // Unknown interaction type - no action
     }
   },
 }));

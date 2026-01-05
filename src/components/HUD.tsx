@@ -3,6 +3,8 @@ import { useGameTime, useWeather, formatGameTime } from '@/stores/worldStore';
 import { useConnectionState, useLatency } from '@/stores/multiplayerStore';
 import { Hotbar } from './Hotbar';
 import { PlacementPreview } from './PlacementPreview';
+import { Inventory } from './Inventory';
+import { ToolCrafting } from './ToolCrafting';
 
 export function HUD() {
   const player = usePlayerStore((s) => s.player);
@@ -42,6 +44,12 @@ export function HUD() {
 
       {/* Placement preview */}
       <PlacementPreview />
+
+      {/* Inventory panel */}
+      <Inventory />
+
+      {/* Tool crafting panel */}
+      <ToolCrafting />
 
       {/* Controls hint */}
       <div className="hud-controls">

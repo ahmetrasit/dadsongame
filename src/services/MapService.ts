@@ -346,6 +346,19 @@ class MapService {
       return null;
     }
 
+    // Guard against duplicate subscriptions: if already subscribed to this map, skip
+    if (this.unsubscribe && this.currentMapId === mapId) {
+      console.log('[MapService] Already subscribed to this map, skipping duplicate subscription');
+      return this.unsubscribe;
+    }
+
+    // Guard against Firebase reconnection stacking: clear any pending reconnection from previous map
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+      console.log('[MapService] Cleared pending reconnection from previous map');
+    }
+
     this.currentMapId = mapId;
     this.updateCallback = callback;
     this.errorCallback = onError || null;
@@ -415,11 +428,21 @@ class MapService {
    * Schedule a reconnection attempt
    */
   private scheduleReconnect(mapId: string): void {
+    // Guard against stacked reconnection attempts: if one is already scheduled, skip
     if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
+      console.log('[MapService] Reconnection already scheduled, skipping duplicate attempt');
+      return;
     }
 
     this.reconnectTimeout = setTimeout(() => {
+      this.reconnectTimeout = null; // Clear the timeout reference
+
+      // Guard against reconnecting to a map that's no longer current
+      if (mapId !== this.currentMapId) {
+        console.log('[MapService] Map changed before reconnection, skipping reconnect for old map');
+        return;
+      }
+
       console.log('[MapService] Attempting to reconnect...');
       this.cleanupSubscription();
 

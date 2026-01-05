@@ -349,8 +349,13 @@ body {
   padding-top: 12px;
 }
 
+.craft-buttons {
+  display: flex;
+  gap: 8px;
+}
+
 .craft-btn {
-  width: 100%;
+  flex: 1;
   padding: 10px;
   background: #2563eb;
   color: white;
@@ -358,6 +363,10 @@ body {
   border-radius: 4px;
   cursor: pointer;
   font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .craft-btn:hover {
@@ -367,6 +376,15 @@ body {
 .craft-btn:disabled {
   background: #4b5563;
   cursor: not-allowed;
+}
+
+.craft-tool-btn-small {
+  background: #16a34a;
+  flex: 0.5;
+}
+
+.craft-tool-btn-small:hover {
+  background: #15803d;
 }
 
 .craft-menu {
@@ -400,4 +418,242 @@ body {
 .craft-cost {
   color: #9ca3af;
   font-size: 12px;
+}
+
+/* ==========================================
+   Tool Crafting Styles
+   ========================================== */
+
+.tool-crafting-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 250;
+}
+
+.tool-crafting-panel {
+  background: #1e1e2e;
+  border: 2px solid #4a4a6e;
+  border-radius: 12px;
+  padding: 20px;
+  min-width: 500px;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  color: white;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.tool-crafting-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tool-crafting-header h2 {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.tool-crafting-content h3 {
+  font-size: 14px;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.material-section,
+.size-section,
+.function-section,
+.preview-section,
+.craft-section {
+  margin-bottom: 20px;
+}
+
+.material-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.material-row label {
+  font-size: 13px;
+  color: #888;
+}
+
+.material-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.material-btn {
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s;
+}
+
+.material-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.material-btn.selected {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+}
+
+.no-materials {
+  color: #666;
+  font-style: italic;
+  font-size: 13px;
+}
+
+.size-options {
+  display: flex;
+  gap: 10px;
+}
+
+.size-btn {
+  flex: 1;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s;
+}
+
+.size-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.size-btn.selected {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+}
+
+.function-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.function-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.function-row label {
+  width: 80px;
+  font-size: 13px;
+  color: #ccc;
+}
+
+.function-row input[type="range"] {
+  flex: 1;
+  height: 6px;
+  -webkit-appearance: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.function-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #3b82f6;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.function-row input[type="range"]:disabled {
+  opacity: 0.4;
+}
+
+.function-value {
+  width: 24px;
+  text-align: center;
+  font-weight: bold;
+  color: #3b82f6;
+}
+
+.function-effectiveness {
+  width: 40px;
+  font-size: 11px;
+  color: #22c55e;
+}
+
+.preview-section {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.preview-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.preview-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 8px 16px;
+  border-radius: 6px;
+}
+
+.preview-stat span:first-child {
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+}
+
+.effective-power {
+  font-size: 20px;
+  font-weight: bold;
+  color: #22c55e;
+}
+
+.craft-tool-btn {
+  width: 100%;
+  padding: 14px;
+  background: #22c55e;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  transition: all 0.15s;
+}
+
+.craft-tool-btn:hover {
+  background: #16a34a;
+}
+
+.craft-tool-btn:disabled {
+  background: #4b5563;
+  cursor: not-allowed;
 }

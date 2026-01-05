@@ -1,6 +1,7 @@
 import { useInventoryStore, useInventorySlots, useSelectedSlot } from '@/stores/inventoryStore';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
-import { FaTrashAlt } from 'react-icons/fa';
+import { useToolsStore } from '@/stores/toolsStore';
+import { FaTimes, FaTools } from 'react-icons/fa';
 import { getCraftableStackRecipes } from '@/types/bootstrap';
 import { usePlacementStore } from '@/stores/placementStore';
 import { useState } from 'react';
@@ -25,7 +26,7 @@ export function Inventory() {
         <div className="inventory-header">
           <h2>Inventory</h2>
           <button className="close-btn" onClick={() => setOpen(false)}>
-            <FaTrashAlt />
+            <FaTimes />
           </button>
         </div>
 
@@ -79,13 +80,24 @@ export function Inventory() {
 
         {/* Craft section */}
         <div className="inventory-craft">
-          <button
-            className="craft-btn"
-            disabled={craftableRecipes.length === 0}
-            onClick={() => setShowCraftMenu(!showCraftMenu)}
-          >
-            Craft ({craftableRecipes.length})
-          </button>
+          <div className="craft-buttons">
+            <button
+              className="craft-btn"
+              disabled={craftableRecipes.length === 0}
+              onClick={() => setShowCraftMenu(!showCraftMenu)}
+            >
+              Craft ({craftableRecipes.length})
+            </button>
+            <button
+              className="craft-btn craft-tool-btn-small"
+              onClick={() => {
+                setOpen(false);
+                useToolsStore.getState().openCrafting();
+              }}
+            >
+              <FaTools /> Tool
+            </button>
+          </div>
 
           {showCraftMenu && craftableRecipes.length > 0 && (
             <div className="craft-menu">

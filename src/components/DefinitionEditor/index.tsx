@@ -4,6 +4,9 @@ import { TreeSidebar } from './TreeSidebar';
 import { PlantForm } from './PlantForm';
 import { AnimalForm } from './AnimalForm';
 import { ResourceForm } from './ResourceForm';
+import type { PlantDefinition } from '@/stores/definitions/plantsStore';
+import type { AnimalDefinition } from '@/stores/definitions/animalsStore';
+import type { ResourceDefinition } from '@/stores/definitions/resourcesStore';
 
 interface DefinitionEditorProps {
   initialTab?: 'plants' | 'animals' | 'resources';
@@ -47,6 +50,9 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
     new Set(['food', 'tree', 'crop', 'livestock', 'poultry'])
   );
 
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+
   // ESC key to close
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -82,6 +88,13 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
     : activeTab === 'animals'
     ? animals
     : resources;
+
+  // Filter items based on search query
+  const filteredItems = searchQuery.trim()
+    ? currentItems.filter(item =>
+        item.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : currentItems;
 
   const selectedItem = currentItems.find((item) => item.id === selectedId);
 
@@ -136,7 +149,7 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
           {(['plants', 'animals', 'resources'] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => { setActiveTab(tab); setSearchQuery(''); }}
               style={{
                 padding: '8px 16px',
                 background: activeTab === tab ? '#0D0D0D' : '#E8DDD1',
@@ -164,11 +177,30 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
             overflowY: 'auto',
           }}
         >
+          {/* Search bar */}
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              marginBottom: '15px',
+              border: '1px solid #D4C4B0',
+              borderRadius: '4px',
+              background: '#FFFFFF',
+              fontSize: '14px',
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+
           {/* Tree structure */}
           {activeTab === 'resources' && (
             <TreeSidebar
               categories={['food', 'water', 'metal', 'rock', 'wood', 'organics']}
-              items={resources}
+              items={filteredItems}
               getCategory={(item: any) => item.category}
               expandedCategories={expandedCategories}
               toggleCategory={toggleCategory}
@@ -179,7 +211,7 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
           {activeTab === 'plants' && (
             <TreeSidebar
               categories={['tree', 'crop', 'flower', 'bush']}
-              items={plants}
+              items={filteredItems}
               getCategory={(item: any) => item.subCategory}
               expandedCategories={expandedCategories}
               toggleCategory={toggleCategory}
@@ -190,7 +222,7 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
           {activeTab === 'animals' && (
             <TreeSidebar
               categories={['livestock', 'poultry', 'wild', 'pet']}
-              items={animals}
+              items={filteredItems}
               getCategory={(item: any) => item.subCategory}
               expandedCategories={expandedCategories}
               toggleCategory={toggleCategory}
@@ -238,9 +270,9 @@ export function DefinitionEditor({ initialTab, onClose }: DefinitionEditorProps 
             </div>
           )}
 
-          {!draftPlant && selectedItem && activeTab === 'plants' && <PlantForm item={selectedItem} />}
-          {!draftAnimal && selectedItem && activeTab === 'animals' && <AnimalForm item={selectedItem} />}
-          {!draftResource && selectedItem && activeTab === 'resources' && <ResourceForm item={selectedItem} />}
+          {!draftPlant && selectedItem && activeTab === 'plants' && <PlantForm item={selectedItem as PlantDefinition} />}
+          {!draftAnimal && selectedItem && activeTab === 'animals' && <AnimalForm item={selectedItem as AnimalDefinition} />}
+          {!draftResource && selectedItem && activeTab === 'resources' && <ResourceForm item={selectedItem as ResourceDefinition} />}
         </div>
       </div>
     </div>

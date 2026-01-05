@@ -1,16 +1,18 @@
-# Progress (v0.093)
+# Progress (v0.094)
 
 ## Latest Session (2026-01-02)
+- **Step 4: Tool Crafting implemented**
+  - Tool types/store: CraftedTool, ToolFunctionAllocation, material suitability
+  - ToolCrafting UI: material selection, size toggle, function point sliders
+  - Inventory integration: tools stored with unique IDs, displayed in slots
+  - HUD integration: Inventory + ToolCrafting overlays rendered in game
+  - "Tool" button in inventory opens crafting panel
+- Previous: Steps 1-3 (bootstrap, inventory integration, fire pit)
+
+## Session 2026-01-01
 - Redesigned crafting system (5 categories: Tools, Storage, Vehicles, Consumables, Knowledge)
 - Tool crafting: Handle + Working Part + Binder + Size (short/long) + Function Points
 - 6 tool functions: cutting, shaping, piercing, digging, grinding, scooping
-- 7 material categories: Food, Fiber, Hide, Wood, Clay, Ore, Metal
-- Processing methods: Environment (Heat/Dry/Soak), Manual (Twist/Mold/Weave), Additive (Preserve), Tool-based
-- Component crafting: Wheel, Frame, Hull, Handle, Sail, Sled runner
-- Vehicle crafting: Frame + Mobility + optional(Handles, Sail, Attachments)
-- Storage types: Personal, Carried, Stationary, Attached
-- Station crafting: Frame + Processing function (must be in building)
-- Knowledge: Auto-generated recipes, books for trading
 - Bootstrap: by-hand actions (break, twist, mold, stack, gather)
 - All crafting consolidated into DESIGN.md
 
@@ -56,7 +58,7 @@ Map Editor, Definition Editor, Firebase Integration, Interaction System, Yield S
 | 10   | Knowledge System      | Steps 4-9    | Auto-generated recipes, books                  |
 
 ## Next Steps
-P0: E key → inventory, inventory HUD, harvestYield()
+P0: Step 5 (Processing System) - Heat/Dry/Soak/Twist/Mold/Weave + tool-based
 P1: goal system, villager personalities, discovery hints
 P2: marketplace expansion, random events, multiple islands
 
@@ -85,4 +87,7 @@ design/property-hierarchy.md       # forms, capabilities, functional
 design/storyline.md                # needs, verbs, tiers
 stores/definitions/index.ts        # AliveYield, interactionType
 game/utils/interactionDetection.ts # yield+need detection
+types/tools.ts                     # Tool crafting types, material suitability
+stores/toolsStore.ts               # Tool crafting state management
+components/ToolCrafting.tsx        # Tool crafting UI
 ```

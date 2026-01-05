@@ -64,10 +64,3 @@ export function getAvailableTransformations(
     return { transformation, canPerform, missingRequirements };
   });
 }
-
-// For now, get equipped tool stats from inventory (simplified)
-export function getEquippedToolStats(): Partial<ToolFunctionAllocation> | null {
-  // TODO: Implement proper tool tracking
-  // For now, return null (no tool equipped) or a test tool
-  return null;
-}

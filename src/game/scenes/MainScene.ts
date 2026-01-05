@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { TILE_SIZE, MAP_SIZE } from '@/game/config';
-import { useMapEditorStore, PlantPlacement, AnimalPlacement, WaterPlacement, ResourcePlacement } from '@/stores/mapEditorStore';
+import { useMapEditorStore, PlantPlacement, AnimalPlacement, WaterPlacement, ResourcePlacement, MapData } from '@/stores/mapEditorStore';
+import { useRuntimeMapStore } from '@/stores/runtimeMapStore';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
 import { useGameStateStore } from '@/stores/gameStateStore';
 import { useInteractionStore } from '@/stores/interactionStore';
@@ -13,6 +14,18 @@ import { initSpoilageSystem } from '@/services/SpoilageService';
 import { useYieldStateStore } from '@/stores/yieldStateStore';
 import { getBootstrapRecipe } from '@/types/bootstrap';
 import { usePlacementStore } from '@/stores/placementStore';
+
+/**
+ * Helper to get the appropriate map data based on mode.
+ * In editor mode: use mapEditorStore (blueprint)
+ * In game mode: use runtimeMapStore (working copy)
+ */
+function getActiveMapData(isEditing: boolean): MapData {
+  if (isEditing) {
+    return useMapEditorStore.getState().mapData;
+  }
+  return useRuntimeMapStore.getState().mapData;
+}
 
 export class MainScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite;
@@ -38,6 +51,7 @@ export class MainScene extends Phaser.Scene {
   private lastResourcesHash = '';
   private lastStructuresHash = '';
   private lastSpawnHash = '';
+  private lastYieldStateHash = '';
   private lastIsEditing = false;
 
   // Movement
@@ -67,6 +81,12 @@ export class MainScene extends Phaser.Scene {
   private unsubscribeYieldSystem: (() => void) | null = null;
   private unsubscribeSpoilageSystem: (() => void) | null = null;
 
+  // Event handler references for cleanup
+  private wheelHandler: ((pointer: Phaser.Input.Pointer, gameObjects: Phaser.GameObjects.GameObject[], deltaX: number, deltaY: number) => void) | null = null;
+  private pointerDownHandler: ((pointer: Phaser.Input.Pointer) => void) | null = null;
+  private focusInHandler: ((e: FocusEvent) => void) | null = null;
+  private focusOutHandler: ((e: FocusEvent) => void) | null = null;
+
   constructor() {
     super({ key: 'MainScene' });
   }
@@ -85,9 +105,10 @@ export class MainScene extends Phaser.Scene {
     this.spawnMarker = this.add.graphics();
     this.spawnMarker.setDepth(3);
 
-    // Get spawn point from store
-    const store = useMapEditorStore.getState();
-    const spawn = store.mapData.spawn;
+    // Get spawn point from appropriate store based on mode
+    const editorStore = useMapEditorStore.getState();
+    const isEditing = editorStore.isEditing;
+    const spawn = getActiveMapData(isEditing).spawn;
 
     // Create player
     this.player = this.add.sprite(spawn.x, spawn.y, 'player');
@@ -124,7 +145,7 @@ export class MainScene extends Phaser.Scene {
     };
 
     // Mouse wheel zoom
-    this.input.on('wheel', (_pointer: Phaser.Input.Pointer, _gameObjects: Phaser.GameObjects.GameObject[], _deltaX: number, deltaY: number) => {
+    this.wheelHandler = (_pointer: Phaser.Input.Pointer, _gameObjects: Phaser.GameObjects.GameObject[], _deltaX: number, deltaY: number) => {
       const zoomChange = deltaY > 0 ? -0.1 : 0.1;
       const newZoom = Phaser.Math.Clamp(
         this.cameras.main.zoom + zoomChange,
@@ -132,28 +153,30 @@ export class MainScene extends Phaser.Scene {
         this.MAX_ZOOM
       );
       this.cameras.main.setZoom(newZoom);
-    });
+    };
+    this.input.on('wheel', this.wheelHandler);
 
     // Mouse click for editor
-    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+    this.pointerDownHandler = (pointer: Phaser.Input.Pointer) => {
       this.handleEditorClick(pointer);
-    });
+    };
+    this.input.on('pointerdown', this.pointerDownHandler);
 
     // Disable Phaser keyboard when HTML inputs are focused
-    const handleFocusIn = (e: FocusEvent) => {
+    this.focusInHandler = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
         this.input.keyboard!.enabled = false;
       }
     };
-    const handleFocusOut = (e: FocusEvent) => {
+    this.focusOutHandler = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
         this.input.keyboard!.enabled = true;
       }
     };
-    document.addEventListener('focusin', handleFocusIn);
-    document.addEventListener('focusout', handleFocusOut);
+    document.addEventListener('focusin', this.focusInHandler);
+    document.addEventListener('focusout', this.focusOutHandler);
 
     // Initialize game systems
     this.unsubscribeYieldSystem = initYieldSystem();
@@ -165,6 +188,26 @@ export class MainScene extends Phaser.Scene {
   }
 
   shutdown(): void {
+    // Cleanup input event listeners
+    if (this.wheelHandler) {
+      this.input.off('wheel', this.wheelHandler);
+      this.wheelHandler = null;
+    }
+    if (this.pointerDownHandler) {
+      this.input.off('pointerdown', this.pointerDownHandler);
+      this.pointerDownHandler = null;
+    }
+
+    // Cleanup document event listeners
+    if (this.focusInHandler) {
+      document.removeEventListener('focusin', this.focusInHandler);
+      this.focusInHandler = null;
+    }
+    if (this.focusOutHandler) {
+      document.removeEventListener('focusout', this.focusOutHandler);
+      this.focusOutHandler = null;
+    }
+
     // Cleanup game systems
     if (this.unsubscribeYieldSystem) {
       this.unsubscribeYieldSystem();
@@ -174,7 +217,7 @@ export class MainScene extends Phaser.Scene {
       this.unsubscribeSpoilageSystem();
       this.unsubscribeSpoilageSystem = null;
     }
-    console.log('[MainScene] Yield and spoilage systems cleaned up');
+    console.log('[MainScene] Event listeners and systems cleaned up');
   }
 
   update(_time: number, delta: number): void {
@@ -192,12 +235,13 @@ export class MainScene extends Phaser.Scene {
 
     const mapStore = useMapEditorStore.getState();
     const defStore = useDefinitionsStore.getState();
+    const isEditing = mapStore.isEditing;
 
     // Only allow player movement and interaction when neither editor is open and no input focused
-    if (!mapStore.isEditing && !defStore.isEditorOpen && !isInputFocused) {
+    if (!isEditing && !defStore.isEditorOpen && !isInputFocused) {
       this.handlePlayerMovement(delta);
-      this.updateInteractionDetection(mapStore, defStore);
-    } else if (mapStore.isEditing || defStore.isEditorOpen) {
+      this.updateInteractionDetection(isEditing, defStore);
+    } else if (isEditing || defStore.isEditorOpen) {
       // Clear interaction target when in editor mode
       useInteractionStore.getState().clearTarget();
     }
@@ -209,16 +253,19 @@ export class MainScene extends Phaser.Scene {
   }
 
   private updateInteractionDetection(
-    mapStore: ReturnType<typeof useMapEditorStore.getState>,
+    isEditing: boolean,
     defStore: ReturnType<typeof useDefinitionsStore.getState>
   ): void {
     const interactionStore = useInteractionStore.getState();
+
+    // Use runtime map for gameplay, editor map for editing
+    const mapData = getActiveMapData(isEditing);
 
     // Find nearest interactable object
     const target = findNearestInteractable(
       this.player.x,
       this.player.y,
-      mapStore.mapData,
+      mapData,
       {
         plants: defStore.plants,
         animals: defStore.animals,
@@ -260,35 +307,39 @@ export class MainScene extends Phaser.Scene {
       }
     }
 
-    // 1 key - Collect action (for resources)
-    if (Phaser.Input.Keyboard.JustDown(this.editorKeys.ONE)) {
-      if (!mapStore.isEditing && !defStore.isEditorOpen && interactionStore.currentTarget) {
-        const target = interactionStore.currentTarget;
-        // Only handle if this is a resource
-        if (target.object.type === 'resource') {
-          interactionStore.executeInteraction('collect');
-        }
-      }
-    }
-
-    // Handle number keys 2-9 for transformations
-    const numKeys = ['TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE'] as const;
-    numKeys.forEach((keyName, index) => {
+    // Handle number keys 1-9 for interactions
+    const allNumKeys = ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE'] as const;
+    allNumKeys.forEach((keyName, keyIndex) => {
       const key = this.editorKeys[keyName];
       if (key && Phaser.Input.Keyboard.JustDown(key)) {
         if (!mapStore.isEditing && !defStore.isEditorOpen && interactionStore.currentTarget) {
           const target = interactionStore.currentTarget;
-          if (target.object.type === 'resource') {
-            const resource = defStore.resources.find(r => r.id === target.object.definitionId);
-            if (resource?.transformations && resource.transformations[index]) {
-              const transformation = resource.transformations[index];
-              interactionStore.executeInteraction(transformation.action);
+
+          // For plants/animals: use interactionTypes array (yield actions + transformations)
+          if (target.object.type === 'plant' || target.object.type === 'animal') {
+            // The interactionTypes array contains yield actions and transformation actions
+            // in the same order as displayed in InteractionPrompt
+            if (target.interactionTypes[keyIndex]) {
+              interactionStore.executeInteraction(target.interactionTypes[keyIndex]);
+            }
+          }
+          // For resources: key 1 = collect, keys 2-9 = transformations
+          else if (target.object.type === 'resource') {
+            if (keyIndex === 0) {
+              interactionStore.executeInteraction('collect');
             } else {
-              // Fallback to bootstrap recipe for key 2
-              if (index === 0) {
-                const recipe = getBootstrapRecipe(target.object.definitionId);
-                if (recipe) {
-                  interactionStore.executeInteraction(recipe.action);
+              const transformIndex = keyIndex - 1;  // key 2 = index 0, key 3 = index 1, etc.
+              const resource = defStore.resources.find(r => r.id === target.object.definitionId);
+              if (resource?.transformations && resource.transformations[transformIndex]) {
+                const transformation = resource.transformations[transformIndex];
+                interactionStore.executeInteraction(transformation.action);
+              } else {
+                // Fallback to bootstrap recipe for key 2
+                if (transformIndex === 0) {
+                  const recipe = getBootstrapRecipe(target.object.definitionId);
+                  if (recipe) {
+                    interactionStore.executeInteraction(recipe.action);
+                  }
                 }
               }
             }
@@ -331,7 +382,7 @@ export class MainScene extends Phaser.Scene {
       placementStore.updatePreview(worldX, worldY);
 
       if (pointer.leftButtonDown()) {
-        // TODO: Consume items from inventory, place structure
+        // confirmPlacement() handles inventory consumption and structure placement
         placementStore.confirmPlacement();
       }
       return; // Don't process other clicks during placement
@@ -384,7 +435,12 @@ export class MainScene extends Phaser.Scene {
   private renderMapData(forceRender = false): void {
     const mapStore = useMapEditorStore.getState();
     const defStore = useDefinitionsStore.getState();
-    const { mapData, activeRiver, isEditing } = mapStore;
+    const { activeRiver, isEditing } = mapStore;
+
+    // Get the appropriate map data based on mode
+    // Editor mode: use blueprint from mapEditorStore
+    // Game mode: use runtime copy from runtimeMapStore
+    const mapData = getActiveMapData(isEditing);
 
     // Check if editing mode changed (need to update labels)
     const editingChanged = isEditing !== this.lastIsEditing;
@@ -444,6 +500,20 @@ export class MainScene extends Phaser.Scene {
     if (forceRender || spawnHash !== this.lastSpawnHash || editingChanged) {
       this.lastSpawnHash = spawnHash;
       this.renderSpawnMarker(mapData.spawn, isEditing);
+    }
+
+    // Yield state - update badges when yield state changes (separate from plant/animal data)
+    const yieldStateStore = useYieldStateStore.getState();
+    const yieldStateHash = this.hashData(Array.from(yieldStateStore.yieldStates.entries()));
+    if (forceRender || yieldStateHash !== this.lastYieldStateHash) {
+      this.lastYieldStateHash = yieldStateHash;
+      // Update yield badges for all plants and animals
+      for (const [id, container] of this.plantSprites) {
+        this.updateYieldBadge(container, id);
+      }
+      for (const [id, container] of this.animalSprites) {
+        this.updateYieldBadge(container, id);
+      }
     }
   }
 
@@ -533,27 +603,6 @@ export class MainScene extends Phaser.Scene {
     // Get sprite image (custom or generated)
     const textureKey = `plant-sprite-${placement.definitionId}`;
 
-    if (!this.textures.exists(textureKey) && definition) {
-      // Create texture from imageUrl or generate one
-      const imageUrl = definition.imageUrl || generatePlantPreview(definition.subCategory, definition.name);
-      if (imageUrl) {
-        const img = new Image();
-        img.onload = () => {
-          if (!this.textures.exists(textureKey)) {
-            this.textures.addImage(textureKey, img);
-            // Update sprite once texture is loaded
-            const existingSprite = container.first;
-            if (existingSprite && existingSprite instanceof Phaser.GameObjects.Sprite) {
-              existingSprite.setTexture(textureKey);
-              existingSprite.setDisplaySize(32, 32); // Re-apply size after texture change
-              existingSprite.clearTint();
-            }
-          }
-        };
-        img.src = imageUrl;
-      }
-    }
-
     // Create sprite with texture if available, otherwise use fallback
     const sprite = this.textures.exists(textureKey)
       ? this.add.sprite(0, 0, textureKey)
@@ -571,6 +620,25 @@ export class MainScene extends Phaser.Scene {
         bush: 0x84cc16,
       };
       sprite.setTint(colorMap[definition.subCategory] || 0xffffff);
+
+      // Start loading texture if not available
+      const imageUrl = definition.imageUrl || generatePlantPreview(definition.subCategory, definition.name);
+      if (imageUrl) {
+        const img = new Image();
+        img.onload = () => {
+          // Add texture only if it doesn't exist yet (first load wins)
+          if (!this.textures.exists(textureKey)) {
+            this.textures.addImage(textureKey, img);
+          }
+          // Always update THIS sprite once texture is available
+          if (sprite && sprite.scene) {
+            sprite.setTexture(textureKey);
+            sprite.setDisplaySize(32, 32);
+            sprite.clearTint();
+          }
+        };
+        img.src = imageUrl;
+      }
     }
     container.add(sprite);
 
@@ -752,40 +820,17 @@ export class MainScene extends Phaser.Scene {
     // Get sprite image (custom or generated)
     const textureKey = `animal-sprite-${placement.definitionId}`;
 
-    if (!this.textures.exists(textureKey) && definition) {
-      // Create texture from imageUrl or generate one
-      const imageUrl = definition.imageUrl || generateAnimalPreview(definition.subCategory, definition.name);
-      if (imageUrl) {
-        const img = new Image();
-        img.onload = () => {
-          if (!this.textures.exists(textureKey)) {
-            this.textures.addImage(textureKey, img);
-            // Update sprite once texture is loaded
-            const existingSprite = container.first;
-            if (existingSprite && existingSprite instanceof Phaser.GameObjects.Sprite) {
-              existingSprite.setTexture(textureKey);
-              existingSprite.setDisplaySize(32, 32); // Re-apply size after texture change
-            } else if (existingSprite && existingSprite instanceof Phaser.GameObjects.Graphics) {
-              // Replace graphics with sprite
-              existingSprite.destroy();
-              const sprite = this.add.sprite(0, 0, textureKey);
-              sprite.setDisplaySize(32, 32);
-              container.addAt(sprite, 0);
-            }
-          }
-        };
-        img.src = imageUrl;
-      }
-    }
-
     // Create sprite with texture if available, otherwise use fallback graphics
+    let sprite: Phaser.GameObjects.Sprite | null = null;
+    let graphics: Phaser.GameObjects.Graphics | null = null;
+
     if (this.textures.exists(textureKey)) {
-      const sprite = this.add.sprite(0, 0, textureKey);
+      sprite = this.add.sprite(0, 0, textureKey);
       sprite.setDisplaySize(32, 32);
       container.add(sprite);
     } else {
       // Fallback: colored circle (16px radius = 32px diameter = 1 meter)
-      const graphics = this.add.graphics();
+      graphics = this.add.graphics();
       const colorMap: Record<string, number> = {
         livestock: 0x8b4513,
         poultry: 0xffa500,
@@ -798,6 +843,28 @@ export class MainScene extends Phaser.Scene {
       graphics.lineStyle(2, 0x000000, 1);
       graphics.strokeCircle(0, 0, 16);
       container.add(graphics);
+
+      // Start loading texture if not available
+      if (definition) {
+        const imageUrl = definition.imageUrl || generateAnimalPreview(definition.subCategory, definition.name);
+        if (imageUrl) {
+          const img = new Image();
+          img.onload = () => {
+            // Add texture only if it doesn't exist yet (first load wins)
+            if (!this.textures.exists(textureKey)) {
+              this.textures.addImage(textureKey, img);
+            }
+            // Always update THIS container once texture is available
+            if (graphics && graphics.scene) {
+              graphics.destroy();
+              const newSprite = this.add.sprite(0, 0, textureKey);
+              newSprite.setDisplaySize(32, 32);
+              container.addAt(newSprite, 0);
+            }
+          };
+          img.src = imageUrl;
+        }
+      }
     }
 
     // Add yield badge (top-right corner)
@@ -875,24 +942,6 @@ export class MainScene extends Phaser.Scene {
     // Get sprite image if available
     const textureKey = `water-sprite-${placement.definitionId}`;
 
-    if (!this.textures.exists(textureKey) && definition?.imageUrl) {
-      const img = new Image();
-      img.onload = () => {
-        if (!this.textures.exists(textureKey)) {
-          this.textures.addImage(textureKey, img);
-          // Replace graphics with sprite once loaded
-          const existingGraphics = container.first;
-          if (existingGraphics && existingGraphics instanceof Phaser.GameObjects.Graphics) {
-            existingGraphics.destroy();
-            const sprite = this.add.sprite(0, 0, textureKey);
-            sprite.setDisplaySize(32, 32);
-            container.addAt(sprite, 0);
-          }
-        }
-      };
-      img.src = definition.imageUrl;
-    }
-
     // Create sprite with texture if available, otherwise use fallback graphics
     if (this.textures.exists(textureKey)) {
       const sprite = this.add.sprite(0, 0, textureKey);
@@ -914,6 +963,25 @@ export class MainScene extends Phaser.Scene {
       graphics.lineStyle(2, 0x1e40af, 1);
       graphics.strokeCircle(0, 0, 16);
       container.add(graphics);
+
+      // Start loading texture if not available
+      if (definition?.imageUrl) {
+        const img = new Image();
+        img.onload = () => {
+          // Add texture only if it doesn't exist yet (first load wins)
+          if (!this.textures.exists(textureKey)) {
+            this.textures.addImage(textureKey, img);
+          }
+          // Always update THIS container once texture is available
+          if (graphics && graphics.scene) {
+            graphics.destroy();
+            const newSprite = this.add.sprite(0, 0, textureKey);
+            newSprite.setDisplaySize(32, 32);
+            container.addAt(newSprite, 0);
+          }
+        };
+        img.src = definition.imageUrl;
+      }
     }
 
     // Add label if editing
@@ -1147,17 +1215,17 @@ export class MainScene extends Phaser.Scene {
     const newX = this.player.x + vx * speed;
     const newY = this.player.y + vy * speed;
 
-    // Check collisions
-    const store = useMapEditorStore.getState();
-    const canMove = !checkCollision(newX, newY, store.mapData);
+    // Check collisions using runtime map (since this is called during gameplay, not editing)
+    const mapData = useRuntimeMapStore.getState().mapData;
+    const canMove = !checkCollision(newX, newY, mapData);
 
     if (canMove) {
       this.player.x = newX;
       this.player.y = newY;
     } else {
       // Try axis-separated movement
-      const canMoveX = !checkCollision(newX, this.player.y, store.mapData);
-      const canMoveY = !checkCollision(this.player.x, newY, store.mapData);
+      const canMoveX = !checkCollision(newX, this.player.y, mapData);
+      const canMoveY = !checkCollision(this.player.x, newY, mapData);
       if (canMoveX) this.player.x = newX;
       if (canMoveY) this.player.y = newY;
     }

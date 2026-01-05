@@ -5,9 +5,10 @@ import { Card, FieldRow, CompactInput, CompactSelect, TwoColumnRow, SliderField,
 import { TransformationsEditor } from './TransformationsEditor';
 import { FaTrashAlt } from 'react-icons/fa';
 import { generateAnimalPreview } from '@/utils/generatePreviewImage';
+import type { AnimalDefinition } from '@/stores/definitions/animalsStore';
 
 interface AnimalFormProps {
-  item: any;
+  item: AnimalDefinition;
   isDraft?: boolean;
   onSave?: () => void;
   onCancel?: () => void;
@@ -18,7 +19,7 @@ export function AnimalForm({ item, isDraft, onSave, onCancel }: AnimalFormProps)
   const { openSpriteEditor } = useGameStateStore();
   const [draftDeadYield, setDraftDeadYield] = useState<DeadYield | null>(null);
 
-  const handleChange = (field: string, value: any) => {
+  const handleChange = (field: string, value: unknown) => {
     if (isDraft) {
       updateDraftAnimal({ [field]: value });
     } else {
@@ -31,7 +32,7 @@ export function AnimalForm({ item, isDraft, onSave, onCancel }: AnimalFormProps)
   };
 
   const handleRemoveAliveYield = (index: number) => {
-    handleChange('aliveYields', item.aliveYields.filter((_: any, i: number) => i !== index));
+    handleChange('aliveYields', item.aliveYields.filter((_: AliveYield, i: number) => i !== index));
   };
 
   const handleAliveYieldChange = (index: number, updated: AliveYield) => {
@@ -57,10 +58,10 @@ export function AnimalForm({ item, isDraft, onSave, onCancel }: AnimalFormProps)
   };
 
   const handleRemoveDeadYield = (index: number) => {
-    handleChange('deadYields', item.deadYields.filter((_: any, i: number) => i !== index));
+    handleChange('deadYields', item.deadYields.filter((_: DeadYield, i: number) => i !== index));
   };
 
-  const handleDeadYieldChange = (index: number, field: keyof DeadYield, value: any) => {
+  const handleDeadYieldChange = (index: number, field: keyof DeadYield, value: unknown) => {
     const updated = item.deadYields.map((dy: DeadYield, i: number) =>
       i === index ? { ...dy, [field]: value } : dy
     );

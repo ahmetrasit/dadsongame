@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { WorldChunk, BiomeType, Tile } from '@/types';
 import { getChunkKey } from '@/services';
 import type { Season } from '@/stores/definitions';
@@ -130,7 +131,9 @@ function generateChunk(chunkX: number, chunkY: number, seed: number): WorldChunk
   };
 }
 
-export const useWorldStore = create<WorldState>((set, get) => ({
+export const useWorldStore = create<WorldState>()(
+  persist(
+    (set, get) => ({
   chunks: new Map(),
   currentBiome: 'forest',
   time: 8 * 60, // Start at 8:00 AM
@@ -292,7 +295,20 @@ export const useWorldStore = create<WorldState>((set, get) => ({
       }));
     };
   },
-}));
+    }),
+    {
+      name: 'world-storage',
+      partialize: (state) => ({
+        time: state.time,
+        day: state.day,
+        season: state.season,
+        year: state.year,
+        weather: state.weather,
+        seed: state.seed,
+      }),
+    }
+  )
+);
 
 // Selectors
 export const useGameTime = () => useWorldStore((s) => s.time);

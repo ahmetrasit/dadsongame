@@ -1,5 +1,7 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { Season } from '@/stores/definitions';
+import { useWorldStore } from '@/stores/worldStore';
 
 /**
  * Tracks the runtime yield state for placed plants and animals.
@@ -13,6 +15,7 @@ export interface YieldState {
   remaining: number;            // Remaining yield count
   total: number;                // Total yield available this season
   isAvailable: boolean;         // Whether yield is available (season matches)
+  lastHarvestDay: number | null; // Day when last harvested (for interval-based regeneration)
 }
 
 // State for a single placement (plant or animal)
@@ -57,9 +60,14 @@ interface YieldStateStore {
 
   // Clear all yield states
   clearAll: () => void;
+
+  // Regenerate a yield (reset remaining to total, update lastHarvestDay)
+  regenerateYield: (placementId: string, yieldIndex: number, currentDay: number) => void;
 }
 
-export const useYieldStateStore = create<YieldStateStore>((set, get) => ({
+export const useYieldStateStore = create<YieldStateStore>()(
+  persist(
+    (set, get) => ({
   yieldStates: new Map(),
 
   initYieldState: (placementId, placementType, aliveYields, currentSeason) => {
@@ -70,6 +78,7 @@ export const useYieldStateStore = create<YieldStateStore>((set, get) => ({
         remaining: isAvailable ? yield_.amount : 0,
         total: yield_.amount,
         isAvailable,
+        lastHarvestDay: null,
       };
     });
 
@@ -96,6 +105,7 @@ export const useYieldStateStore = create<YieldStateStore>((set, get) => ({
     }
 
     const harvested = Math.min(amount, yieldState.remaining);
+    const currentDay = useWorldStore.getState().day;
 
     set((s) => {
       const newMap = new Map(s.yieldStates);
@@ -104,6 +114,7 @@ export const useYieldStateStore = create<YieldStateStore>((set, get) => ({
       newPlacementState.yields[yieldIndex] = {
         ...yieldState,
         remaining: yieldState.remaining - harvested,
+        lastHarvestDay: currentDay,
       };
       newMap.set(placementId, newPlacementState);
       return { yieldStates: newMap };
@@ -140,6 +151,7 @@ export const useYieldStateStore = create<YieldStateStore>((set, get) => ({
             remaining: isAvailable ? yield_.amount : 0,
             total: yield_.amount,
             isAvailable,
+            lastHarvestDay: null,
           };
         });
 
@@ -165,7 +177,63 @@ export const useYieldStateStore = create<YieldStateStore>((set, get) => ({
   clearAll: () => {
     set({ yieldStates: new Map() });
   },
-}));
+
+  regenerateYield: (placementId, yieldIndex, currentDay) => {
+    const state = get();
+    const placementState = state.yieldStates.get(placementId);
+
+    if (!placementState) return;
+
+    const yieldState = placementState.yields[yieldIndex];
+    if (!yieldState || !yieldState.isAvailable) return;
+
+    set((s) => {
+      const newMap = new Map(s.yieldStates);
+      const newPlacementState = { ...placementState };
+      newPlacementState.yields = [...placementState.yields];
+      newPlacementState.yields[yieldIndex] = {
+        ...yieldState,
+        remaining: yieldState.total,
+        lastHarvestDay: currentDay,
+      };
+      newMap.set(placementId, newPlacementState);
+      return { yieldStates: newMap };
+    });
+  },
+    }),
+    {
+      name: 'yield-state-storage',
+      // Custom storage to handle Map serialization
+      storage: {
+        getItem: (name) => {
+          const str = localStorage.getItem(name);
+          if (!str) return null;
+          const data = JSON.parse(str);
+          // Convert array back to Map
+          if (data.state?.yieldStates) {
+            data.state.yieldStates = new Map(data.state.yieldStates);
+          }
+          return data;
+        },
+        setItem: (name, value) => {
+          // Convert Map to array for JSON serialization
+          // Zustand persist wraps state in { state: ..., version: ... }
+          const toStore = {
+            ...value,
+            state: {
+              ...value.state,
+              yieldStates: Array.from((value.state?.yieldStates || new Map()).entries()),
+            },
+          };
+          localStorage.setItem(name, JSON.stringify(toStore));
+        },
+        removeItem: (name) => localStorage.removeItem(name),
+      },
+      // Only persist the yieldStates data
+      partialize: (state) => ({ yieldStates: state.yieldStates }) as YieldStateStore,
+    }
+  )
+);
 
 // Selectors
 export const useYieldState = (placementId: string) =>

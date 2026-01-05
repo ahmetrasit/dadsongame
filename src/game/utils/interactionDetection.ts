@@ -48,10 +48,9 @@ export function findNearestInteractable(
 
     const dist = distance(playerX, playerY, plant.x, plant.y);
     if (dist <= def.interactionRadius && dist < nearestDistance) {
-      // Combine yield interactions, yield transformation actions, and need interactions
+      // Combine yield interactions (with fallback for undefined), yield transformation actions, and need interactions
       const yieldInteractions = def.aliveYields
-        .map(y => y.interactionType)
-        .filter(Boolean) as string[];
+        .map(y => y.interactionType || 'harvest');  // Default fallback for plants
       // Include transformation actions from yields
       const yieldTransformActions = def.aliveYields
         .flatMap(y => (y.transformations || []).map(t => t.action))
@@ -81,10 +80,9 @@ export function findNearestInteractable(
 
     const dist = distance(playerX, playerY, animal.x, animal.y);
     if (dist <= def.interactionRadius && dist < nearestDistance) {
-      // Combine yield interactions, yield transformation actions, and need interactions
+      // Combine yield interactions (with fallback for undefined), yield transformation actions, and need interactions
       const yieldInteractions = def.aliveYields
-        .map(y => y.interactionType)
-        .filter(Boolean) as string[];
+        .map(y => y.interactionType || 'collect');  // Default fallback for animals
       // Include transformation actions from yields
       const yieldTransformActions = def.aliveYields
         .flatMap(y => (y.transformations || []).map(t => t.action))

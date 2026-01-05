@@ -7,6 +7,7 @@ import { Gallery } from '@/components/Gallery';
 import { MainMenu } from '@/components/MainMenu';
 import { VersionBadge } from '@/components/VersionBadge';
 import { InteractionPrompt } from '@/components/InteractionPrompt';
+import { HUD } from '@/components/HUD';
 import { useGameStateStore } from '@/stores/gameStateStore';
 import { useMapEditorStore } from '@/stores/mapEditorStore';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
@@ -108,6 +109,9 @@ function App() {
     <>
       <Game />
       <VersionBadge />
+
+      {/* Show HUD in game mode */}
+      {currentScreen === 'game' && <HUD />}
 
       {/* Show editor toolbar only in game and mapEditor modes */}
       {(currentScreen === 'game' || currentScreen === 'mapEditor') && <EditorToolbar />}

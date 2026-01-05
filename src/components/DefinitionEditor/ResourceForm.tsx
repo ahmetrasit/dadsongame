@@ -6,11 +6,11 @@ import { FaTrashAlt } from 'react-icons/fa';
 import { generateResourcePreview } from '@/utils/generatePreviewImage';
 import type {
   VitaminType, FoodNutrition, ResourceInteractionType, MaterialCategory,
-  MaterialTransformation, TransformationAction, TransformationProperty, TransformationRequirement
+  MaterialTransformation, TransformationAction, TransformationProperty, TransformationRequirement, ResourceDefinition
 } from '@/stores/definitions/resourcesStore';
 
 interface ResourceFormProps {
-  item: any;
+  item: ResourceDefinition;
   isDraft?: boolean;
   onSave?: () => void;
   onCancel?: () => void;
@@ -28,7 +28,7 @@ export function ResourceForm({ item, isDraft, onSave, onCancel }: ResourceFormPr
   const { updateResource, updateDraftResource, deleteResource, resources } = useDefinitionsStore();
   const { openSpriteEditor } = useGameStateStore();
 
-  const handleChange = (field: string, value: any) => {
+  const handleChange = (field: string, value: unknown) => {
     if (isDraft) {
       updateDraftResource({ [field]: value });
     } else {
@@ -74,7 +74,7 @@ export function ResourceForm({ item, isDraft, onSave, onCancel }: ResourceFormPr
   const nutrition = item.nutrition || defaultNutrition;
 
   // Handle nutrition field changes
-  const handleNutritionChange = useCallback((field: keyof FoodNutrition, value: any) => {
+  const handleNutritionChange = useCallback((field: keyof FoodNutrition, value: unknown) => {
     const updatedNutrition = { ...nutrition, [field]: value };
     handleChange('nutrition', updatedNutrition);
   }, [nutrition, handleChange]);

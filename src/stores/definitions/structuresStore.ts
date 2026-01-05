@@ -1,4 +1,5 @@
 import { StateCreator } from 'zustand';
+import { useWorldStore } from '@/stores/worldStore';
 
 export interface StructureDefinition {
   id: string;
@@ -59,7 +60,7 @@ export const createStructureSlice: StateCreator<
       definitionId,
       x,
       y,
-      placedAtDay: 1 // TODO: get from worldStore
+      placedAtDay: useWorldStore.getState().day
     };
     set((s) => ({
       structurePlacements: [...s.structurePlacements, placement]

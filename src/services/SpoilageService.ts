@@ -1,4 +1,4 @@
-import { useMapEditorStore } from '@/stores/mapEditorStore';
+import { useRuntimeMapStore } from '@/stores/runtimeMapStore';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
 import { SPOILAGE_DAYS, useWorldStore } from '@/stores/worldStore';
 
@@ -37,7 +37,7 @@ export function isResourceExpired(
  * Should be called at the start of each new day
  */
 export function removeExpiredResources(): number {
-  const mapStore = useMapEditorStore.getState();
+  const mapStore = useRuntimeMapStore.getState();
   const defStore = useDefinitionsStore.getState();
   const worldStore = useWorldStore.getState();
   const currentDay = worldStore.day;

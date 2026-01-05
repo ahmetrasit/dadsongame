@@ -5,9 +5,10 @@ import { Card, FieldRow, CompactInput, CompactSelect, TwoColumnRow, SliderField,
 import { TransformationsEditor } from './TransformationsEditor';
 import { FaTrashAlt } from 'react-icons/fa';
 import { generatePlantPreview } from '@/utils/generatePreviewImage';
+import type { PlantDefinition } from '@/stores/definitions/plantsStore';
 
 interface PlantFormProps {
-  item: any;
+  item: PlantDefinition;
   isDraft?: boolean;
   onSave?: () => void;
   onCancel?: () => void;
@@ -18,7 +19,7 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
   const { openSpriteEditor } = useGameStateStore();
   const [draftDeadYield, setDraftDeadYield] = useState<DeadYield | null>(null);
 
-  const handleChange = (field: string, value: any) => {
+  const handleChange = (field: string, value: unknown) => {
     if (isDraft) {
       updateDraftPlant({ [field]: value });
     } else {
@@ -52,7 +53,7 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
   };
 
   const handleRemoveAliveYield = (index: number) => {
-    handleChange('aliveYields', item.aliveYields.filter((_: any, i: number) => i !== index));
+    handleChange('aliveYields', item.aliveYields.filter((_: AliveYield, i: number) => i !== index));
   };
 
   const handleAliveYieldChange = (index: number, updated: AliveYield) => {
@@ -78,10 +79,10 @@ export function PlantForm({ item, isDraft, onSave, onCancel }: PlantFormProps) {
   };
 
   const handleRemoveDeadYield = (index: number) => {
-    handleChange('deadYields', item.deadYields.filter((_: any, i: number) => i !== index));
+    handleChange('deadYields', item.deadYields.filter((_: DeadYield, i: number) => i !== index));
   };
 
-  const handleDeadYieldChange = (index: number, field: keyof DeadYield, value: any) => {
+  const handleDeadYieldChange = (index: number, field: keyof DeadYield, value: unknown) => {
     const updated = item.deadYields.map((dy: DeadYield, i: number) =>
       i === index ? { ...dy, [field]: value } : dy
     );

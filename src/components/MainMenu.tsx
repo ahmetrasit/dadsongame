@@ -1,18 +1,69 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStateStore } from '@/stores/gameStateStore';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
+import { useMapEditorStore } from '@/stores/mapEditorStore';
+import { useRuntimeMapStore } from '@/stores/runtimeMapStore';
+import { useInventoryStore } from '@/stores/inventoryStore';
+import { useYieldStateStore } from '@/stores/yieldStateStore';
+import { useWorldStore } from '@/stores/worldStore';
 
 export function MainMenu() {
   const { setScreen } = useGameStateStore();
   const { openEditor } = useDefinitionsStore();
+  const savedMaps = useMapEditorStore((s) => s.savedMaps);
+  const isLoadingMaps = useMapEditorStore((s) => s.isLoadingMaps);
+  const refreshMapList = useMapEditorStore((s) => s.refreshMapList);
+  const loadMap = useMapEditorStore((s) => s.loadMap);
+  const newMap = useMapEditorStore((s) => s.newMap);
+  const syncError = useMapEditorStore((s) => s.syncError);
+
   const [showMapSelect, setShowMapSelect] = useState(false);
   const [showEditorMenu, setShowEditorMenu] = useState(false);
+
+  // Fetch saved maps when showing map selection
+  useEffect(() => {
+    if (showMapSelect) {
+      refreshMapList();
+    }
+  }, [showMapSelect, refreshMapList]);
 
   const handleNewGame = () => {
     setShowMapSelect(true);
   };
 
+  // Reset all runtime game state for a fresh start
+  const resetGameState = () => {
+    useInventoryStore.getState().initInventory();
+    useYieldStateStore.getState().clearAll();
+    useWorldStore.getState().initWorld();
+  };
+
+  const handleSelectMap = async (mapId: string) => {
+    await loadMap(mapId);
+    // Only navigate if load succeeded (no error set)
+    const error = useMapEditorStore.getState().syncError;
+    if (!error) {
+      // Reset all game state for new game
+      resetGameState();
+      // Initialize runtime map from the loaded blueprint
+      const blueprint = useMapEditorStore.getState().mapData;
+      useRuntimeMapStore.getState().initFromBlueprint(blueprint, mapId);
+      setScreen('game');
+    }
+  };
+
+  const handleDefaultMap = () => {
+    newMap();  // Start fresh with default map
+    // Reset all game state for new game
+    resetGameState();
+    // Initialize runtime map from the default blueprint
+    const blueprint = useMapEditorStore.getState().mapData;
+    useRuntimeMapStore.getState().initFromBlueprint(blueprint, null);
+    setScreen('game');
+  };
+
   const handleStartGame = () => {
+    // Resume uses existing runtime state (don't reinitialize)
     setScreen('game');
   };
 
@@ -73,7 +124,81 @@ export function MainMenu() {
       {showMapSelect && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '400px' }}>
           <h2 style={{ textAlign: 'center', marginBottom: '10px', fontSize: '24px' }}>Select Map</h2>
-          <MenuButton onClick={handleStartGame}>Default Map</MenuButton>
+
+          {/* Error display */}
+          {syncError && (
+            <div style={{
+              padding: '10px',
+              background: '#FEE2E2',
+              border: '1px solid #EF4444',
+              borderRadius: '6px',
+              color: '#DC2626',
+              fontSize: '14px',
+              textAlign: 'center',
+            }}>
+              {syncError}
+            </div>
+          )}
+
+          <MenuButton onClick={handleDefaultMap}>Default Map</MenuButton>
+
+          {/* Saved Maps */}
+          {isLoadingMaps && (
+            <div style={{ textAlign: 'center', color: '#666', padding: '10px' }}>
+              Loading saved maps...
+            </div>
+          )}
+
+          {!isLoadingMaps && savedMaps.length > 0 && (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+              maxHeight: '200px',
+              overflowY: 'auto',
+              padding: '10px',
+              background: '#E8DDD1',
+              borderRadius: '8px',
+            }}>
+              <div style={{ fontSize: '14px', color: '#666', marginBottom: '5px' }}>
+                Saved Maps:
+              </div>
+              {savedMaps.map((map) => (
+                <button
+                  key={map.id}
+                  onClick={() => handleSelectMap(map.id)}
+                  style={{
+                    padding: '12px 16px',
+                    fontSize: '16px',
+                    background: '#FFF1E5',
+                    border: '1px solid #D4C4B0',
+                    borderRadius: '6px',
+                    color: '#333',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#0D0D0D';
+                    e.currentTarget.style.color = '#FFF1E5';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#FFF1E5';
+                    e.currentTarget.style.color = '#333';
+                  }}
+                >
+                  {map.name}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {!isLoadingMaps && savedMaps.length === 0 && (
+            <div style={{ textAlign: 'center', color: '#666', fontSize: '14px', padding: '10px' }}>
+              No saved maps. Create one in Map Editor!
+            </div>
+          )}
+
           <MenuButton onClick={() => setShowMapSelect(false)} secondary>Back</MenuButton>
         </div>
       )}

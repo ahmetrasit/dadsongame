@@ -1,6 +1,8 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { LegacyInventory as Inventory, LegacyInventorySlot as InventorySlot, ItemDefinition } from '@/types';
 import { useDefinitionsStore } from './definitionsStore';
+import type { CraftedTool } from '@/types/tools';
 
 // Item definitions - will be expanded later
 export const ITEM_DEFINITIONS: Record<string, ItemDefinition> = {
@@ -89,7 +91,9 @@ const logInventory = (slots: InventorySlot[], action: string) => {
   console.log(`  Total: ${items.length} item type(s)`);
 };
 
-export const useInventoryStore = create<InventoryState>((set, get) => ({
+export const useInventoryStore = create<InventoryState>()(
+  persist(
+    (set, get) => ({
   inventory: {
     slots: createEmptySlots(20),
     maxSlots: 20,
@@ -126,6 +130,23 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
           stackable: true,
           maxStack: 99,
           spriteKey: resource.imageUrl || `item-${resource.category}`
+        };
+      }
+    }
+
+    // If not found, try crafted tools
+    if (!definition && itemId.startsWith('tool-')) {
+      const { useToolsStore } = require('./toolsStore');
+      const tool: CraftedTool | undefined = useToolsStore.getState().getTool(itemId);
+      if (tool) {
+        definition = {
+          id: tool.id,
+          name: tool.name,
+          description: `${tool.size === 'long' ? 'Long' : 'Short'} tool`,
+          category: 'tool',
+          stackable: false,
+          maxStack: 1,
+          spriteKey: 'item-tool'
         };
       }
     }
@@ -186,6 +207,23 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
           stackable: true,
           maxStack: 99,
           spriteKey: resource.imageUrl || `item-${resource.category}`
+        };
+      }
+    }
+
+    // If not found, try crafted tools
+    if (!definition && itemId.startsWith('tool-')) {
+      const { useToolsStore } = require('./toolsStore');
+      const tool: CraftedTool | undefined = useToolsStore.getState().getTool(itemId);
+      if (tool) {
+        definition = {
+          id: tool.id,
+          name: tool.name,
+          description: `Tool`,
+          category: 'tool',
+          stackable: false,
+          maxStack: 1,
+          spriteKey: 'item-tool'
         };
       }
     }
@@ -335,6 +373,24 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
       }
     }
 
+    // If not found, try crafted tools (lazy import to avoid circular dependency)
+    if (!definition && itemId.startsWith('tool-')) {
+      // Use require to avoid circular import
+      const { useToolsStore } = require('./toolsStore');
+      const tool: CraftedTool | undefined = useToolsStore.getState().getTool(itemId);
+      if (tool) {
+        definition = {
+          id: tool.id,
+          name: tool.name,
+          description: `${tool.size === 'long' ? 'Long' : 'Short'} tool (${tool.totalPoints} pts)`,
+          category: 'tool',
+          stackable: false,
+          maxStack: 1,
+          spriteKey: 'item-tool'
+        };
+      }
+    }
+
     return definition;
   },
 
@@ -342,7 +398,16 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     const state = get();
     return state.inventory.slots[state.inventory.selectedSlot] ?? null;
   }
-}));
+    }),
+    {
+      name: 'inventory-storage',
+      partialize: (state) => ({
+        inventory: state.inventory,
+        // Don't persist isOpen - UI state shouldn't persist
+      }),
+    }
+  )
+);
 
 // Selector hooks
 export const useInventorySlots = () => useInventoryStore((state) => state.inventory.slots);

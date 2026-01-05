@@ -43,6 +43,7 @@ export function EditorToolbar() {
   const [expandedCategory, setExpandedCategory] = useState<Category | null>('plants');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showLoadPanel, setShowLoadPanel] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Load saved maps list when panel is opened
   useEffect(() => {
@@ -159,6 +160,17 @@ export function EditorToolbar() {
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   };
+
+  // Filter items based on search query
+  const filteredPlants = searchQuery.trim()
+    ? plants.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : plants;
+  const filteredAnimals = searchQuery.trim()
+    ? animals.filter(a => a.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : animals;
+  const filteredResources = searchQuery.trim()
+    ? resources.filter(r => r.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : resources;
 
   // Get image for an object
   const getPlantImage = (plant: typeof plants[0]) => {
@@ -426,6 +438,29 @@ export function EditorToolbar() {
         </div>
       )}
 
+      {/* Search bar */}
+      <input
+        type="text"
+        placeholder="Search objects..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        onKeyDown={(e) => e.stopPropagation()}
+        onKeyUp={(e) => e.stopPropagation()}
+        onKeyPress={(e) => e.stopPropagation()}
+        style={{
+          width: '100%',
+          padding: '8px 10px',
+          marginBottom: '10px',
+          background: '#2a2a2a',
+          border: '1px solid #444',
+          borderRadius: '4px',
+          color: 'white',
+          fontSize: '12px',
+          fontFamily: 'Avenir, system-ui, sans-serif',
+          boxSizing: 'border-box',
+        }}
+      />
+
       {/* Categories Accordion */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
 
@@ -435,18 +470,18 @@ export function EditorToolbar() {
             style={categoryHeaderStyle('plants', currentTool === 'plant')}
             onClick={() => toggleCategory('plants')}
           >
-            <span>Plants ({plants.length})</span>
+            <span>Plants ({filteredPlants.length})</span>
             <span>{expandedCategory === 'plants' ? '▼' : '▶'}</span>
           </button>
           {expandedCategory === 'plants' && (
             <div style={{ padding: '8px', background: '#1a1a1a', borderRadius: '0 0 4px 4px', marginBottom: '4px' }}>
-              {plants.length === 0 ? (
+              {filteredPlants.length === 0 ? (
                 <div style={{ fontSize: '11px', color: '#888', textAlign: 'center', padding: '8px' }}>
-                  No plants defined
+                  {searchQuery ? 'No matching plants' : 'No plants defined'}
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {plants.map(plant => (
+                  {filteredPlants.map(plant => (
                     <div
                       key={plant.id}
                       style={badgeStyle(selectedPlantId === plant.id)}
@@ -468,18 +503,18 @@ export function EditorToolbar() {
             style={categoryHeaderStyle('animals', currentTool === 'animal')}
             onClick={() => toggleCategory('animals')}
           >
-            <span>Animals ({animals.length})</span>
+            <span>Animals ({filteredAnimals.length})</span>
             <span>{expandedCategory === 'animals' ? '▼' : '▶'}</span>
           </button>
           {expandedCategory === 'animals' && (
             <div style={{ padding: '8px', background: '#1a1a1a', borderRadius: '0 0 4px 4px', marginBottom: '4px' }}>
-              {animals.length === 0 ? (
+              {filteredAnimals.length === 0 ? (
                 <div style={{ fontSize: '11px', color: '#888', textAlign: 'center', padding: '8px' }}>
-                  No animals defined
+                  {searchQuery ? 'No matching animals' : 'No animals defined'}
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {animals.map(animal => (
+                  {filteredAnimals.map(animal => (
                     <div
                       key={animal.id}
                       style={badgeStyle(selectedAnimalId === animal.id)}
@@ -501,24 +536,28 @@ export function EditorToolbar() {
             style={categoryHeaderStyle('materials', currentTool === 'resource')}
             onClick={() => toggleCategory('materials')}
           >
-            <span>Materials ({resources.length})</span>
+            <span>Materials ({filteredResources.length})</span>
             <span>{expandedCategory === 'materials' ? '▼' : '▶'}</span>
           </button>
           {expandedCategory === 'materials' && (
             <div style={{ padding: '8px', background: '#1a1a1a', borderRadius: '0 0 4px 4px', marginBottom: '4px' }}>
-              {resources.length === 0 ? (
+              {filteredResources.length === 0 ? (
                 <div style={{ fontSize: '11px', color: '#888', textAlign: 'center', padding: '8px' }}>
-                  No materials defined
+                  {searchQuery ? 'No matching materials' : 'No materials defined'}
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {resources.map(resource => (
+                  {filteredResources.map(resource => (
                     <div
                       key={resource.id}
                       style={badgeStyle(selectedResourceId === resource.id)}
                       onClick={() => setSelectedResourceId(resource.id)}
                     >
-                      {getResourceImage(resource) ? (
+                      {resource.emoji ? (
+                        <div style={{ ...badgeImageStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+                          {resource.emoji}
+                        </div>
+                      ) : getResourceImage(resource) ? (
                         <img src={getResourceImage(resource)} alt={resource.name} style={badgeImageStyle} />
                       ) : (
                         <div style={{ ...badgeImageStyle, background: '#666', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>

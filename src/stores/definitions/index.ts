@@ -22,7 +22,7 @@ export type AnimalYieldInteraction = 'milk' | 'shear' | 'gather' | 'collect';
 
 // Need interaction types - how player cares for the creature
 export type PlantNeedInteraction = 'water' | 'fertilize';
-export type AnimalNeedInteraction = 'feed' | 'water' | 'pet' | 'lead' | 'tame';
+export type AnimalNeedInteraction = 'feed' | 'water' | 'pet' | 'lead' | 'tame' | 'ride';
 
 export interface AliveYield {
   resourceId: string;
@@ -227,7 +227,6 @@ export const useDefinitionsStore = create<DefinitionsState>()(
                 firebaseSyncEnabled: true,
                 lastSyncTime: result.timestamp,
               });
-              console.log('[DefinitionsStore] Loaded definitions from Firebase');
             } else {
               // No data in Firebase yet - upload current local data
               const state = get();
@@ -241,7 +240,6 @@ export const useDefinitionsStore = create<DefinitionsState>()(
                 firebaseSyncEnabled: true,
                 lastSyncTime: timestamp || new Date().toISOString()
               });
-              console.log('[DefinitionsStore] Uploaded local definitions to Firebase');
             }
 
             // Subscribe to real-time updates from other users
@@ -253,12 +251,8 @@ export const useDefinitionsStore = create<DefinitionsState>()(
                 const localWithTransforms = localResources.filter(r => r.transformations && r.transformations.length > 0);
                 const remoteWithTransforms = remoteResources.filter((r: any) => r.transformations && r.transformations.length > 0);
 
-                console.log('[DefinitionsStore] Remote update received');
-                console.log('  Local resources with transformations:', localWithTransforms.length);
-                console.log('  Remote resources with transformations:', remoteWithTransforms.length);
-
                 if (localWithTransforms.length > remoteWithTransforms.length) {
-                  console.warn('[DefinitionsStore] WARNING: Remote update has fewer transformations than local! Local transformations may be lost.');
+                  console.warn('[DefinitionsStore] Remote update has fewer transformations than local - local data may be overwritten');
                 }
 
                 // Update lastSyncedData to prevent re-sync loop
@@ -343,21 +337,11 @@ export const useDefinitionsStore = create<DefinitionsState>()(
             waters: state.waters,
             structurePlacements: state.structurePlacements,
           };
-          // Debug: log resources with transformations when saving
-          const resourcesWithTransforms = state.resources.filter(r => r.transformations && r.transformations.length > 0);
-          if (resourcesWithTransforms.length > 0) {
-            console.log('[DefinitionsStore] Persisting resources with transformations:', resourcesWithTransforms.map(r => ({ id: r.id, name: r.name, transformCount: r.transformations?.length })));
-          }
           return data;
         },
         // Merge persisted state with initial state
         merge: (persistedState, currentState) => {
           const persisted = persistedState as Partial<DefinitionsState> | undefined;
-          // Debug: log what's being loaded
-          if (persisted?.resources) {
-            const resourcesWithTransforms = persisted.resources.filter((r: any) => r.transformations && r.transformations.length > 0);
-            console.log('[DefinitionsStore] Loading from storage - resources with transformations:', resourcesWithTransforms.map((r: any) => ({ id: r.id, name: r.name, transformCount: r.transformations?.length })));
-          }
           return {
             ...currentState,
             plants: persisted?.plants ?? currentState.plants,
@@ -395,7 +379,6 @@ if (typeof window !== 'undefined') {
       console.error('[Debug] Failed to parse localStorage:', e);
     }
   };
-  console.log('[DefinitionsStore] Debug helper available: window.debugResourceTransformations()');
 }
 
 // Subscribe to data changes and auto-sync to Firebase

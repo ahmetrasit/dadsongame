@@ -1,4 +1,5 @@
-import { useMapEditorStore, type ResourcePlacement } from '@/stores/mapEditorStore';
+import { useRuntimeMapStore } from '@/stores/runtimeMapStore';
+import type { ResourcePlacement } from '@/stores/mapEditorStore';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
 import { useYieldStateStore } from '@/stores/yieldStateStore';
 import { useWorldStore } from '@/stores/worldStore';
@@ -34,7 +35,7 @@ function getShedPosition(sourceX: number, sourceY: number): { x: number; y: numb
  * Initialize yields for all placements when entering a new season
  */
 export function initializeYieldsForSeason(season: Season): void {
-  const mapStore = useMapEditorStore.getState();
+  const mapStore = useRuntimeMapStore.getState();
   const defStore = useDefinitionsStore.getState();
   const yieldStore = useYieldStateStore.getState();
 
@@ -73,7 +74,7 @@ export function initializeYieldsForSeason(season: Season): void {
  * - Clear uncollected yields (if shedding=false)
  */
 export function processSeasonEnd(_endingSeason: Season): void {
-  const mapStore = useMapEditorStore.getState();
+  const mapStore = useRuntimeMapStore.getState();
   const defStore = useDefinitionsStore.getState();
   const yieldStore = useYieldStateStore.getState();
 
@@ -160,24 +161,12 @@ export function processSeasonEnd(_endingSeason: Season): void {
  * Create shed resources in the map
  */
 function createShedResources(resources: Omit<ResourcePlacement, 'id'>[]): void {
-  const mapStore = useMapEditorStore.getState();
+  const mapStore = useRuntimeMapStore.getState();
 
-  // We need to manually add resources with IDs
-  let counter = mapStore.idCounters.resource;
-
-  const newResources: ResourcePlacement[] = resources.map(r => ({
-    ...r,
-    id: `resource-${++counter}`,
-  }));
-
-  // Update store with new resources
-  useMapEditorStore.setState((state) => ({
-    idCounters: { ...state.idCounters, resource: counter },
-    mapData: {
-      ...state.mapData,
-      resources: [...(state.mapData.resources || []), ...newResources],
-    },
-  }));
+  // Use the runtime store's addResource method for each resource
+  for (const r of resources) {
+    mapStore.addResource(r.definitionId, r.x, r.y, r.sourceId);
+  }
 }
 
 /**
@@ -189,7 +178,7 @@ export function harvestYield(
   yieldIndex: number = 0,
   amount: number = 1
 ): { resourceId: string; amount: number } | null {
-  const mapStore = useMapEditorStore.getState();
+  const mapStore = useRuntimeMapStore.getState();
   const defStore = useDefinitionsStore.getState();
   const yieldStore = useYieldStateStore.getState();
 
@@ -224,8 +213,73 @@ export function harvestYield(
 }
 
 /**
+ * Check and regenerate yields based on interval
+ * Called on each day change to check if any yields should regenerate
+ */
+export function checkYieldRegeneration(): void {
+  const mapStore = useRuntimeMapStore.getState();
+  const defStore = useDefinitionsStore.getState();
+  const yieldStore = useYieldStateStore.getState();
+  const currentDay = useWorldStore.getState().day;
+
+  // Process plants
+  for (const plant of mapStore.mapData.plants) {
+    const def = defStore.plants.find(p => p.id === plant.definitionId);
+    if (!def || !def.aliveYields || def.aliveYields.length === 0) continue;
+
+    const yieldState = yieldStore.getPlacementYields(plant.id);
+    if (!yieldState) continue;
+
+    for (let i = 0; i < def.aliveYields.length; i++) {
+      const aliveYield = def.aliveYields[i];
+      const yieldInfo = yieldState.yields[i];
+
+      // Skip if not available this season or interval is 0 (no regeneration)
+      if (!yieldInfo?.isAvailable || aliveYield.interval <= 0) continue;
+
+      // Skip if never harvested (no lastHarvestDay set)
+      if (yieldInfo.lastHarvestDay === null) continue;
+
+      // Check if enough days have passed since last harvest
+      const daysSinceHarvest = currentDay - yieldInfo.lastHarvestDay;
+      if (daysSinceHarvest >= aliveYield.interval) {
+        yieldStore.regenerateYield(plant.id, i, currentDay);
+        console.log(`[YieldService] Plant ${plant.id} regenerated ${aliveYield.resourceId} (interval: ${aliveYield.interval} days)`);
+      }
+    }
+  }
+
+  // Process animals
+  for (const animal of mapStore.mapData.animals) {
+    const def = defStore.animals.find(a => a.id === animal.definitionId);
+    if (!def || !def.aliveYields || def.aliveYields.length === 0) continue;
+
+    const yieldState = yieldStore.getPlacementYields(animal.id);
+    if (!yieldState) continue;
+
+    for (let i = 0; i < def.aliveYields.length; i++) {
+      const aliveYield = def.aliveYields[i];
+      const yieldInfo = yieldState.yields[i];
+
+      // Skip if not available this season or interval is 0 (no regeneration)
+      if (!yieldInfo?.isAvailable || aliveYield.interval <= 0) continue;
+
+      // Skip if never harvested (no lastHarvestDay set)
+      if (yieldInfo.lastHarvestDay === null) continue;
+
+      // Check if enough days have passed since last harvest
+      const daysSinceHarvest = currentDay - yieldInfo.lastHarvestDay;
+      if (daysSinceHarvest >= aliveYield.interval) {
+        yieldStore.regenerateYield(animal.id, i, currentDay);
+        console.log(`[YieldService] Animal ${animal.id} regenerated ${aliveYield.resourceId} (interval: ${aliveYield.interval} days)`);
+      }
+    }
+  }
+}
+
+/**
  * Initialize the yield system
- * Subscribe to season changes
+ * Subscribe to season and day changes
  */
 export function initYieldSystem(): () => void {
   const worldStore = useWorldStore.getState();
@@ -233,8 +287,13 @@ export function initYieldSystem(): () => void {
   // Initialize yields for current season
   initializeYieldsForSeason(worldStore.season);
 
+  // Subscribe to day changes for interval-based regeneration
+  const unsubscribeDayChange = worldStore.onDayChange(() => {
+    checkYieldRegeneration();
+  });
+
   // Subscribe to season changes
-  const unsubscribe = worldStore.onSeasonChange((newSeason, oldSeason) => {
+  const unsubscribeSeasonChange = worldStore.onSeasonChange((newSeason, oldSeason) => {
     // Process end of previous season (shed/lose)
     processSeasonEnd(oldSeason);
 
@@ -242,5 +301,9 @@ export function initYieldSystem(): () => void {
     initializeYieldsForSeason(newSeason);
   });
 
-  return unsubscribe;
+  // Return combined unsubscribe function
+  return () => {
+    unsubscribeDayChange();
+    unsubscribeSeasonChange();
+  };
 }
