@@ -61,7 +61,7 @@ export interface VillagerQuest {
 }
 
 export interface VillagerTask {
-  type: 'gather' | 'craft' | 'tame' | 'carry' | 'build' | 'farm';
+  type: 'gather' | 'craft' | 'tame' | 'carry' | 'build' | 'farm' | 'tend' | 'guard';
   targetId?: string;
   targetPosition?: Vector2;
   progress: number;

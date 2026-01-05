@@ -156,6 +156,18 @@ export const useVillagerStore = create<VillagerStore>()(
           case 'build':
             stars = (villager.stats.strength + villager.stats.craftingSkill) / 20;
             break;
+          case 'tend':
+            // Tending animals: feed, collect from animals
+            stars = (villager.stats.strength + villager.stats.speed) / 20;
+            break;
+          case 'guard':
+            // Watching for events: requires awareness/intelligence
+            stars = (villager.stats.intelligence + villager.stats.speed) / 20;
+            break;
+          case 'tame':
+          case 'carry':
+            stars = 10; // No restriction for these tasks
+            break;
           default:
             stars = 10; // No restriction for unspecified tasks
         }
