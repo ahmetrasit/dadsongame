@@ -13,6 +13,7 @@ import { generatePlantPreview, generateAnimalPreview } from '@/utils/generatePre
 import { initYieldSystem } from '@/services/YieldService';
 import { initSpoilageSystem } from '@/services/SpoilageService';
 import { initVillagerSystem } from '@/services/VillagerService';
+import { initPlantGrowthSystem } from '@/services/PlantGrowthService';
 import { useYieldStateStore } from '@/stores/yieldStateStore';
 import { getBootstrapRecipe } from '@/types/bootstrap';
 import { usePlacementStore } from '@/stores/placementStore';
@@ -85,6 +86,7 @@ export class MainScene extends Phaser.Scene {
   private unsubscribeYieldSystem: (() => void) | null = null;
   private unsubscribeSpoilageSystem: (() => void) | null = null;
   private unsubscribeVillagerSystem: (() => void) | null = null;
+  private unsubscribePlantGrowthSystem: (() => void) | null = null;
 
   // Event handler references for cleanup
   private wheelHandler: ((pointer: Phaser.Input.Pointer, gameObjects: Phaser.GameObjects.GameObject[], deltaX: number, deltaY: number) => void) | null = null;
@@ -187,7 +189,8 @@ export class MainScene extends Phaser.Scene {
     this.unsubscribeYieldSystem = initYieldSystem();
     this.unsubscribeSpoilageSystem = initSpoilageSystem();
     this.unsubscribeVillagerSystem = initVillagerSystem();
-    console.log('[MainScene] Yield, spoilage, and villager systems initialized');
+    this.unsubscribePlantGrowthSystem = initPlantGrowthSystem();
+    console.log('[MainScene] Yield, spoilage, villager, and plant growth systems initialized');
 
     // Initial render (force full render)
     this.renderMapData(true);
@@ -226,6 +229,10 @@ export class MainScene extends Phaser.Scene {
     if (this.unsubscribeVillagerSystem) {
       this.unsubscribeVillagerSystem();
       this.unsubscribeVillagerSystem = null;
+    }
+    if (this.unsubscribePlantGrowthSystem) {
+      this.unsubscribePlantGrowthSystem();
+      this.unsubscribePlantGrowthSystem = null;
     }
     console.log('[MainScene] Event listeners and systems cleaned up');
   }

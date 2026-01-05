@@ -20,6 +20,9 @@ export interface PlantPlacement {
   definitionId: string; // Reference to plant definition
   x: number;
   y: number;
+  // Runtime properties (for gameplay)
+  stage?: 'seed' | 'sprout' | 'mature' | 'withered';
+  daysGrown?: number; // Days since planting or last stage advancement
 }
 
 export interface AnimalPlacement {
