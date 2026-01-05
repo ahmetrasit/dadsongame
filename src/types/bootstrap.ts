@@ -50,6 +50,16 @@ export const STACK_RECIPES: StackRecipe[] = [
     outputType: 'structure',
     outputId: 'struct-fire-pit',
     heatLevel: 150
+  },
+  {
+    id: 'struct-lean-to',
+    name: 'Lean-to Shelter',
+    inputs: [
+      { resourceId: 'res-branch', quantity: 8 },
+      { resourceId: 'res-plant-fiber', quantity: 5 }
+    ],
+    outputType: 'structure',
+    outputId: 'struct-lean-to'
   }
 ];
 
