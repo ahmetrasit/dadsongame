@@ -17,6 +17,8 @@ import { initPlantGrowthSystem } from '@/services/PlantGrowthService';
 import { useYieldStateStore } from '@/stores/yieldStateStore';
 import { getBootstrapRecipe } from '@/types/bootstrap';
 import { usePlacementStore } from '@/stores/placementStore';
+import { useBuildingStore } from '@/stores/buildingStore';
+import { BuildingGhostPreview } from '@/game/components/BuildingGhostPreview';
 
 /**
  * Helper to get the appropriate map data based on mode.
@@ -44,6 +46,7 @@ export class MainScene extends Phaser.Scene {
   private resourceSprites: Map<string, Phaser.GameObjects.Container> = new Map();
   private structureSprites: Map<string, Phaser.GameObjects.Container> = new Map();
   private villagerSprites: Map<string, Phaser.GameObjects.Container> = new Map();
+  private buildingSprites: Map<string, Phaser.GameObjects.Container> = new Map();
   private spawnMarker!: Phaser.GameObjects.Graphics;
 
   // State tracking for diff-based rendering
@@ -55,6 +58,7 @@ export class MainScene extends Phaser.Scene {
   private lastResourcesHash = '';
   private lastStructuresHash = '';
   private lastVillagersHash = '';
+  private lastBuildingsHash = '';
   private lastSpawnHash = '';
   private lastYieldStateHash = '';
   private lastIsEditing = false;
@@ -69,6 +73,7 @@ export class MainScene extends Phaser.Scene {
   private editorKeys!: {
     E: Phaser.Input.Keyboard.Key;
     D_KEY: Phaser.Input.Keyboard.Key;
+    R: Phaser.Input.Keyboard.Key;
     ONE: Phaser.Input.Keyboard.Key;
     TWO: Phaser.Input.Keyboard.Key;
     THREE: Phaser.Input.Keyboard.Key;
@@ -93,6 +98,9 @@ export class MainScene extends Phaser.Scene {
   private pointerDownHandler: ((pointer: Phaser.Input.Pointer) => void) | null = null;
   private focusInHandler: ((e: FocusEvent) => void) | null = null;
   private focusOutHandler: ((e: FocusEvent) => void) | null = null;
+
+  // Building system
+  private buildingGhostPreview: BuildingGhostPreview | null = null;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -138,6 +146,7 @@ export class MainScene extends Phaser.Scene {
     this.editorKeys = {
       E: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E, false),
       D_KEY: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D, false),
+      R: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.R, false),
       ONE: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ONE, false),
       TWO: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.TWO, false),
       THREE: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.THREE, false),
@@ -192,6 +201,10 @@ export class MainScene extends Phaser.Scene {
     this.unsubscribePlantGrowthSystem = initPlantGrowthSystem();
     console.log('[MainScene] Yield, spoilage, villager, and plant growth systems initialized');
 
+    // Initialize building ghost preview
+    this.buildingGhostPreview = new BuildingGhostPreview(this);
+    console.log('[MainScene] Building ghost preview initialized');
+
     // Initial render (force full render)
     this.renderMapData(true);
   }
@@ -234,6 +247,13 @@ export class MainScene extends Phaser.Scene {
       this.unsubscribePlantGrowthSystem();
       this.unsubscribePlantGrowthSystem = null;
     }
+
+    // Cleanup building ghost preview
+    if (this.buildingGhostPreview) {
+      this.buildingGhostPreview.destroy();
+      this.buildingGhostPreview = null;
+    }
+
     console.log('[MainScene] Event listeners and systems cleaned up');
   }
 
@@ -386,11 +406,26 @@ export class MainScene extends Phaser.Scene {
       defStore.toggleEditor();
     }
 
+    // R key for rotating building ghost preview
+    if (Phaser.Input.Keyboard.JustDown(this.editorKeys.R)) {
+      const buildingStore = useBuildingStore.getState();
+      if (buildingStore.isPlacementMode) {
+        buildingStore.rotateGhost();
+      }
+    }
+
     // ESC for placement mode or return to main menu
     if (Phaser.Input.Keyboard.JustDown(this.editorKeys.ESC)) {
+      // Check building placement mode first
+      const buildingStore = useBuildingStore.getState();
+      if (buildingStore.isPlacementMode) {
+        buildingStore.cancelPlacement();
+        return;
+      }
+
       const placementStore = usePlacementStore.getState();
       if (placementStore.isPlacing) {
-        // Cancel placement mode
+        // Cancel structure placement mode
         placementStore.cancelPlacement();
         return;
       }
@@ -402,7 +437,17 @@ export class MainScene extends Phaser.Scene {
   }
 
   private handleEditorClick(pointer: Phaser.Input.Pointer): void {
-    // Handle placement mode first
+    // Handle building placement mode first
+    const buildingStore = useBuildingStore.getState();
+    if (buildingStore.isPlacementMode) {
+      if (pointer.leftButtonDown() && buildingStore.ghostPreview?.isValid) {
+        // Confirm building placement
+        buildingStore.confirmPlacement();
+      }
+      return; // Don't process other clicks during building placement
+    }
+
+    // Handle structure placement mode
     const placementStore = usePlacementStore.getState();
     if (placementStore.isPlacing) {
       // Get world coordinates
@@ -532,6 +577,14 @@ export class MainScene extends Phaser.Scene {
     if (forceRender || villagersHash !== this.lastVillagersHash || editingChanged) {
       this.lastVillagersHash = villagersHash;
       this.updateVillagers(mapData.villagers || [], isEditing);
+    }
+
+    // Buildings - only update if changed or editing mode changed
+    const buildingStore = useBuildingStore.getState();
+    const buildingsHash = this.hashData(buildingStore.placedBuildings);
+    if (forceRender || buildingsHash !== this.lastBuildingsHash || editingChanged) {
+      this.lastBuildingsHash = buildingsHash;
+      this.updateBuildings(isEditing);
     }
 
     // Spawn marker - only update if changed or editing mode changed
@@ -1357,6 +1410,313 @@ export class MainScene extends Phaser.Scene {
       }
       this.addLoyaltyIndicator(container, villagerData.loyalty);
     }
+  }
+
+  // ==========================================
+  // Building Rendering
+  // ==========================================
+
+  private updateBuildings(isEditing: boolean): void {
+    const buildingStore = useBuildingStore.getState();
+    const buildings = Object.values(buildingStore.placedBuildings);
+    const currentIds = new Set(buildings.map(b => b.id));
+
+    // Remove sprites that no longer exist
+    for (const [id, container] of this.buildingSprites) {
+      if (!currentIds.has(id)) {
+        container.destroy();
+        this.buildingSprites.delete(id);
+      }
+    }
+
+    // Add or update sprites
+    for (const building of buildings) {
+      const existing = this.buildingSprites.get(building.id);
+
+      if (existing) {
+        // Update position if changed
+        if (existing.x !== building.position.x || existing.y !== building.position.y) {
+          existing.setPosition(building.position.x, building.position.y);
+        }
+        // Update appearance based on construction phase
+        this.updateBuildingAppearance(existing, building, isEditing);
+      } else {
+        // Create new sprite
+        const container = this.createBuildingSprite(building, isEditing);
+        this.buildingSprites.set(building.id, container);
+      }
+    }
+  }
+
+  private createBuildingSprite(
+    building: ReturnType<typeof useBuildingStore.getState>['placedBuildings'][string],
+    isEditing: boolean
+  ): Phaser.GameObjects.Container {
+    const container = this.add.container(building.position.x, building.position.y);
+
+    // Building size (3x3 tiles = 96x96 pixels)
+    const size = 96;
+    const halfSize = size / 2;
+
+    // Get phase-based colors
+    const { fillColor, strokeColor, alpha } = this.getBuildingPhaseColors(building.constructionPhase);
+
+    // Draw building base (rectangle)
+    const baseGraphics = this.add.graphics();
+    baseGraphics.fillStyle(fillColor, alpha);
+    baseGraphics.fillRect(-halfSize, -halfSize, size, size);
+    baseGraphics.lineStyle(3, strokeColor, 1);
+    baseGraphics.strokeRect(-halfSize, -halfSize, size, size);
+    baseGraphics.setName('base');
+    container.add(baseGraphics);
+
+    // Draw construction progress bar if not complete
+    if (building.constructionPhase !== 'complete') {
+      this.addConstructionProgressBar(container, building);
+    }
+
+    // Add building emoji/icon
+    const emoji = this.getBuildingEmoji(building.blueprintId);
+    const emojiText = this.add.text(0, -10, emoji, {
+      fontSize: '36px',
+    });
+    emojiText.setOrigin(0.5, 0.5);
+    emojiText.setName('emoji');
+    container.add(emojiText);
+
+    // Add building name label
+    const label = this.add.text(0, 36, building.name, {
+      fontFamily: 'Avenir, system-ui, sans-serif',
+      fontSize: '11px',
+      color: '#ffffff',
+      backgroundColor: isEditing ? '#000000aa' : '#00000088',
+      padding: { x: 4, y: 2 },
+    });
+    label.setOrigin(0.5, 0);
+    label.setName('label');
+    container.add(label);
+
+    // Add phase badge
+    this.addBuildingPhaseBadge(container, building.constructionPhase);
+
+    // Make it interactive for clicking
+    container.setSize(size, size);
+    container.setInteractive({ useHandCursor: true });
+    container.on('pointerdown', () => {
+      this.onBuildingClicked(building.id);
+    });
+
+    container.setDepth(8); // Above structures (7), below villagers (9)
+    return container;
+  }
+
+  private getBuildingPhaseColors(phase: string): { fillColor: number; strokeColor: number; alpha: number } {
+    switch (phase) {
+      case 'blueprint':
+        return { fillColor: 0x60a5fa, strokeColor: 0x3b82f6, alpha: 0.3 }; // Blue, transparent
+      case 'gathering':
+        return { fillColor: 0xfbbf24, strokeColor: 0xf59e0b, alpha: 0.5 }; // Yellow/amber
+      case 'building':
+        return { fillColor: 0xf97316, strokeColor: 0xea580c, alpha: 0.7 }; // Orange
+      case 'complete':
+        return { fillColor: 0x8b5a2b, strokeColor: 0x5d4037, alpha: 1.0 }; // Brown (wood-like)
+      default:
+        return { fillColor: 0x808080, strokeColor: 0x606060, alpha: 0.5 };
+    }
+  }
+
+  private getBuildingEmoji(blueprintId: string): string {
+    // Map blueprint IDs to emojis
+    const emojiMap: Record<string, string> = {
+      'small-hut': '🏠',
+      'house': '🏡',
+      'large-house': '🏘️',
+      'storage-shed': '📦',
+      'granary': '🌾',
+      'cold-storage': '❄️',
+      'workshop': '🔨',
+      'forge': '⚒️',
+      'kitchen': '🍳',
+      'farm-plot': '🌱',
+      'stable': '🐴',
+      'well': '🪣',
+    };
+    return emojiMap[blueprintId] || '🏗️';
+  }
+
+  private addConstructionProgressBar(
+    container: Phaser.GameObjects.Container,
+    building: ReturnType<typeof useBuildingStore.getState>['placedBuildings'][string]
+  ): void {
+    const barWidth = 80;
+    const barHeight = 8;
+    const barY = 52;
+
+    // Calculate progress
+    let progress = 0;
+    if (building.constructionPhase === 'gathering') {
+      const materialKeys = Object.keys(building.requiredMaterials) as (keyof typeof building.requiredMaterials)[];
+      const totalRequired = materialKeys.reduce((sum, key) => sum + (building.requiredMaterials[key] ?? 0), 0);
+      const totalAssigned = materialKeys.reduce((sum, key) => sum + (building.assignedMaterials[key] ?? 0), 0);
+      progress = totalRequired > 0 ? totalAssigned / totalRequired : 0;
+    } else if (building.constructionPhase === 'building') {
+      progress = building.constructionProgress;
+    }
+
+    // Background
+    const bgGraphics = this.add.graphics();
+    bgGraphics.fillStyle(0x333333, 0.8);
+    bgGraphics.fillRect(-barWidth / 2, barY, barWidth, barHeight);
+    bgGraphics.setName('progressBg');
+    container.add(bgGraphics);
+
+    // Progress fill
+    const fillWidth = barWidth * progress;
+    const fillColor = building.constructionPhase === 'gathering' ? 0xfbbf24 : 0xf97316;
+    const fillGraphics = this.add.graphics();
+    fillGraphics.fillStyle(fillColor, 1);
+    fillGraphics.fillRect(-barWidth / 2, barY, fillWidth, barHeight);
+    fillGraphics.setName('progressFill');
+    container.add(fillGraphics);
+
+    // Border
+    const borderGraphics = this.add.graphics();
+    borderGraphics.lineStyle(1, 0xffffff, 0.5);
+    borderGraphics.strokeRect(-barWidth / 2, barY, barWidth, barHeight);
+    borderGraphics.setName('progressBorder');
+    container.add(borderGraphics);
+  }
+
+  private addBuildingPhaseBadge(container: Phaser.GameObjects.Container, phase: string): void {
+    if (phase === 'complete') return; // No badge for complete buildings
+
+    const badgeColors: Record<string, { bg: number; text: string }> = {
+      blueprint: { bg: 0x3b82f6, text: '📐' },
+      gathering: { bg: 0xf59e0b, text: '📦' },
+      building: { bg: 0xea580c, text: '🔨' },
+    };
+
+    const badge = badgeColors[phase] || { bg: 0x808080, text: '?' };
+
+    // Badge background circle
+    const badgeGraphics = this.add.graphics();
+    badgeGraphics.fillStyle(badge.bg, 1);
+    badgeGraphics.fillCircle(40, -40, 14);
+    badgeGraphics.lineStyle(2, 0xffffff, 1);
+    badgeGraphics.strokeCircle(40, -40, 14);
+    badgeGraphics.setName('phaseBadgeBg');
+    container.add(badgeGraphics);
+
+    // Badge icon
+    const badgeText = this.add.text(40, -40, badge.text, {
+      fontSize: '14px',
+    });
+    badgeText.setOrigin(0.5, 0.5);
+    badgeText.setName('phaseBadgeText');
+    container.add(badgeText);
+  }
+
+  private updateBuildingAppearance(
+    container: Phaser.GameObjects.Container,
+    building: ReturnType<typeof useBuildingStore.getState>['placedBuildings'][string],
+    isEditing: boolean
+  ): void {
+    // Update base graphics with current phase colors
+    const existingBase = container.getByName('base') as Phaser.GameObjects.Graphics | null;
+    if (existingBase) {
+      const { fillColor, strokeColor, alpha } = this.getBuildingPhaseColors(building.constructionPhase);
+      const size = 96;
+      const halfSize = size / 2;
+      existingBase.clear();
+      existingBase.fillStyle(fillColor, alpha);
+      existingBase.fillRect(-halfSize, -halfSize, size, size);
+      existingBase.lineStyle(3, strokeColor, 1);
+      existingBase.strokeRect(-halfSize, -halfSize, size, size);
+    }
+
+    // Update or remove progress bar
+    const existingProgressBg = container.getByName('progressBg') as Phaser.GameObjects.Graphics | null;
+    const existingProgressFill = container.getByName('progressFill') as Phaser.GameObjects.Graphics | null;
+    const existingProgressBorder = container.getByName('progressBorder') as Phaser.GameObjects.Graphics | null;
+
+    if (building.constructionPhase === 'complete') {
+      // Remove progress bar if complete
+      if (existingProgressBg) existingProgressBg.destroy();
+      if (existingProgressFill) existingProgressFill.destroy();
+      if (existingProgressBorder) existingProgressBorder.destroy();
+    } else if (existingProgressFill) {
+      // Update progress bar
+      let progress = 0;
+      if (building.constructionPhase === 'gathering') {
+        const materialKeys = Object.keys(building.requiredMaterials) as (keyof typeof building.requiredMaterials)[];
+        const totalRequired = materialKeys.reduce((sum, key) => sum + (building.requiredMaterials[key] ?? 0), 0);
+        const totalAssigned = materialKeys.reduce((sum, key) => sum + (building.assignedMaterials[key] ?? 0), 0);
+        progress = totalRequired > 0 ? totalAssigned / totalRequired : 0;
+      } else if (building.constructionPhase === 'building') {
+        progress = building.constructionProgress;
+      }
+
+      const barWidth = 80;
+      const barHeight = 8;
+      const barY = 52;
+      const fillWidth = barWidth * progress;
+      const fillColor = building.constructionPhase === 'gathering' ? 0xfbbf24 : 0xf97316;
+
+      existingProgressFill.clear();
+      existingProgressFill.fillStyle(fillColor, 1);
+      existingProgressFill.fillRect(-barWidth / 2, barY, fillWidth, barHeight);
+    }
+
+    // Update phase badge
+    const existingBadgeBg = container.getByName('phaseBadgeBg') as Phaser.GameObjects.Graphics | null;
+    const existingBadgeText = container.getByName('phaseBadgeText') as Phaser.GameObjects.Text | null;
+
+    if (building.constructionPhase === 'complete') {
+      // Remove badge if complete
+      if (existingBadgeBg) existingBadgeBg.destroy();
+      if (existingBadgeText) existingBadgeText.destroy();
+    } else {
+      // Update badge
+      const badgeColors: Record<string, { bg: number; text: string }> = {
+        blueprint: { bg: 0x3b82f6, text: '📐' },
+        gathering: { bg: 0xf59e0b, text: '📦' },
+        building: { bg: 0xea580c, text: '🔨' },
+      };
+      const badge = badgeColors[building.constructionPhase] || { bg: 0x808080, text: '?' };
+
+      if (existingBadgeBg) {
+        existingBadgeBg.clear();
+        existingBadgeBg.fillStyle(badge.bg, 1);
+        existingBadgeBg.fillCircle(40, -40, 14);
+        existingBadgeBg.lineStyle(2, 0xffffff, 1);
+        existingBadgeBg.strokeCircle(40, -40, 14);
+      }
+      if (existingBadgeText) {
+        existingBadgeText.setText(badge.text);
+      }
+    }
+
+    // Update label background
+    const existingLabel = container.getByName('label') as Phaser.GameObjects.Text | null;
+    if (existingLabel) {
+      existingLabel.setBackgroundColor(isEditing ? '#000000aa' : '#00000088');
+    }
+  }
+
+  private onBuildingClicked(buildingId: string): void {
+    // Don't handle building clicks during placement mode
+    const buildingStore = useBuildingStore.getState();
+    if (buildingStore.isPlacementMode) {
+      return;
+    }
+
+    // Emit an event that React can listen to
+    // We'll use a custom event on the window object
+    const event = new CustomEvent('building-selected', {
+      detail: { buildingId }
+    });
+    window.dispatchEvent(event);
+    console.log(`[MainScene] Building clicked: ${buildingId}`);
   }
 
   private renderSpawnMarker(spawn: { x: number; y: number }, isEditing: boolean): void {

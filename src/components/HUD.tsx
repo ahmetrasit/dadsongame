@@ -5,6 +5,8 @@ import { Hotbar } from './Hotbar';
 import { PlacementPreview } from './PlacementPreview';
 import { Inventory } from './Inventory';
 import { ToolCrafting } from './ToolCrafting';
+import { BuildingMenu } from './BuildingMenu';
+import { ConstructionPanelTrigger } from './ConstructionPanel';
 
 export function HUD() {
   const player = usePlayerStore((s) => s.player);
@@ -51,10 +53,18 @@ export function HUD() {
       {/* Tool crafting panel */}
       <ToolCrafting />
 
+      {/* Building menu */}
+      <BuildingMenu />
+
+      {/* Construction panel (toggle with C key) */}
+      <ConstructionPanelTrigger />
+
       {/* Controls hint */}
       <div className="hud-controls">
         <span>WASD: Move</span>
         <span>I: Inventory</span>
+        <span>B: Build</span>
+        <span>C: Construction</span>
         <span>1-0: Hotbar</span>
       </div>
     </div>

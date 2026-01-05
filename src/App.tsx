@@ -8,6 +8,7 @@ import { MainMenu } from '@/components/MainMenu';
 import { VersionBadge } from '@/components/VersionBadge';
 import { InteractionPrompt } from '@/components/InteractionPrompt';
 import { HUD } from '@/components/HUD';
+import { BuildingMenu } from '@/components/BuildingMenu';
 import { useGameStateStore } from '@/stores/gameStateStore';
 import { useMapEditorStore } from '@/stores/mapEditorStore';
 import { useDefinitionsStore } from '@/stores/definitionsStore';
@@ -118,6 +119,9 @@ function App() {
 
       {/* Show interaction prompt in game mode */}
       {currentScreen === 'game' && <InteractionPrompt />}
+
+      {/* Show building menu in game mode (toggle with B key) */}
+      {currentScreen === 'game' && <BuildingMenu />}
 
       {/* Show definition editor in materialEditor and creatureEditor modes */}
       {currentScreen === 'materialEditor' && (
