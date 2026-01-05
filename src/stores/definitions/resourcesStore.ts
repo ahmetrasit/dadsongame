@@ -116,13 +116,46 @@ export const initialResources: ResourceDefinition[] = [
   { id: 'res-apple', name: 'Apple', category: 'food', spoilageRate: 'medium', weight: 0.2, emoji: '🍎', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false,
     nutrition: { kcalPerKg: 520, vitamins: ['C'], protein: 2, carbs: 96, goodFat: 1, badFat: 1 } },
   { id: 'res-wheat', name: 'Wheat', category: 'food', spoilageRate: 'slow', weight: 0.5, emoji: '🌾', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false,
-    nutrition: { kcalPerKg: 3390, vitamins: ['B', 'E'], protein: 15, carbs: 80, goodFat: 4, badFat: 1 } },
+    nutrition: { kcalPerKg: 3390, vitamins: ['B', 'E'], protein: 15, carbs: 80, goodFat: 4, badFat: 1 },
+    transformations: [
+      {
+        action: 'cook',
+        resultMaterialId: 'res-bread',
+        resultQuantity: 1,
+        requirements: [{ property: 'heat', min: 100 }]
+      }
+    ]
+  },
+  { id: 'res-bread', name: 'Bread', category: 'food', spoilageRate: 'slow', weight: 0.5, emoji: '🍞', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false,
+    nutrition: { kcalPerKg: 2650, vitamins: ['B'], protein: 12, carbs: 83, goodFat: 4, badFat: 1 } },
   { id: 'res-milk', name: 'Milk', category: 'food', spoilageRate: 'fast', weight: 1, emoji: '🥛', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false,
     nutrition: { kcalPerKg: 610, vitamins: ['A', 'B', 'D'], protein: 21, carbs: 30, goodFat: 27, badFat: 22 } },
-  { id: 'res-meat', name: 'Meat', category: 'food', spoilageRate: 'fast', weight: 2, emoji: '🥩', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false,
-    nutrition: { kcalPerKg: 2500, vitamins: ['B'], protein: 43, carbs: 0, goodFat: 30, badFat: 27 } },
-  { id: 'res-egg', name: 'Egg', category: 'food', spoilageRate: 'medium', weight: 0.1, emoji: '🥚', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false,
-    nutrition: { kcalPerKg: 1430, vitamins: ['A', 'B', 'D', 'E'], protein: 35, carbs: 3, goodFat: 38, badFat: 24 } },
+  { id: 'res-meat', name: 'Raw Meat', category: 'food', spoilageRate: 'fast', weight: 2, emoji: '🥩', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false,
+    nutrition: { kcalPerKg: 2500, vitamins: ['B'], protein: 43, carbs: 0, goodFat: 30, badFat: 27 },
+    transformations: [
+      {
+        action: 'cook',
+        resultMaterialId: 'res-cooked-meat',
+        resultQuantity: 1,
+        requirements: [{ property: 'heat', min: 100 }]
+      }
+    ]
+  },
+  { id: 'res-cooked-meat', name: 'Cooked Meat', category: 'food', spoilageRate: 'medium', weight: 2, emoji: '🍖', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false,
+    nutrition: { kcalPerKg: 2700, vitamins: ['B'], protein: 45, carbs: 0, goodFat: 32, badFat: 23 } },
+  { id: 'res-egg', name: 'Raw Egg', category: 'food', spoilageRate: 'medium', weight: 0.1, emoji: '🥚', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false,
+    nutrition: { kcalPerKg: 1430, vitamins: ['A', 'B', 'D', 'E'], protein: 35, carbs: 3, goodFat: 38, badFat: 24 },
+    transformations: [
+      {
+        action: 'cook',
+        resultMaterialId: 'res-cooked-egg',
+        resultQuantity: 1,
+        requirements: [{ property: 'heat', min: 100 }]
+      }
+    ]
+  },
+  { id: 'res-cooked-egg', name: 'Cooked Egg', category: 'food', spoilageRate: 'slow', weight: 0.1, emoji: '🍳', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false,
+    nutrition: { kcalPerKg: 1550, vitamins: ['A', 'B', 'D', 'E'], protein: 37, carbs: 3, goodFat: 38, badFat: 22 } },
   // Fiber
   { id: 'res-plant-fiber', name: 'Plant Fiber', category: 'fiber', spoilageRate: 'never', weight: 0.1, emoji: '🌿', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false },
   { id: 'res-cordage', name: 'Cordage', category: 'fiber', spoilageRate: 'never', weight: 0.05, emoji: '🪢', interactionTypes: ['collect'], interactionRadius: 24, isBlocking: false },
