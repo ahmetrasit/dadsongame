@@ -96,7 +96,10 @@ export function ConstructionPanel({ buildingId, onClose }: ConstructionPanelProp
     // Add to building
     const added = addMaterial(building.id, materialId, 1);
     if (!added) {
-      console.log(`[Construction] Failed to add ${materialId} to building`);
+      console.log(`[Construction] Failed to add ${materialId} to building, rolling back inventory`);
+      // M-1: Rollback - return item to inventory if addMaterial fails
+      const { addItem } = useInventoryStore.getState();
+      addItem(materialId, 1);
     }
   }, [building, getInventoryCount, inventory.slots, removeItems, addMaterial]);
 
@@ -132,6 +135,8 @@ export function ConstructionPanel({ buildingId, onClose }: ConstructionPanelProp
 
     // TODO: Return materials to inventory before removing
     // For now, just remove the building
+    // L-1: TODO - Replace native confirm() with a custom modal component for better UX and security.
+    // Native confirm() can be spoofed and doesn't match the game's visual style.
     if (confirm('Are you sure you want to cancel this construction? Materials will be lost.')) {
       removeBuilding(building.id);
       onClose();

@@ -1424,6 +1424,11 @@ export class MainScene extends Phaser.Scene {
     // Remove sprites that no longer exist
     for (const [id, container] of this.buildingSprites) {
       if (!currentIds.has(id)) {
+        // M-3: Remove click handler before destroying to prevent memory leak
+        const clickHandler = container.getData('clickHandler');
+        if (clickHandler) {
+          container.off('pointerdown', clickHandler);
+        }
         container.destroy();
         this.buildingSprites.delete(id);
       }
@@ -1502,9 +1507,13 @@ export class MainScene extends Phaser.Scene {
     // Make it interactive for clicking
     container.setSize(size, size);
     container.setInteractive({ useHandCursor: true });
-    container.on('pointerdown', () => {
+
+    // M-3: Store click handler reference for cleanup
+    const clickHandler = () => {
       this.onBuildingClicked(building.id);
-    });
+    };
+    container.on('pointerdown', clickHandler);
+    container.setData('clickHandler', clickHandler);
 
     container.setDepth(8); // Above structures (7), below villagers (9)
     return container;

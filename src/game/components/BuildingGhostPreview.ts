@@ -103,6 +103,9 @@ export class BuildingGhostPreview {
       const snappedX = Math.round(worldPoint.x / TILE_SIZE) * TILE_SIZE;
       const snappedY = Math.round(worldPoint.y / TILE_SIZE) * TILE_SIZE;
 
+      // L-3: Validate coordinates are finite numbers
+      if (!isFinite(snappedX) || !isFinite(snappedY)) return;
+
       // Update store with new position
       state.updateGhostPosition(snappedX, snappedY);
     };
@@ -225,6 +228,9 @@ export class BuildingGhostPreview {
       const segmentLength = drawing
         ? Math.min(dashLength, length - currentLength)
         : Math.min(gapLength, length - currentLength);
+
+      // L-2: Safety check to prevent infinite loop
+      if (segmentLength <= 0) break;
 
       if (drawing) {
         const startX = x1 + unitX * currentLength;

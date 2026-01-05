@@ -100,11 +100,13 @@ const DEFAULT_MATERIAL_REQUIREMENTS: BuildingMaterialRequirements = {
 // Helpers
 // ==========================================
 
-let buildingIdCounter = 0;
-
 const generateBuildingId = (): string => {
-  buildingIdCounter++;
-  return `building-${Date.now()}-${buildingIdCounter}`;
+  // L-4: Use crypto.randomUUID() for robust unique ID generation
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return `building-${crypto.randomUUID()}`;
+  }
+  // Fallback for environments without crypto.randomUUID
+  return `building-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 };
 
 const createEmptyMaterials = (): BuildingMaterialRequirements => ({
@@ -270,6 +272,12 @@ export const useBuildingStore = create<BuildingState>()(
       // ==========================================
 
       addMaterial: (buildingId, materialId, quantity) => {
+        // M-2: Validate quantity is positive finite number
+        if (typeof quantity !== 'number' || !Number.isFinite(quantity) || quantity <= 0) {
+          console.warn(`[Building] Invalid quantity: ${quantity}`);
+          return false;
+        }
+
         const state = get();
         const building = state.placedBuildings[buildingId];
 
@@ -425,12 +433,34 @@ export const useBuildingStore = create<BuildingState>()(
 
         if (!building) return;
 
+        // H-1 & M-2: Validate and sanitize building name
+        // Trim whitespace
+        let sanitizedName = (name || '').trim();
+
+        // Validate non-empty string
+        if (!sanitizedName) {
+          console.warn('[Building] Building name cannot be empty');
+          return;
+        }
+
+        // Only allow alphanumeric, spaces, and hyphens (XSS prevention)
+        sanitizedName = sanitizedName.replace(/[^a-zA-Z0-9\s\-]/g, '');
+
+        // Limit to 50 characters
+        sanitizedName = sanitizedName.substring(0, 50);
+
+        // Final check after sanitization
+        if (!sanitizedName) {
+          console.warn('[Building] Building name contains no valid characters');
+          return;
+        }
+
         set((s) => ({
           placedBuildings: {
             ...s.placedBuildings,
             [buildingId]: {
               ...building,
-              name,
+              name: sanitizedName,
             },
           },
         }));
@@ -442,12 +472,22 @@ export const useBuildingStore = create<BuildingState>()(
 
         if (!building || building.constructionPhase !== 'complete') return;
 
+        // M-2: Validate star values are non-negative
+        const validatedStars = { ...stars };
+        for (const key of Object.keys(validatedStars) as (keyof BuildingStarAllocation)[]) {
+          const value = validatedStars[key];
+          if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+            console.warn(`[Building] Invalid star value for ${key}: ${value}`);
+            validatedStars[key] = 0;
+          }
+        }
+
         set((s) => ({
           placedBuildings: {
             ...s.placedBuildings,
             [buildingId]: {
               ...building,
-              stars,
+              stars: validatedStars,
             },
           },
         }));
